@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --experimental-strip-types --test $(find src/domain src/lib -name '*.test.ts')",
-    "football:check": "node --conditions=react-server --experimental-strip-types src/lib/football-providers/api-football/check-connectivity.ts"
+    "football:check": "node --env-file=.env.local --conditions=react-server --experimental-strip-types src/lib/football-providers/api-football/check-connectivity.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
