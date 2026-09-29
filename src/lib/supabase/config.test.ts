@@ -21,14 +21,14 @@ function withEnv(vars: Record<string, string | undefined>, run: () => void) {
 
 test("isSupabaseConfigured is false when both env vars are missing", () => {
   withEnv(
-    { NEXT_PUBLIC_SUPABASE_URL: undefined, NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined },
+    { NEXT_PUBLIC_SUPABASE_URL: undefined, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: undefined },
     () => assert.equal(isSupabaseConfigured(), false)
   );
 });
 
 test("isSupabaseConfigured is false when only one env var is present", () => {
   withEnv(
-    { NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co", NEXT_PUBLIC_SUPABASE_ANON_KEY: undefined },
+    { NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co", NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: undefined },
     () => assert.equal(isSupabaseConfigured(), false)
   );
 });
@@ -37,7 +37,7 @@ test("isSupabaseConfigured is true when both env vars are present", () => {
   withEnv(
     {
       NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co",
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "anon-key",
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "publishable-key",
     },
     () => assert.equal(isSupabaseConfigured(), true)
   );

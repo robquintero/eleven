@@ -63,9 +63,13 @@ export async function getUserLeagues(): Promise<LeagueSummary[]> {
     id: league.id,
     name: league.name,
     inviteCode: league.invite_code,
-    status: league.status,
+    // The DB CHECK constraint on this column guarantees the value is one
+    // of these four — the generated column type is a plain `string`
+    // because Postgres CHECK constraints (unlike native enums) don't
+    // carry literal-union information into introspection.
+    status: league.status as LeagueSummary["status"],
     memberCount: countByLeagueId.get(league.id) ?? 0,
-    role: roleByLeagueId.get(league.id) ?? "manager",
+    role: (roleByLeagueId.get(league.id) ?? "manager") as LeagueSummary["role"],
   }));
 }
 

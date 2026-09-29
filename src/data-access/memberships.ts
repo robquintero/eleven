@@ -26,7 +26,9 @@ export async function getUserMemberships(): Promise<Membership[]> {
 
   return data.map((row) => ({
     leagueId: row.league_id,
-    role: row.role,
+    // DB CHECK constraint guarantees "manager" | "commissioner" — see the
+    // matching comment in data-access/leagues.ts.
+    role: row.role as Membership["role"],
     joinedAt: row.joined_at,
   }));
 }

@@ -46,7 +46,7 @@ Fill in the three values from your project's **Settings → API** page:
 | Variable | Where to find it |
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `anon` / `public` key |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | `publishable` key |
 | `SUPABASE_SERVICE_ROLE_KEY` | `service_role` key — not used by any code yet, reserved for a future trusted-ingestion pass. **Never** expose this to the browser or prefix it with `NEXT_PUBLIC_`. |
 
 `.env.local` is gitignored — never commit real credentials.
