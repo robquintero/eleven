@@ -1,0 +1,51 @@
+{
+  "get": "players",
+  "parameters": { "team": "50", "season": "2026" },
+  "errors": [],
+  "results": 3,
+  "paging": { "current": 1, "total": 1 },
+  "response": [
+    {
+      "player": {
+        "id": 1100,
+        "name": "Erling Haaland",
+        "lastname": "Haaland",
+        "nationality": "Norway"
+      },
+      "statistics": [
+        {
+          "team": { "id": 50 },
+          "games": { "position": "Attacker", "number": 9 }
+        }
+      ]
+    },
+    {
+      "player": {
+        "id": 1101,
+        "name": "Ederson",
+        "lastname": null,
+        "nationality": "Brazil"
+      },
+      "statistics": [
+        {
+          "team": { "id": 50 },
+          "games": { "position": "Goalkeeper", "number": 31 }
+        }
+      ]
+    },
+    {
+      "player": {
+        "id": 1102,
+        "name": "Unknown Role Player",
+        "lastname": "Player",
+        "nationality": "Unknown"
+      },
+      "statistics": [
+        {
+          "team": { "id": 50 },
+          "games": { "position": null, "number": null }
+        }
+      ]
+    }
+  ]
+}

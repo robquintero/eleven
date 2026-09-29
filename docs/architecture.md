@@ -49,6 +49,103 @@ anything is written to a canonical table, so switching providers is a
 matter of writing a new normalization step, not rebuilding the schema or
 the application.
 
+**Status as of Pass 7A**: the first two stages of this pipeline are real
+— see "Football data provider" below. INGESTION (writing normalized data
+into Postgres, resolving through `provider_mappings`) does not exist yet;
+that's Pass 7B.
+
+## Football data provider (Pass 7A)
+
+Eleven's chosen football data provider is [API-Football
+v3](https://www.api-football.com/documentation-v3). The provider boundary
+lives entirely under `src/lib/football-providers/`:
+
+```
+API-Football (v3.football.api-sports.io)
+    ↓
+src/lib/football-providers/api-football/client.ts     (HTTP, auth, timeout, quota parsing, error classification)
+    ↓
+src/lib/football-providers/api-football/adapter.ts     (raw provider JSON → normalized contracts, pure functions)
+    ↓
+src/lib/football-providers/types.ts                    (Normalized{Competition,Club,Player,Fixture,FixturePlayerStats} — provider-independent)
+    ↓
+[Pass 7B] ingestion service                             (resolves externalId → Eleven uuid via provider_mappings, upserts src/domain/football-shaped rows)
+    ↓
+Supabase (public.competitions/clubs/players/fixtures/player_match_stats)
+    ↓
+Eleven application                                       (reads only Eleven's own canonical tables — never the provider, never this module)
+```
+
+**Module boundary — non-negotiable:**
+
+- `API_FOOTBALL_KEY` is **server-only**. It has no `NEXT_PUBLIC_` prefix,
+  is read exactly once (lazily, in `api-football/config.ts`, only when a
+  request is about to be made), and `client.ts` carries `import
+  "server-only"` so accidentally importing it from a Client Component is
+  a build error, not a runtime leak.
+- Nothing outside `src/lib/football-providers/api-football/` is allowed
+  to import `api-football/types.ts` (the raw provider response shapes).
+  Everything else — future ingestion code, and eventually the
+  application — only ever sees `src/lib/football-providers/types.ts`'s
+  `Normalized*` contracts, or (once Pass 7B exists) `src/domain/football`'s
+  canonical types. Provider JSON shapes stop at the adapter.
+- `Normalized*` contracts are **not** `src/domain/football` types: they
+  carry the provider's `externalId` untouched (never Eleven's own uuid
+  `id`), because they exist to be fed into `provider_mappings`
+  resolution, not to be mistaken for already-canonical data. See the
+  header comment in `src/lib/football-providers/types.ts`.
+- The provider is replaceable: a second provider would add a sibling
+  `src/lib/football-providers/<other-provider>/` with its own
+  client/adapter/errors, producing the exact same `Normalized*` contracts
+  — nothing upstream of the adapter boundary would need to change.
+- UI components and Supabase data-access code (`src/data-access/*`) never
+  call the provider client directly, and never will — only a future
+  ingestion service (server-side, scheduled) does.
+- Raw provider data is never persisted blindly. Everything gets
+  normalized (and, from Pass 7B on, id-resolved through
+  `provider_mappings`) before it's allowed anywhere near a canonical
+  Postgres table.
+
+**Big Five configuration** (`api-football/big-five-competitions.ts`) is the
+single place API-Football's numeric league IDs are wired to Eleven's own
+competition codes — nowhere else in the codebase hardcodes a provider
+league ID. Each entry also carries a `providerSeason` (the season's
+*starting* year — API-Football's own convention, since European seasons
+span two calendar years) as a best-known default, explicitly **not** a
+guarantee: `resolveCurrentSeason()` prefers whatever a live `/leagues`
+response actually marks `current`, falling back to the config only when
+the provider data doesn't clearly indicate one. All five competitions are
+configured; none are ingested yet (Pass 7A is provider-foundation only —
+see "Do NOT begin bulk football ingestion" in the Pass 7A brief).
+
+**Coverage awareness** (`api-football/coverage.ts`): not every
+league-season has identical data available. `getCompetitionCoverage()`
+fetches ONE competition's live coverage flags (fixtures/events/lineups/
+player statistics/injuries/standings) from `/leagues` — deliberately never
+looped across the whole Big Five automatically. This becomes load-bearing
+before the scoring system is designed: Eleven can't build a scoring rule
+around a stat a given competition-season doesn't actually report.
+
+**Quota / rate-limit protection**: the client treats provider requests as
+a scarce resource on purpose (we're developing against a low daily
+allowance). It parses both header conventions API-Football uses
+(`x-ratelimit-requests-limit`/`-remaining` for the daily budget,
+`x-ratelimit-limit`/`-remaining` for the per-minute one) into a
+`ProviderQuota` on every response, classifies HTTP 429 into a distinct
+`ApiFootballRateLimitError` carrying that quota, and applies a 10s request
+timeout. Pagination (the `page` param on `/players` and `/fixtures`) is
+always explicit and caller-supplied — the client never loops through
+pages, and there is no "fetch everything" helper anywhere in this module.
+A real distributed rate limiter is explicitly deferred; this pass only
+builds the defensive foundation a future one sits on top of.
+
+**Live provider checks are manual only.** `npm run football:check` runs
+one cheap `GET /status` request and prints a plain-text connectivity
+summary (provider/status/quota) — never the API key, never raw response
+headers. It's not a route, not wired into any page, and nothing in `npm
+test` touches the network; every adapter/quota/error test runs against
+static fixture JSON under `api-football/__fixtures__/`.
+
 ## Future responsibilities
 
 | Component | Responsibility |
@@ -144,6 +241,32 @@ to selection/derivation logic) to justify a second folder next to
 formatting concern (relative time, deadlines) the app has. Add it when a
 real need shows up rather than pre-creating an empty folder.
 
+**Added in Pass 7A:**
+
+```
+src/lib/
+  football-providers/
+    types.ts                       NormalizedCompetition/Club/Player/Fixture/FixturePlayerStats, ProviderCoverage/Quota/Pagination
+    api-football/
+      client.ts                    The one controlled HTTP client (server-only)
+      config.ts                    getApiKey() — split out so "missing key" is unit-testable
+      errors.ts                    ApiFootballConfigError/NetworkError/RateLimitError/ResponseError
+      response-helpers.ts          parseQuotaHeaders, extractPagination, ensureSuccessfulStatus, hasProviderErrors — pure, unit-tested
+      types.ts                     Raw API-Football v3 response shapes — never imported outside this folder
+      adapter.ts                   Raw → Normalized*, pure functions, unit-tested against __fixtures__/
+      big-five-competitions.ts     BIG_FIVE_COMPETITIONS config, resolveCurrentSeason()
+      coverage.ts                  getCompetitionCoverage() — one competition at a time, never a loop
+      check-connectivity.ts        npm run football:check — manual, server-only, prints no secrets
+      __fixtures__/                Sanitized sample JSON the test suite runs against (no network, no secrets)
+```
+
+Several files split pure logic (`config.ts`, `response-helpers.ts`) out of
+the actual network-calling `client.ts` (which carries `"server-only"`) —
+same reasoning as Pass 6's `src/lib/errors/league-action-error.ts` split
+from `src/data-access/leagues.ts`: `"server-only"` can't be resolved by
+plain `node --test`, so anything meant to be unit-tested needs to live
+where that guard isn't in its import chain.
+
 ## No enterprise cosplay
 
 Deliberately absent, and not planned for a future pass without a concrete
@@ -152,3 +275,19 @@ service factories, CQRS, event sourcing, a message bus, or generic
 "enterprise" interfaces with a single implementation. The domain layer is
 plain TypeScript types plus a handful of pure functions — clear, typed,
 and extensible without being abstract for its own sake.
+
+## Pass 7 roadmap
+
+Football data integration is split across several passes on purpose —
+each one is small enough to land, verify, and stop:
+
+| Pass | Scope |
+|---|---|
+| **7A** | Provider foundation — API-Football client/adapter/errors, normalized contracts, Big Five config, coverage discovery, quota awareness, manual connectivity check. **This pass. No ingestion, no UI change.** |
+| **7B** | Football world ingestion — a real ingestion service that resolves `Normalized*` output through `provider_mappings` and writes `competitions`/`clubs`/`players` into Postgres. |
+| **7C** | Fixtures + match data — ingesting `fixtures` and (once coverage confirms it's available per competition) `player_match_stats`. |
+| **7D** | Sync system — the scheduled/triggered job(s) that actually run 7B/7C's ingestion on a cadence tied to real kickoffs, rather than one-off manual runs. |
+| **7E** | Replace mock football reads — Dashboard/Team/Players start reading real `competitions`/`clubs`/`players`/`fixtures` instead of `src/lib/mock/*`, behind the same kind of graceful-fallback pattern Pass 6 used for auth. |
+
+Pass 7A does not start 7B. Fantasy scoring and the draft engine are not
+on this list at all yet — they depend on 7C's real stats existing first.

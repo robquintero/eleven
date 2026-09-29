@@ -1,0 +1,11 @@
+{
+  "get": "teams",
+  "parameters": { "league": "39", "season": "2026" },
+  "errors": [],
+  "results": 2,
+  "paging": { "current": 1, "total": 1 },
+  "response": [
+    { "team": { "id": 50, "name": "Manchester City", "code": "MCI" } },
+    { "team": { "id": 42, "name": "Arsenal", "code": "ARS" } }
+  ]
+}
