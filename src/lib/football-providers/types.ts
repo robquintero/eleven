@@ -73,6 +73,7 @@ export interface NormalizedFixturePlayerStats {
   fixtureExternalId: string;
   playerExternalId: string;
   minutes: number;
+  started: boolean;
   goals: number;
   assists: number;
   shotsOnTarget: number;

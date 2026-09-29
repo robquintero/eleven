@@ -122,3 +122,28 @@ export interface ApiFootballFixtureItem {
     away: { id: number };
   };
 }
+
+// ---------------------------------------------------------------------
+// GET /fixtures/players — per-fixture player statistics, grouped by team.
+// Only the fields `adapter.ts` actually reads are declared; the real
+// endpoint returns considerably more (ratings, duels, dribbles, passes,
+// fouls, penalties) — see docs/football-data-system.md "Stats
+// deliberately not modeled" for why those aren't mapped yet.
+// ---------------------------------------------------------------------
+
+export interface ApiFootballFixturePlayerStats {
+  player: { id: number };
+  statistics: Array<{
+    games: { minutes: number | null; substitute: boolean };
+    shots: { on: number | null };
+    goals: { total: number | null; assists: number | null; saves: number | null };
+    passes: { key: number | null };
+    tackles: { total: number | null; blocks: number | null; interceptions: number | null };
+    cards: { yellow: number; red: number };
+  }>;
+}
+
+export interface ApiFootballFixturePlayersItem {
+  team: { id: number };
+  players: ApiFootballFixturePlayerStats[];
+}

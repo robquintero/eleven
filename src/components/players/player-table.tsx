@@ -22,10 +22,10 @@ function HeaderCell({
   label: string;
   sortKey?: SortKey;
   activeSort: SortKey;
-  onSort: (key: SortKey) => void;
+  onSort?: (key: SortKey) => void;
   className?: string;
 }) {
-  if (!sortKey) {
+  if (!sortKey || !onSort) {
     return (
       <span className={cn("label-system text-[10px] text-foreground-tertiary", className)}>
         {label}
@@ -77,18 +77,17 @@ export function PlayerTable({
         <span />
         <HeaderCell label="PLAYER" sortKey="name" activeSort={sort} onSort={onSort} />
         <HeaderCell label="POS" activeSort={sort} onSort={onSort} />
-        <HeaderCell label="CLUB" activeSort={sort} onSort={onSort} />
+        <HeaderCell label="CLUB" sortKey="club" activeSort={sort} onSort={onSort} />
         <HeaderCell
           label="LGE"
           activeSort={sort}
           onSort={onSort}
           className="hidden lg:flex"
         />
-        <HeaderCell label="NEXT" sortKey="kickoff" activeSort={sort} onSort={onSort} />
-        <HeaderCell label="PTS" sortKey="points" activeSort={sort} onSort={onSort} />
+        <HeaderCell label="NEXT" activeSort={sort} onSort={onSort} />
+        <HeaderCell label="MIN" activeSort={sort} onSort={onSort} />
         <HeaderCell
-          label="FORM"
-          sortKey="form"
+          label="STARTS"
           activeSort={sort}
           onSort={onSort}
           className="hidden lg:flex"
@@ -157,11 +156,11 @@ export function PlayerTable({
               </span>
 
               <span className="label-system text-sm font-semibold text-foreground">
-                {player.totalPoints ?? player.fantasyPoints}
+                {player.seasonStats ? player.seasonStats.minutes : "—"}
               </span>
 
               <span className="label-system hidden text-[11px] text-foreground-tertiary lg:block">
-                {(player.averagePoints ?? player.fantasyPoints).toFixed(1)}
+                {player.seasonStats ? player.seasonStats.starts : "—"}
               </span>
 
               <OwnershipStatus player={player} className="justify-self-end text-[11px]" />

@@ -44,6 +44,8 @@ export type PlayerOwnership = "free" | "owned" | "waivers" | "mine";
 
 export interface SeasonStats {
   appearances: number;
+  /** How many of `appearances` were starts (provider: NOT substitute). */
+  starts: number;
   minutes: number;
   goals: number;
   assists: number;

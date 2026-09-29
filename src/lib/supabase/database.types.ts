@@ -1,16 +1,3 @@
-/**
- * Generated from the live "Eleven" Supabase project (oknhqdiinaxofrzxphxf).
- * Regenerate after any schema change:
- *
- *   npx supabase gen types typescript --linked --schema public > src/lib/supabase/database.types.ts
- *
- * Do not hand-edit. These are DATABASE types (raw table/RPC shapes) — they
- * are a distinct layer from Eleven's own DOMAIN types (`src/domain/*`),
- * which stay hand-written and carry the product's own vocabulary/
- * invariants. Data-access functions (`src/data-access/*`) are the seam
- * that maps between the two; UI code should reach for `src/domain/*` or
- * `src/data-access/*`'s own return types, not this file, directly.
- */
 export type Json =
   | string
   | number
@@ -24,6 +11,31 @@ export type Database = {
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.18"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -72,6 +84,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          season: number | null
           updated_at: string
         }
         Insert: {
@@ -80,6 +93,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          season?: number | null
           updated_at?: string
         }
         Update: {
@@ -88,6 +102,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          season?: number | null
           updated_at?: string
         }
         Relationships: []
@@ -447,6 +462,7 @@ export type Database = {
           home_club_id: string
           id: string
           kickoff_at: string
+          season: number
           status: string
           updated_at: string
         }
@@ -457,6 +473,7 @@ export type Database = {
           home_club_id: string
           id?: string
           kickoff_at: string
+          season: number
           status?: string
           updated_at?: string
         }
@@ -467,6 +484,7 @@ export type Database = {
           home_club_id?: string
           id?: string
           kickoff_at?: string
+          season?: number
           status?: string
           updated_at?: string
         }
@@ -743,6 +761,7 @@ export type Database = {
           red_cards: number
           saves: number
           shots_on_target: number
+          started: boolean
           tackles: number
           updated_at: string
           yellow_cards: number
@@ -762,6 +781,7 @@ export type Database = {
           red_cards?: number
           saves?: number
           shots_on_target?: number
+          started?: boolean
           tackles?: number
           updated_at?: string
           yellow_cards?: number
@@ -781,6 +801,7 @@ export type Database = {
           red_cards?: number
           saves?: number
           shots_on_target?: number
+          started?: boolean
           tackles?: number
           updated_at?: string
           yellow_cards?: number
@@ -1397,6 +1418,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },

@@ -38,7 +38,7 @@ Every visible piece of product data comes from one of:
 
 1. persisted Eleven data (Supabase, via `src/data-access/*`),
 2. deterministic derivation from persisted data (`src/domain/fantasy/league-lifecycle.ts`, `src/lib/selectors/*`),
-3. real external football data ingested into Eleven (not yet — Pass 8),
+3. real external football data ingested into Eleven (Pass 8 — see `docs/football-data-system.md`; only a small controlled sample is ingested so far, not the full Big Five),
 4. legitimate application/system metadata.
 
 `src/lib/mock/*` (the pre-7.5 mock layer that powered every screen) was
@@ -106,7 +106,7 @@ a real membership check on every request.
 | Home | `getUserLeagues`, `getUserSquad`, `getCurrentMatchup`, `getStandings`, `getRecentActivity` | No league → onboarding. Not active → `LeagueStatusPanel`. Matchup/standings/activity always render their own "not scheduled/no results yet/no activity yet" branch while empty. |
 | Team | `getUserTeamInLeague`, `getUserSquad` | No league → onboarding. Squad empty (always, pre-draft) → "NO SQUAD," 0 starters/bench, no "Edit lineup" control (nothing to persist edits to). |
 | Matchup | `getCurrentMatchup` behind the league-lifecycle gate | Pre-draft → "Awaiting league draft." Otherwise the same nullable `MatchupCommand` as Home. |
-| Players | `getPlayerDatabase()` (`public.players`, real, currently unseeded) | `[]` → "0 PLAYERS / NO PLAYER DATA AVAILABLE." Never falls back to a mock roster. |
+| Players | `getPlayerDatabase()` (`public.players`, real, server-side filtered/paginated — see `docs/football-data-system.md`) | `total: 0` and no ingestion has run anywhere → "0 PLAYERS / NO PLAYER DATA AVAILABLE." Once Pass 8's `football:sync` has ingested real data, the full scouting workspace (search/filter/sort/pagination/inspector) activates on it — never a mock roster. |
 | League | `getLeagueDetail`, `getDraftStatus`, `getStandings`, `getRecentActivity` | Real members list, real capacity, "NOT YET AVAILABLE" draft, "NO RESULTS YET" / "NO TRANSACTIONS YET." |
 
 ## Interaction truthfulness
@@ -133,8 +133,11 @@ populated."
 
 ## Future systems that activate these states
 
-- **Pass 8 (football ingestion)** populates `players`/`clubs`/`fixtures` →
-  Players stops being empty; `getPlayerDatabase()`'s shape does not change.
+- **Pass 8 (football ingestion, landed)** populates `players`/`clubs`/`fixtures`
+  via `npm run football:sync` — see `docs/football-data-system.md`. Players
+  stops being empty exactly where ingestion has run; `getPlayerDatabase()`'s
+  shape didn't change when real rows started appearing. Full Big Five
+  population is a separate, explicitly-approved future step.
 - **Draft engine** writes `drafts`/`draft_picks`/`roster_entries`/
   `league_player_ownership` → `getUserSquad()` starts returning real
   starters/bench; lifecycle starts reaching `DRAFTING`/`ACTIVE`.

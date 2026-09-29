@@ -1,10 +1,12 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useMediaQuery } from "@base-ui/react/unstable-use-media-query";
 import {
   PlayerInspectorContent,
   type LineupInspectorContext,
 } from "@/components/players/player-inspector-content";
+import { getPlayerRecentMatchesAction } from "@/app/(app)/players/actions";
 import {
   Sheet,
   SheetContent,
@@ -12,6 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import type { RecentMatchRow } from "@/data-access/players";
 import type { Player } from "@/lib/types/fantasy";
 
 export function PlayerInspector({
@@ -34,6 +37,28 @@ export function PlayerInspector({
     noSsr: true,
   });
 
+  // Keyed by playerId rather than reset-then-fetch, so the effect only
+  // ever calls setState from inside the resolved promise callback (never
+  // synchronously in the effect body) — the loading state is *derived*
+  // below by comparing this to the current player, not tracked separately.
+  const [loadedMatches, setLoadedMatches] = useState<{ playerId: string; matches: RecentMatchRow[] } | null>(null);
+
+  useEffect(() => {
+    if (!player) return;
+    let cancelled = false;
+    const playerId = player.id;
+    getPlayerRecentMatchesAction(playerId).then((matches) => {
+      if (!cancelled) setLoadedMatches({ playerId, matches });
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [player?.id]);
+
+  const recentMatches =
+    loadedMatches && player && loadedMatches.playerId === player.id ? loadedMatches.matches : null;
+
   if (variant === "inline") {
     if (!player) return null;
     return (
@@ -42,6 +67,7 @@ export function PlayerInspector({
           key={player.id}
           player={player}
           index={index}
+          recentMatches={recentMatches}
           lineupContext={lineupContext}
         />
       </aside>
@@ -61,6 +87,7 @@ export function PlayerInspector({
               key={player.id}
               player={player}
               index={index}
+              recentMatches={recentMatches}
               lineupContext={lineupContext}
             />
           )}
