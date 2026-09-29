@@ -9,6 +9,7 @@ import { PlayerTable } from "@/components/players/player-table";
 import { currentRound } from "@/lib/mock/dashboard";
 import { playerDatabase } from "@/lib/mock/players-database";
 import { defaultFilters, filterAndSortPlayers, type PlayerFilters } from "@/lib/players-filters";
+import { getDatabaseSummary } from "@/lib/selectors/player";
 import { pad2 } from "@/lib/team-fixture";
 import type { Player } from "@/lib/types/fantasy";
 
@@ -52,17 +53,7 @@ export default function PlayersPage() {
     : undefined;
 
   const summary = useMemo(() => {
-    const counts = { free: 0, owned: 0, waivers: 0, flagged: 0 };
-    for (const p of playerDatabase) {
-      const ownership = p.ownership ?? "free";
-      if (ownership === "free") counts.free += 1;
-      else if (ownership === "owned") counts.owned += 1;
-      else if (ownership === "waivers") counts.waivers += 1;
-      if (p.availability === "injured" || p.availability === "suspended") {
-        counts.flagged += 1;
-      }
-    }
-    return counts;
+    return getDatabaseSummary(playerDatabase);
   }, []);
 
   function updateFilters(patch: Partial<PlayerFilters>) {

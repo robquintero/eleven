@@ -17,6 +17,12 @@ import {
 } from "@/lib/mock/dashboard";
 import { roundFixtures } from "@/lib/mock/fixtures";
 import { squad as initialSquad } from "@/lib/mock/team";
+import {
+  findBenchPlayerAtPosition,
+  findStarterSlotAtPosition,
+  findStarterSlotForPlayer,
+  swapPlayers,
+} from "@/lib/selectors/lineup";
 import { nextLock, pad2 } from "@/lib/team-fixture";
 import type {
   LineupSlot,
@@ -47,22 +53,7 @@ export default function TeamPage() {
   }`;
 
   function swap(slotId: string, benchPlayerId: string) {
-    setSquad((prev) => {
-      const slotIndex = prev.starters.findIndex((s) => s.id === slotId);
-      const benchIndex = prev.bench.findIndex((p) => p.id === benchPlayerId);
-      if (slotIndex === -1 || benchIndex === -1) return prev;
-
-      const slot = prev.starters[slotIndex];
-      const benchPlayer = prev.bench[benchIndex];
-
-      const nextStarters = [...prev.starters];
-      nextStarters[slotIndex] = { ...slot, player: benchPlayer };
-
-      const nextBench = [...prev.bench];
-      nextBench[benchIndex] = slot.player;
-
-      return { ...prev, starters: nextStarters, bench: nextBench };
-    });
+    setSquad((prev) => swapPlayers(prev, slotId, benchPlayerId));
   }
 
   function toggleEditing() {
@@ -121,15 +112,15 @@ export default function TeamPage() {
   }
 
   function handleMoveToBench(player: Player) {
-    const slot = squad.starters.find((s) => s.player.id === player.id);
-    const benchTarget = squad.bench.find((p) => p.position === player.position);
+    const slot = findStarterSlotForPlayer(squad, player.id);
+    const benchTarget = findBenchPlayerAtPosition(squad, player.position);
     if (!slot || !benchTarget) return;
     swap(slot.id, benchTarget.id);
     setDetailOpen(false);
   }
 
   function handleMoveToStarting(player: Player) {
-    const slot = squad.starters.find((s) => s.position === player.position);
+    const slot = findStarterSlotAtPosition(squad, player.position);
     if (!slot) return;
     swap(slot.id, player.id);
     setDetailOpen(false);

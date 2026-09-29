@@ -8,6 +8,7 @@ import { AvailabilityStatus } from "@/components/players/availability-status";
 import { OwnershipStatus } from "@/components/players/ownership-status";
 import { Button } from "@/components/ui/button";
 import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-panel";
+import { getRecentFormAverage } from "@/lib/selectors/player";
 import { formatKickoff } from "@/lib/team-fixture";
 import type { Player, PlayerOwnership } from "@/lib/types/fantasy";
 
@@ -41,9 +42,7 @@ export function PlayerInspectorContent({
 
   const ownership = player.ownership ?? "free";
   const stats = player.seasonStats;
-  const last5 = player.recentForm?.length
-    ? player.recentForm.reduce((a, b) => a + b, 0) / player.recentForm.length
-    : null;
+  const last5 = getRecentFormAverage(player);
 
   return (
     <TerminalPanel
