@@ -216,7 +216,11 @@ const mineStats: Record<string, SeasonStatsSeed> = {
   plr_leao: { apps: 4, mins: 320, goals: 2, assists: 1 },
 };
 
-function enrichMine(player: Player): Player {
+/** Enriches a raw squad player (from `mock/team.ts`) with the ownership/
+ * stats fields the scouting database shows — reused by Team/Dashboard so a
+ * squad player opened via the shared Player Inspector shows the same
+ * MINE/season data as browsing the same player on `/players`. */
+export function enrichMine(player: Player): Player {
   const stats = mineStats[player.id];
   const totalPoints = (player.recentForm?.reduce((sum, n) => sum + n, 0) ?? 0) + player.fantasyPoints;
   const apps = stats?.apps ?? (player.recentForm?.length ?? 4) + 1;

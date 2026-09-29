@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FixturesList } from "@/components/football/fixtures-list";
 import { BenchRow } from "@/components/team/bench-row";
 import { NextLock } from "@/components/team/next-lock";
 import { Pitch } from "@/components/team/pitch";
-import { PlayerDetailSheet } from "@/components/team/player-detail-sheet";
 import { RoundIntelligence } from "@/components/team/round-intelligence";
 import { SquadAvailability } from "@/components/team/squad-availability";
+import { PlayerInspector } from "@/components/players/player-inspector";
 import { Button } from "@/components/ui/button";
 import {
   currentLeague,
@@ -16,6 +16,7 @@ import {
   currentUserTeam,
 } from "@/lib/mock/dashboard";
 import { roundFixtures } from "@/lib/mock/fixtures";
+import { enrichMine } from "@/lib/mock/players-database";
 import { squad as initialSquad } from "@/lib/mock/team";
 import {
   findBenchPlayerAtPosition,
@@ -63,7 +64,7 @@ export default function TeamPage() {
 
   function handleSlotClick(slot: LineupSlot) {
     if (!editing) {
-      setDetail({ player: slot.player, isStarter: true });
+      setDetail({ player: enrichMine(slot.player), isStarter: true });
       setDetailOpen(true);
       return;
     }
@@ -88,7 +89,7 @@ export default function TeamPage() {
 
   function handleBenchClick(player: Player) {
     if (!editing) {
-      setDetail({ player, isStarter: false });
+      setDetail({ player: enrichMine(player), isStarter: false });
       setDetailOpen(true);
       return;
     }
@@ -155,6 +156,20 @@ export default function TeamPage() {
 
   const upcomingLock = nextLock(squad.starters);
 
+  useEffect(() => {
+    if (!editing) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      if (pending) {
+        setPending(null);
+      } else {
+        setEditing(false);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [editing, pending]);
+
   return (
     <div>
       <div className="flex items-start justify-between gap-4">
@@ -177,11 +192,18 @@ export default function TeamPage() {
         </Button>
       </div>
 
-      <p className="mt-3 text-xs text-foreground-tertiary">
-        {editing
-          ? "Tap a starter, then a bench player in the same position to swap."
-          : "Lineup locks progressively as player matches begin."}
-      </p>
+      <div className="mt-3 flex items-center gap-2">
+        {editing && (
+          <span className="label-system flex items-center gap-1.5 border border-l-2 border-accent/40 border-l-accent bg-accent/5 px-2 py-1 text-[10px] font-semibold text-accent">
+            LINEUP_MODE / EDIT
+          </span>
+        )}
+        <p className="text-xs text-foreground-tertiary">
+          {editing
+            ? "Tap a starter, then a bench player in the same position to swap. Esc to cancel."
+            : "Lineup locks progressively as player matches begin."}
+        </p>
+      </div>
 
       <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12">
         <section>
@@ -262,14 +284,21 @@ export default function TeamPage() {
         </div>
       </div>
 
-      <PlayerDetailSheet
+      <PlayerInspector
         player={detail?.player ?? null}
+        variant="overlay"
         open={detailOpen}
         onOpenChange={setDetailOpen}
-        isStarter={detail?.isStarter ?? false}
-        canSwap={detailCanSwap}
-        onMoveToBench={() => detail && handleMoveToBench(detail.player)}
-        onMoveToStarting={() => detail && handleMoveToStarting(detail.player)}
+        lineupContext={
+          detail
+            ? {
+                isStarter: detail.isStarter,
+                canSwap: detailCanSwap,
+                onMoveToBench: () => handleMoveToBench(detail.player),
+                onMoveToStarting: () => handleMoveToStarting(detail.player),
+              }
+            : undefined
+        }
       />
     </div>
   );

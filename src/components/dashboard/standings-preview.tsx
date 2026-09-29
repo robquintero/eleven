@@ -31,8 +31,10 @@ export function StandingsPreview({
           <div
             key={team.id}
             className={cn(
-              "flex items-center gap-3 border-l-2 border-l-transparent py-3 pl-2",
-              team.id === highlightTeamId && "border-l-accent bg-accent/5"
+              "flex items-center gap-3 border-l-2 border-l-transparent py-3 pl-2 transition-colors",
+              team.id === highlightTeamId
+                ? "border-l-accent bg-accent/5"
+                : "hover:bg-surface"
             )}
           >
             <span className="label-system w-4 shrink-0 text-sm font-medium text-foreground-tertiary">

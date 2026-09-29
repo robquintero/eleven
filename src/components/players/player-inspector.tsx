@@ -1,7 +1,10 @@
 "use client";
 
 import { useMediaQuery } from "@base-ui/react/unstable-use-media-query";
-import { PlayerInspectorContent } from "@/components/players/player-inspector-content";
+import {
+  PlayerInspectorContent,
+  type LineupInspectorContext,
+} from "@/components/players/player-inspector-content";
 import {
   Sheet,
   SheetContent,
@@ -17,12 +20,14 @@ export function PlayerInspector({
   variant,
   open,
   onOpenChange,
+  lineupContext,
 }: {
   player: Player | null;
   index?: number;
   variant: "inline" | "overlay";
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  lineupContext?: LineupInspectorContext;
 }) {
   const isLgDesktop = useMediaQuery("(min-width: 1024px)", {
     defaultMatches: true,
@@ -33,7 +38,12 @@ export function PlayerInspector({
     if (!player) return null;
     return (
       <aside className="h-fit pl-4">
-        <PlayerInspectorContent key={player.id} player={player} index={index} />
+        <PlayerInspectorContent
+          key={player.id}
+          player={player}
+          index={index}
+          lineupContext={lineupContext}
+        />
       </aside>
     );
   }
@@ -47,7 +57,12 @@ export function PlayerInspector({
         </SheetHeader>
         <div className="px-4 pb-6">
           {player && (
-            <PlayerInspectorContent key={player.id} player={player} index={index} />
+            <PlayerInspectorContent
+              key={player.id}
+              player={player}
+              index={index}
+              lineupContext={lineupContext}
+            />
           )}
         </div>
       </SheetContent>

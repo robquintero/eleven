@@ -592,17 +592,21 @@ check here first for any new round/fixture/status surface
   the full-width strip below the hero, see §12
 
 **Players** (`@/components/players`)
-- `PlayerRow` (dashboard) — compact list-row pattern, position/club/points
-  now mono
+- `PlayerRow` (dashboard Starting XI) — compact list-row pattern,
+  position/club/points now mono, clickable (`onSelect`/`selected`) to open
+  the shared inspector
 - `PlayerDatabaseToolbar`, `PlayerTable`, `PlayerListMobile`,
   `PlayerInspector` + `PlayerInspectorContent`, `OwnershipStatus`,
-  `AvailabilityStatus` — the `/players` scouting terminal (§19); check
-  here before building any new player-browsing surface
+  `AvailabilityStatus` — the `/players` scouting terminal (§19); also the
+  cross-screen shared inspector (§21) — check here before building any new
+  player-browsing or player-detail surface anywhere in the app
 
 **Team** (`@/components/team`)
 - `Pitch`, `PlayerNode` (tactical marker, §11), `BenchRow` (roster table,
-  §7), `PlayerDetailSheet`, `SquadAvailability` — reuse before building
-  any new squad-management UI
+  §7), `SquadAvailability` — reuse before building any new squad-management
+  UI. Selecting a pitch or bench player opens the shared `PlayerInspector`
+  (`@/components/players`, §21) with a `lineupContext` rather than a
+  Team-specific detail sheet.
 - `RoundIntelligence` — PTS/PROJECTED/ACTIVE/REMAINING/LOCKED readout for
   the operations rail, derived from `starterBuckets()`
 - `NextLock` — soonest still-upcoming starter + live `Countdown` to their
@@ -845,6 +849,78 @@ pre-approved without further justification. Don't extend that allowance
 to anything else on mobile: the geometry language (fewer pills, hard
 separators, terminal typography) carries through unchanged, only the
 density relaxes.
+
+---
+
+## 21. Professional Workstation Principle
+
+Eleven's desktop identity is not "terminal themed." It is a **professional
+football operations workstation** — closer to a trading/analytics desk's
+information architecture than to retro terminal cosplay. Studied (not
+copied) from a professional trading-terminal reference: high information
+density, strong alignment, specialized instrument-like controls, restrained
+color, and data that stays visible without opening a separate page. None of
+its crypto branding, candlestick charts, or buy/sell vocabulary belongs
+here — only the seriousness and density discipline transfers.
+
+Rough formula, useful as a gut check when a new module feels off: **50%
+professional workstation information architecture, 30% premium sports
+interface, 20% terminal/operator interaction language.** Not 80% literal
+terminal — see §1's three reference points, which this refines rather than
+replaces.
+
+**Three surface levels** — use deliberately, not interchangeably:
+
+| Level | Purpose | Example |
+|---|---|---|
+| **Workspace** | The default page canvas, usually open. Information grouped through alignment/spacing/rules, not containers. | Dashboard's bare sections, the Team page's right rail |
+| **Module** | A defined functional region — thin border or `TerminalPanel`. | The pitch, the Player Inspector, the bench table |
+| **Focus surface** | Rare; the current high-value action or headline information, may take slightly stronger contrast. | `MatchupHero` |
+
+Most of a screen is Workspace. Module is common. Focus surface is one
+moment per screen, not a default — treating every section as a Focus
+surface is the "dashboard tile overload" failure mode this principle
+exists to prevent.
+
+**Density philosophy**: every region earns its space (§12) — this pass
+specifically closes gaps where a module *could* say more without becoming
+noise: `RoundStatus`'s readout (FIXTURES/PLAYERS/SCORE/PROJECTED/OPPONENT/
+DELTA) and `MatchupHero`'s DELTA line are both cases of "integrate one more
+real number into an existing surface" rather than adding a new card.
+
+**Shared player inspection**: a manager should learn one rule — *selecting
+a footballer opens their dossier* — and have it hold everywhere. Dashboard's
+Starting XI, the Team screen's pitch/bench, and the Players database all
+open the same `PlayerInspector` / `PlayerInspectorContent` (`@/components/
+players`). The one variation point is `lineupContext`: when present (Team
+screen), the record's action slot shows "Move to bench"/"Move to starting
+XI" instead of the ownership-based action (add/trade/claim/view-in-squad).
+Never fork a second inspector body per screen — extend the shared one.
+Squad players opened this way are enriched with the same `ownership`/
+`seasonStats` the scouting database shows (`enrichMine()`,
+`@/lib/mock/players-database`) so the dossier reads identically regardless
+of where it was opened from.
+
+**Keyboard interaction philosophy**: keyboard shortcuts exist to make
+*focused* actions faster (⌘K anywhere, `/` to search, arrow-key roving
+selection in the Players database, `Escape` to step back one level), never
+to gate an action a mouse can't also complete. Team's edit mode follows the
+same rule: `Escape` cancels a pending swap selection, or exits edit mode
+entirely if nothing is pending — a small, local affordance, not a new
+navigation engine.
+
+**Semantic data color** stays exactly as defined in §3 — this pass adds no
+new colors. `DELTA` and similar derived numbers reuse `--live`/
+`--destructive` for positive/negative, never a new hue.
+
+**Additional forbidden patterns**, on top of §18:
+
+- Dashboard tile overload — three-plus Focus-surface treatments on one
+  screen competing for attention
+- Excessive empty space defended as "minimalism" when a real number could
+  fill it usefully (see Density philosophy above)
+- A second, independent player detail component instead of extending the
+  shared `PlayerInspectorContent`
 
 ---
 

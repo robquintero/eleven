@@ -38,6 +38,7 @@ export function MatchupHero({ matchup }: { matchup: Matchup }) {
   const total = matchup.homeScore + matchup.awayScore || 1;
   const homeShare = (matchup.homeScore / total) * 100;
   const isLive = matchup.status === "live";
+  const delta = matchup.homeProjected - matchup.awayProjected;
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-border bg-surface-elevated p-6 sm:p-8">
@@ -103,6 +104,20 @@ export function MatchupHero({ matchup }: { matchup: Matchup }) {
           className="h-full bg-accent transition-all"
           style={{ width: `${homeShare}%` }}
         />
+      </div>
+
+      <div className="relative mt-3 flex items-center justify-center">
+        <span className="label-system text-[11px] text-foreground-tertiary">
+          DELTA{" "}
+          <span
+            className={
+              delta >= 0 ? "font-semibold text-live" : "font-semibold text-destructive"
+            }
+          >
+            {delta >= 0 ? "+" : ""}
+            {delta}
+          </span>
+        </span>
       </div>
     </section>
   );

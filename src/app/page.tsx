@@ -12,7 +12,6 @@ import {
   currentRound,
   currentUserTeam,
   standings,
-  startingXI,
 } from "@/lib/mock/dashboard";
 import { roundFixtures } from "@/lib/mock/fixtures";
 import { squad } from "@/lib/mock/team";
@@ -21,6 +20,7 @@ export default function Home() {
   const liveFixtures = roundFixtures.filter(
     (f) => f.state === "live" || f.state === "ht"
   );
+  const startingXI = squad.starters.map((slot) => slot.player);
 
   return (
     <div className="flex flex-col gap-10 sm:gap-12">

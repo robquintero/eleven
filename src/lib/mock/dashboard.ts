@@ -184,20 +184,6 @@ export const players = {
   },
 } as const satisfies Record<string, Player>;
 
-export const startingXI: Player[] = [
-  players.alisson,
-  players.vanDijk,
-  players.hakimi,
-  players.bastoni,
-  players.rudiger,
-  players.bellingham,
-  players.musiala,
-  players.saka,
-  players.haaland,
-  players.mbappe,
-  players.dembele,
-];
-
 const managers = {
   robert: { id: "mgr_robert", displayName: "Robert", initials: "RQ" },
   alex: { id: "mgr_alex", displayName: "Alex Chen", initials: "AC" },

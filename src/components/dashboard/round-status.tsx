@@ -13,6 +13,7 @@ export function RoundStatus({
 }) {
   const buckets = starterBuckets(starters);
   const complete = fixtures.filter((f) => f.state === "final").length;
+  const delta = matchup.homeProjected - matchup.awayProjected;
 
   return (
     <section>
@@ -21,23 +22,29 @@ export function RoundStatus({
       </h2>
       <div className="mt-2 divide-y divide-border">
         <OperationalRow
-          label="MATCHES"
+          label="FIXTURES"
           value={`${complete} / ${fixtures.length}`}
           secondary="complete"
         />
         <OperationalRow
           label="PLAYERS"
-          value={`${buckets.live} live · ${buckets.locked} locked · ${buckets.upcoming} upcoming`}
+          value={`${buckets.live} live / ${buckets.locked + buckets.final} locked / ${buckets.upcoming} remaining`}
         />
-        <OperationalRow
-          label="MY SCORE"
-          value={matchup.homeScore}
-          secondary={`Proj ${matchup.homeProjected}`}
-        />
+        <OperationalRow label="SCORE" value={matchup.homeScore} />
+        <OperationalRow label="PROJECTED" value={matchup.homeProjected} />
         <OperationalRow
           label="OPPONENT"
           value={matchup.awayScore}
           secondary={`Proj ${matchup.awayProjected}`}
+        />
+        <OperationalRow
+          label="DELTA"
+          value={
+            <span className={delta >= 0 ? "text-live" : "text-destructive"}>
+              {delta >= 0 ? "+" : ""}
+              {delta}
+            </span>
+          }
         />
       </div>
     </section>
