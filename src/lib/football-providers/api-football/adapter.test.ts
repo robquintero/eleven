@@ -160,6 +160,7 @@ test("normalizeFixture maps a scheduled fixture correctly", () => {
   assert.equal(normalized.awayClubExternalId, "42");
   assert.equal(normalized.status, "scheduled");
   assert.equal(normalized.kickoffAt, new Date("2026-10-03T14:00:00+00:00").toISOString());
+  assert.equal(normalized.round, "Regular Season - 8");
 });
 
 test("normalizeFixture maps a finished fixture correctly", () => {

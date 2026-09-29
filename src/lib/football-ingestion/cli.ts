@@ -8,7 +8,13 @@
  *   competitions [--code ENG] [--season 2023]   sync one (or, with no --code, all enabled Big Five) competition's metadata + season; --season pins the season clubs/players/fixtures syncs will use, overriding whatever /leagues reports as current (needed when the account's plan restricts which seasons OTHER endpoints serve — see docs/football-data-system.md)
  *   clubs --code ENG                    sync one competition's clubs
  *   players --code ENG --club MCI [--page 1]   sync one page of one club's players
- *   fixtures --code ENG [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--page 1]   sync one page of one competition's fixtures
+ *   fixtures --code ENG [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--page 1] [--exclude-qualifying]   sync one page of one competition's fixtures; --exclude-qualifying drops qualifying-round/play-off fixtures (UEFA competitions only — see rounds.ts)
+ *
+ * --code accepts either a Big Five domestic code (ENG/ESP/GER/ITA/FRA) or
+ * a UEFA competition code (UCL/UEL) — see big-five-competitions.ts and
+ * uefa-competitions.ts. Only Big Five membership gates Eleven's draftable
+ * player pool; UEFA competitions are ingested for fixture/stat history
+ * only (see docs/football-data-system.md).
  *   fixture-stats --fixture <providerFixtureId>   sync one fixture's player stats
  *
  * Every operation makes exactly ONE provider request (or, for
@@ -19,6 +25,7 @@
 import "server-only";
 import { BIG_FIVE_COMPETITIONS, getBigFiveCompetition } from "../football-providers/api-football/big-five-competitions.ts";
 import type { BigFiveCompetitionCode } from "../../domain/football/constants.ts";
+import { getUefaCompetition, isUefaCompetitionCode } from "../football-providers/api-football/uefa-competitions.ts";
 import { ApiFootballConfigError, ApiFootballRateLimitError } from "../football-providers/api-football/errors.ts";
 import { getApiKey } from "../football-providers/api-football/config.ts";
 import { createAdminClient, isSupabaseAdminConfigured } from "../supabase/admin.ts";
@@ -29,7 +36,13 @@ import { syncFixtures } from "./sync-fixtures.ts";
 import { syncFixtureStats } from "./sync-fixture-stats.ts";
 import { recordSyncEvent } from "./record-sync-event.ts";
 import { shouldStopForQuota } from "./quota.ts";
-import type { SyncResult } from "./types.ts";
+import type { CompetitionSyncTarget, SyncResult } from "./types.ts";
+
+/** Resolves a `--code` flag against either config list — Big Five or UEFA — never guessing/hardcoding a provider id inline at a call site. */
+function resolveCompetition(code: string): CompetitionSyncTarget {
+  if (isUefaCompetitionCode(code)) return getUefaCompetition(code);
+  return getBigFiveCompetition(code as BigFiveCompetitionCode);
+}
 
 function parseFlags(argv: string[]): Record<string, string> {
   const flags: Record<string, string> = {};
@@ -108,7 +121,7 @@ async function main() {
   try {
     switch (operation) {
       case "competitions": {
-        const configs = flags.code ? [getBigFiveCompetition(flags.code as BigFiveCompetitionCode)] : BIG_FIVE_COMPETITIONS.filter((c) => c.enabled);
+        const configs = flags.code ? [resolveCompetition(flags.code)] : BIG_FIVE_COMPETITIONS.filter((c) => c.enabled);
         const seasonOverride = flags.season ? Number(flags.season) : undefined;
         for (const config of configs) {
           const result = await run(syncCompetition(admin, config, seasonOverride));
@@ -122,7 +135,7 @@ async function main() {
 
       case "clubs": {
         if (!flags.code) throw new Error('clubs requires --code, e.g. "clubs --code ENG"');
-        await run(syncClubs(admin, getBigFiveCompetition(flags.code as BigFiveCompetitionCode)));
+        await run(syncClubs(admin, resolveCompetition(flags.code)));
         break;
       }
 
@@ -131,17 +144,18 @@ async function main() {
           throw new Error('players requires --code and --club, e.g. "players --code ENG --club MCI"');
         }
         const page = flags.page ? Number(flags.page) : 1;
-        await run(syncPlayersForClub(admin, getBigFiveCompetition(flags.code as BigFiveCompetitionCode), flags.club, page));
+        await run(syncPlayersForClub(admin, resolveCompetition(flags.code), flags.club, page));
         break;
       }
 
       case "fixtures": {
         if (!flags.code) throw new Error('fixtures requires --code, e.g. "fixtures --code ENG"');
         await run(
-          syncFixtures(admin, getBigFiveCompetition(flags.code as BigFiveCompetitionCode), {
+          syncFixtures(admin, resolveCompetition(flags.code), {
             from: flags.from,
             to: flags.to,
             page: flags.page ? Number(flags.page) : undefined,
+            excludeQualifying: flags["exclude-qualifying"] === "true",
           })
         );
         break;

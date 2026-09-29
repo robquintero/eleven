@@ -7,7 +7,6 @@
  * `adapter.test.ts`).
  */
 
-import type { BigFiveCompetitionConfig } from "@/lib/football-providers/api-football/big-five-competitions";
 import type {
   ApiFootballFixtureItem,
   ApiFootballFixturePlayersItem,
@@ -67,14 +66,17 @@ export function mapFixtureStatus(shortStatus: string): FixtureStatus {
 }
 
 /**
- * Takes the matching Big Five config alongside the raw item rather than
- * guessing Eleven's competition `code` from provider fields — the config
- * is the source of truth for that mapping (see
- * `big-five-competitions.ts`).
+ * Takes the matching competition config alongside the raw item rather
+ * than guessing Eleven's competition `code` from provider fields — the
+ * config is the source of truth for that mapping. Deliberately typed to
+ * the minimal shape this function needs (not `BigFiveCompetitionConfig`)
+ * so it works for any configured competition, Big Five or UEFA — see
+ * `src/lib/football-ingestion/types.ts`'s `CompetitionSyncTarget` doc
+ * comment for why the two config types stay separate.
  */
 export function normalizeCompetition(
   item: ApiFootballLeagueItem,
-  config: BigFiveCompetitionConfig
+  config: { code: string; providerSeason: number }
 ): NormalizedCompetition {
   const season =
     item.seasons.find((s) => s.current) ?? item.seasons.find((s) => s.year === config.providerSeason);
@@ -135,6 +137,7 @@ export function normalizeFixture(item: ApiFootballFixtureItem): NormalizedFixtur
     awayClubExternalId: String(item.teams.away.id),
     kickoffAt: new Date(item.fixture.date).toISOString(),
     status: mapFixtureStatus(item.fixture.status.short),
+    round: item.league.round,
   };
 }
 
