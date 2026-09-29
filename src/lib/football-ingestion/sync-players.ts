@@ -2,10 +2,9 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getPlayers } from "../football-providers/api-football/client.ts";
 import { normalizePlayer } from "../football-providers/api-football/adapter.ts";
-import type { BigFiveCompetitionConfig } from "../football-providers/api-football/big-five-competitions.ts";
 import { createMappings, getExistingMappings, PROVIDER } from "./identity.ts";
 import { emptySyncCounts, planReconciliation } from "./reconcile.ts";
-import type { SyncResult } from "./types.ts";
+import type { CompetitionSyncTarget, SyncResult } from "./types.ts";
 import type { Database } from "@/lib/supabase/database.types";
 import type { NormalizedPlayer } from "@/lib/football-providers/types";
 
@@ -23,7 +22,7 @@ import type { NormalizedPlayer } from "@/lib/football-providers/types";
  */
 export async function syncPlayersForClub(
   admin: SupabaseClient<Database>,
-  config: BigFiveCompetitionConfig,
+  config: CompetitionSyncTarget,
   clubCode: string,
   page = 1
 ): Promise<SyncResult> {

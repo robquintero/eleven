@@ -2,10 +2,10 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getFixtures } from "../football-providers/api-football/client.ts";
 import { normalizeFixture } from "../football-providers/api-football/adapter.ts";
-import type { BigFiveCompetitionConfig } from "../football-providers/api-football/big-five-competitions.ts";
 import { createMappings, getExistingMappings } from "./identity.ts";
 import { emptySyncCounts, planReconciliation } from "./reconcile.ts";
-import type { SyncResult } from "./types.ts";
+import { isQualifyingRound } from "./rounds.ts";
+import type { CompetitionSyncTarget, SyncResult } from "./types.ts";
 import type { Database } from "@/lib/supabase/database.types";
 
 export interface SyncFixturesOptions {
@@ -13,6 +13,8 @@ export interface SyncFixturesOptions {
   from?: string;
   to?: string;
   page?: number;
+  /** UEFA competitions only — excludes qualifying-round/play-off fixtures (see rounds.ts), keeping only the main League Stage/knockout competition. No-op for domestic leagues, which have no qualifying rounds. */
+  excludeQualifying?: boolean;
 }
 
 /**
@@ -25,12 +27,18 @@ export interface SyncFixturesOptions {
  */
 export async function syncFixtures(
   admin: SupabaseClient<Database>,
-  config: BigFiveCompetitionConfig,
+  config: CompetitionSyncTarget,
   options: SyncFixturesOptions = {}
 ): Promise<SyncResult> {
   const counts = emptySyncCounts();
   const errors: string[] = [];
-  const scope = { competitionCode: config.code, ...options };
+  const scope = {
+    competitionCode: config.code,
+    from: options.from,
+    to: options.to,
+    page: options.page,
+    excludeQualifying: options.excludeQualifying ? "true" : undefined,
+  };
   const fail = (message: string, requestsUsed = 0): SyncResult => {
     errors.push(message);
     counts.failed += 1;
@@ -55,7 +63,18 @@ export async function syncFixtures(
       to: options.to,
     });
 
-    const normalized = data.response.map(normalizeFixture);
+    const rawNormalized = data.response.map(normalizeFixture);
+    const normalized = options.excludeQualifying
+      ? rawNormalized.filter((f) => {
+          const isQualifying = isQualifyingRound(f.round);
+          if (isQualifying) {
+            errors.push(`Skipping fixture ${f.externalId}: qualifying round ("${f.round}"), not the main competition.`);
+            counts.skipped += 1;
+          }
+          return !isQualifying;
+        })
+      : rawNormalized;
+
     const clubExternalIds = Array.from(
       new Set(normalized.flatMap((f) => [f.homeClubExternalId, f.awayClubExternalId]))
     );

@@ -2,26 +2,35 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getTeams } from "../football-providers/api-football/client.ts";
 import { normalizeClub } from "../football-providers/api-football/adapter.ts";
-import type { BigFiveCompetitionConfig } from "../football-providers/api-football/big-five-competitions.ts";
+import { resolveUniqueClubCode } from "./club-codes.ts";
 import { createMappings, getExistingMappings } from "./identity.ts";
-import { emptySyncCounts } from "./reconcile.ts";
-import type { SyncResult } from "./types.ts";
+import { emptySyncCounts, planReconciliation } from "./reconcile.ts";
+import type { CompetitionSyncTarget, SyncResult } from "./types.ts";
 import type { Database } from "@/lib/supabase/database.types";
 
 /**
  * Syncs every club for one already-synced competition — one
  * `GET /teams?league=&season=` request (API-Football returns a whole
- * league's clubs in a single page; no pagination loop needed here). `clubs`
- * has a natural unique key (`competition_id`, `code`), so every item is
- * upserted by that key unconditionally (idempotent by the DB constraint
- * itself) — `provider_mappings` is then backfilled only for external ids
- * that don't have one yet, same end result as the players/fixtures
- * reconciliation but without needing the generic plan for an entity that
- * already has a natural key.
+ * league's clubs in a single page; no pagination loop needed here).
+ *
+ * Identity is resolved via `provider_mappings` (`planReconciliation()`),
+ * exactly like players/fixtures — NOT by the `(competition_id, code)`
+ * natural key. This matters the moment a club competes in more than one
+ * synced competition (a Big Five club also playing in the Champions
+ * League, say): the natural key alone can't tell "this club already
+ * exists under a different competition_id" from "this is a genuinely new
+ * club," and would silently create a second, orphaned row for the same
+ * real club. Resolving by provider mapping first means: a club Eleven has
+ * already seen gets its `name`/`short_name` refreshed in place and its
+ * *existing* `competition_id` is left untouched (a club's primary/domestic
+ * competition is set once, on first sight, and never reassigned by a
+ * later sync from a different competition); only a club with no existing
+ * mapping is created fresh, attributed to whichever competition this call
+ * is syncing.
  */
 export async function syncClubs(
   admin: SupabaseClient<Database>,
-  config: BigFiveCompetitionConfig
+  config: CompetitionSyncTarget
 ): Promise<SyncResult> {
   const counts = emptySyncCounts();
   const errors: string[] = [];
@@ -61,52 +70,70 @@ export async function syncClubs(
 
     const normalized = data.response.map((item) => normalizeClub(item, String(config.providerLeagueId)));
 
-    for (const club of normalized) {
-      const { error: upsertError } = await admin
+    const existing = await getExistingMappings(
+      admin,
+      "club",
+      normalized.map((c) => c.externalId)
+    );
+    const plan = planReconciliation(normalized, existing);
+
+    if (plan.toCreate.length > 0) {
+      // Guard against a real provider data quirk (discovered live): two
+      // distinct clubs in the same competition can report the SAME
+      // `team.code` (e.g. Bayern München and Bayer Leverkusen both "BAY").
+      // Without this, the whole batch insert fails atomically on the
+      // `(competition_id, code)` unique constraint — see club-codes.ts.
+      const { data: existingCodeRows } = await admin
         .from("clubs")
-        .upsert(
-          {
+        .select("code")
+        .eq("competition_id", competitionRow.id);
+      const takenCodes = new Set((existingCodeRows ?? []).map((r) => r.code));
+
+      const toInsert = plan.toCreate.map((c) => {
+        const code = resolveUniqueClubCode(c.code, c.externalId, takenCodes);
+        takenCodes.add(code);
+        return { externalId: c.externalId, code, name: c.name, shortName: c.shortName };
+      });
+
+      const { data: inserted, error: insertError } = await admin
+        .from("clubs")
+        .insert(
+          toInsert.map((c) => ({
             competition_id: competitionRow.id,
-            code: club.code,
-            name: club.name,
-            short_name: club.shortName,
-          },
-          { onConflict: "competition_id,code" }
-        );
-      if (upsertError) {
-        errors.push(`Failed to upsert club ${club.name}: ${upsertError.message}`);
-        counts.failed += 1;
-      }
-    }
+            code: c.code,
+            name: c.name,
+            short_name: c.shortName,
+          }))
+        )
+        .select("id");
 
-    // Backfill provider_mappings for whichever of these clubs don't have one yet.
-    const externalIds = normalized.map((c) => c.externalId);
-    const existingMappings = await getExistingMappings(admin, "club", externalIds);
-    const unmapped = normalized.filter((c) => !existingMappings.has(c.externalId));
-
-    if (unmapped.length > 0) {
-      const { data: rows, error: selectError } = await admin
-        .from("clubs")
-        .select("id, code")
-        .eq("competition_id", competitionRow.id)
-        .in(
-          "code",
-          unmapped.map((c) => c.code)
-        );
-
-      if (selectError || !rows) {
-        errors.push(`Failed to resolve newly-created club ids: ${selectError?.message}`);
-        counts.failed += unmapped.length;
+      if (insertError || !inserted) {
+        errors.push(`Failed to insert clubs: ${insertError?.message}`);
+        counts.failed += plan.toCreate.length;
       } else {
-        const idByCode = new Map(rows.map((r) => [r.code, r.id]));
-        const pairs = unmapped
-          .map((c) => ({ externalId: c.externalId, internalId: idByCode.get(c.code) }))
-          .filter((p): p is { externalId: string; internalId: string } => Boolean(p.internalId));
-        await createMappings(admin, "club", pairs);
-        counts.created += pairs.length;
+        await createMappings(
+          admin,
+          "club",
+          toInsert.map((c, i) => ({ externalId: c.externalId, internalId: inserted[i].id }))
+        );
+        counts.created += inserted.length;
       }
     }
-    counts.updated += normalized.length - unmapped.length - counts.failed;
+
+    for (const { internalId, item } of plan.toUpdate) {
+      // Deliberately NOT updating competition_id — see module doc comment.
+      const { error: updateError } = await admin
+        .from("clubs")
+        .update({ name: item.name, short_name: item.shortName })
+        .eq("id", internalId);
+
+      if (updateError) {
+        errors.push(`Failed to update club ${item.name}: ${updateError.message}`);
+        counts.failed += 1;
+      } else {
+        counts.updated += 1;
+      }
+    }
 
     return {
       operation: "sync-clubs",

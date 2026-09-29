@@ -11,7 +11,7 @@
         "date": "2026-10-03T14:00:00+00:00",
         "status": { "short": "NS" }
       },
-      "league": { "id": 39, "season": 2026 },
+      "league": { "id": 39, "season": 2026, "round": "Regular Season - 8" },
       "teams": { "home": { "id": 50 }, "away": { "id": 42 } }
     },
     {
@@ -20,7 +20,7 @@
         "date": "2026-10-03T16:30:00+00:00",
         "status": { "short": "FT" }
       },
-      "league": { "id": 39, "season": 2026 },
+      "league": { "id": 39, "season": 2026, "round": "Regular Season - 8" },
       "teams": { "home": { "id": 42 }, "away": { "id": 50 } }
     },
     {
@@ -29,7 +29,7 @@
         "date": "2026-10-04T11:15:00+00:00",
         "status": { "short": "PST" }
       },
-      "league": { "id": 39, "season": 2026 },
+      "league": { "id": 39, "season": 2026, "round": "Regular Season - 8" },
       "teams": { "home": { "id": 50 }, "away": { "id": 42 } }
     }
   ]

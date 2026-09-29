@@ -65,3 +65,34 @@ test("planReconciliation is empty-input safe", () => {
   assert.deepEqual(plan.toCreate, []);
   assert.deepEqual(plan.toUpdate, []);
 });
+
+interface FakeClub {
+  externalId: string;
+  code: string;
+  name: string;
+}
+
+test("planReconciliation: a club that already exists (discovered via a different competition's sync) is never re-created — regression test for the cross-competition club duplication defect", () => {
+  // Manchester City was first ingested via a Premier League (domestic)
+  // clubs sync and already has a provider mapping. A later Champions
+  // League clubs sync returns the same real club (same provider
+  // externalId) alongside genuinely new, never-seen clubs. Before this
+  // fix, sync-clubs.ts decided create-vs-update by the (competition_id,
+  // code) natural key instead of by provider mapping, so re-syncing under
+  // a different competition_id produced a second, orphaned row for the
+  // same real club. planReconciliation must route the known club to
+  // toUpdate regardless of which competition context is doing the
+  // syncing — the identity lives in provider_mappings, not in which
+  // competition happened to ask about it.
+  const mci: FakeClub = { externalId: "50", code: "MCI", name: "Manchester City" };
+  const sporting: FakeClub = { externalId: "600", code: "SCP", name: "Sporting CP" };
+  const existingFromDomesticSync = new Map([["50", "club-uuid-mci"]]);
+
+  const plan = planReconciliation([mci, sporting], existingFromDomesticSync);
+
+  assert.equal(plan.toUpdate.length, 1);
+  assert.equal(plan.toUpdate[0].internalId, "club-uuid-mci");
+  assert.equal(plan.toUpdate[0].item.externalId, "50");
+  assert.equal(plan.toCreate.length, 1, "only the genuinely new club is created");
+  assert.equal(plan.toCreate[0].externalId, "600");
+});

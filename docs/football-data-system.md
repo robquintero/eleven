@@ -152,6 +152,82 @@ week) can all belong to the same round later without a schema change.
 any number of stat rows across any number of fixtures, with no assumption
 that they land in disjoint rounds.
 
+## Competition scope: Big Five + UCL/UEL
+
+Eleven's canonical football universe (as of the 2026/27 population) is
+seven competitions: the five Big Five domestic leagues, plus the UEFA
+Champions League (`UCL`, provider id 2) and Europa League (`UEL`, provider
+id 3) — both verified live via `GET /leagues?search=`, never guessed.
+`src/lib/football-providers/api-football/uefa-competitions.ts` holds their
+config, deliberately **separate** from `BIG_FIVE_COMPETITIONS`: only Big
+Five membership gates Eleven's draftable player pool (see "Player
+eligibility" below). No other UEFA competition, domestic cup, or
+international fixture is in scope; expanding this list is a deliberate
+future decision, not an automatic consequence of ingesting fixtures that
+happen to reference other competitions.
+
+### Player eligibility (Big Five only)
+
+A player's `competition_id` is set once, from whichever domestic league
+sync first created their row, and is never reassigned — including by a
+later UEFA fixture/stat sync for the same player. UCL/UEL participation by
+a Big Five player doesn't change their eligibility; it just means their
+`player_match_stats` include rows whose `fixture_id` points at a UEFA
+fixture, which is exactly what makes "this Big Five player's Champions
+League performance" a real, queryable fact without expanding the
+draftable universe.
+
+### Non-Big-Five opponent clubs
+
+UCL/UEL fixtures reference clubs outside the Big Five (e.g., Sporting CP).
+`fixtures.home_club_id`/`away_club_id` are `NOT NULL` foreign keys, so
+these clubs' rows must exist for fixture integrity — `sync-clubs.ts`
+ingests every club `GET /teams` returns for UCL/UEL, Big Five and
+non-Big-Five alike. A genuinely new (non-Big-Five) club gets
+`competition_id` = the UEFA competition it was discovered through; that
+same field is exactly what excludes it from Eleven's player pool (queries
+scoping to the five Big Five competition ids naturally never see a player
+whose `competition_id` is UCL/UEL) — no separate "eligibility" flag or
+system was needed. **No player rows are created for non-Big-Five clubs at
+all** — `sync-fixture-stats.ts` already skips any player with no existing
+`provider_mappings` row rather than fabricating one (this is the same
+mechanism, unchanged, that skips any not-yet-ingested player in a domestic
+fixture too).
+
+### Qualifying rounds are excluded
+
+UCL/UEL run qualifying rounds and play-offs before the League Stage proper
+— verified live via `GET /fixtures/rounds` for the 2026/27 season (exact
+names: `1st/2nd/3rd Qualifying Round`, `Play-offs`, then `League Stage -
+1` through `8`). `sync-fixtures.ts`'s `excludeQualifying` option (CLI:
+`--exclude-qualifying`) filters these out via `rounds.ts`'s
+`isQualifyingRound()` (pure, tested) before anything is written — a
+qualifying-round fixture is never silently included. Domestic leagues have
+no such concept (`Regular Season - N` only) and are unaffected.
+
+## Real defects found and fixed during population (before merge)
+
+Two genuine bugs surfaced live while populating the 2026/27 season, both
+caught and fixed on a dedicated branch before continuing — see that
+branch's commit history for the full detail:
+
+- **Club identity across competitions.** `sync-clubs.ts` originally
+  decided create-vs-update by the `(competition_id, code)` natural key.
+  That's safe only if every club belongs to exactly one synced
+  competition — false the moment UCL/UEL entered scope, since a Big Five
+  club playing in Europe would get a second, orphaned row. Fixed by
+  resolving identity via `provider_mappings` first, like players/fixtures
+  already did (see "Player eligibility" above for the resulting
+  `competition_id` semantics).
+- **Club-code collisions.** API-Football reports the same `team.code`
+  ("BAY") for both Bayern München and Bayer Leverkusen — a real provider
+  data quirk, not a misread. A batch insert of both failed atomically on
+  the `(competition_id, code)` unique constraint. Fixed by
+  `club-codes.ts`'s `resolveUniqueClubCode()`, which disambiguates by
+  appending the colliding club's own provider externalId — never
+  inventing a "real" abbreviation Eleven has no authority to assign.
+  `clubs.short_name` (the UI-facing value) is untouched.
+
 ## Idempotency
 
 Running any `sync-*` command twice must never duplicate a row. Mechanisms,
@@ -208,6 +284,27 @@ Add `--page 2` to `players`/`fixtures` to continue a paginated sync later
 (idempotent) and will reconcile rather than duplicate. This exact sequence
 is what Pass 8's live validation ran — see the Pass 8 final report for the
 actual result counts.
+
+**`fixtures` without `--from`/`--to` fetches the whole season in one
+request** — API-Football's `/fixtures?league=&season=` (no date filter)
+returns every fixture for that league-season in a single response and
+rejects an explicit `--page` (a real provider quirk discovered during the
+2026/27 population: `page` "does not exist" as a field for this query
+shape). Only pass `--page` when you're also date-bounding with
+`--from`/`--to`.
+
+**Bulk-populating every club's players** is a real loop over every club
+in a competition, each needing its own `players --code X --club Y`
+call(s) — there is deliberately no single CLI command that does this
+automatically (brief §8's "no sync-everything command" still holds for
+routine day-to-day use). The 2026/27 population used a short-lived,
+uncommitted orchestration script that called `syncCompetition`/
+`syncClubs`/`syncPlayersForClub`/`syncFixtures`/`syncFixtureStats`
+directly (the exact same functions the CLI calls) in a loop, for that one
+population event — see the Pass 8 final report for exact counts. That
+script was never committed; it isn't part of Eleven's architecture, and a
+future bulk population would write a similar one-off rather than the CLI
+gaining a permanent "sync everything" mode.
 
 ## Sync observability
 

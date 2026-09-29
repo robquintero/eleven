@@ -116,6 +116,8 @@ export interface ApiFootballFixtureItem {
   league: {
     id: number;
     season: number;
+    /** e.g. "Regular Season - 5" (domestic) or "League Stage - 1" / "3rd Qualifying Round" (UEFA) — see `syncFixtures`'s `roundFilter` option. */
+    round: string;
   };
   teams: {
     home: { id: number };
