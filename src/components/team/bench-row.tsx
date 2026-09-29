@@ -58,7 +58,7 @@ export function BenchRow({
       type="button"
       onClick={onSelect}
       className={cn(
-        "grid w-full grid-cols-[1.25rem_2.25rem_1fr_auto] items-center gap-3 rounded-lg py-2.5 pr-2 pl-1 text-left transition-colors sm:grid-cols-[1.25rem_2.25rem_1fr_3rem_4.5rem_5rem]",
+        "grid w-full grid-cols-[1.25rem_2.25rem_1fr_auto] items-center gap-2 rounded-lg py-2 pr-2 pl-1 text-left transition-colors sm:grid-cols-[1.25rem_2rem_1fr_2.25rem_4.25rem]",
         editing && "cursor-pointer",
         selected && "bg-accent/10 ring-1 ring-accent",
         swapTarget && !selected && "bg-accent/5 ring-1 ring-accent/30"
@@ -68,7 +68,7 @@ export function BenchRow({
         {String(index + 1).padStart(2, "0")}
       </span>
 
-      <span className="label-system flex w-9 shrink-0 items-center justify-center rounded-md bg-muted py-1 text-[11px] font-semibold text-foreground-secondary">
+      <span className="label-system flex w-7 shrink-0 items-center justify-center rounded-md bg-muted py-1 text-[10px] font-semibold text-foreground-secondary sm:w-8">
         {player.position}
       </span>
 
@@ -87,12 +87,8 @@ export function BenchRow({
         </p>
       </div>
 
-      <span className="label-system hidden text-xs text-foreground-tertiary sm:block">
+      <span className="label-system hidden truncate text-xs text-foreground-tertiary sm:block">
         {player.club.shortName}
-      </span>
-
-      <span className="label-system hidden text-xs text-foreground-tertiary sm:block">
-        {playerFixtureCode(player)}
       </span>
 
       <span

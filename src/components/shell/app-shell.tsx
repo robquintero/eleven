@@ -10,7 +10,7 @@ import { currentUserTeam, leagues } from "@/lib/mock/dashboard";
 
 export function AppShell({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto min-h-dvh max-w-[1440px] lg:grid lg:grid-cols-[240px_1fr]">
+    <div className="mx-auto min-h-dvh max-w-[1920px] lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:gap-8 lg:border-r lg:border-border lg:px-5 lg:py-7">
         <Wordmark />
         <div className="border-t border-border" />

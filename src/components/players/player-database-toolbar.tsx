@@ -12,7 +12,6 @@ import {
   sortOptions,
   type PlayerFilters,
 } from "@/lib/players-filters";
-import { cn } from "@/lib/utils";
 
 function FilterCell<T extends string>({
   label,
@@ -61,43 +60,39 @@ export function PlayerDatabaseToolbar({
   const active = isFiltersActive(filters);
 
   return (
-    <div className="border-b border-border pb-4">
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-foreground-tertiary"
-          strokeWidth={2}
-        />
-        <input
-          ref={searchInputRef}
-          type="text"
-          value={filters.query}
-          onChange={(e) => onChange({ query: e.target.value })}
-          placeholder="Search player or club…"
-          className={cn(
-            "h-9 w-full rounded-control border border-border bg-surface pr-9 pl-9 text-sm text-foreground outline-none placeholder:text-foreground-tertiary",
-            "focus-visible:border-accent focus-visible:ring-2 focus-visible:ring-accent/40"
+    <div className="border-b border-border pb-3">
+      {/* One professional instrumentation strip — search and filters share
+          a single border/divide-x row instead of a rounded search box
+          sitting above a separate filter strip. */}
+      <div className="flex items-stretch divide-x divide-border overflow-x-auto border border-border">
+        <div className="relative flex min-w-55 flex-1 items-center">
+          <Search
+            className="pointer-events-none absolute left-2.5 size-3.5 text-foreground-tertiary"
+            strokeWidth={2}
+          />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={filters.query}
+            onChange={(e) => onChange({ query: e.target.value })}
+            placeholder="Search player or club…"
+            className="h-9 w-full bg-transparent pr-9 pl-8 text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
+          />
+          {filters.query ? (
+            <button
+              type="button"
+              onClick={() => onChange({ query: "" })}
+              className="absolute right-2.5 text-foreground-tertiary hover:text-foreground"
+              aria-label="Clear search"
+            >
+              <X className="size-3.5" strokeWidth={2} />
+            </button>
+          ) : (
+            <span className="label-system pointer-events-none absolute right-3 text-[10px] text-foreground-tertiary">
+              /
+            </span>
           )}
-        />
-        {filters.query ? (
-          <button
-            type="button"
-            onClick={() => onChange({ query: "" })}
-            className="absolute top-1/2 right-2.5 -translate-y-1/2 text-foreground-tertiary hover:text-foreground"
-            aria-label="Clear search"
-          >
-            <X className="size-3.5" strokeWidth={2} />
-          </button>
-        ) : (
-          <span className="label-system pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[10px] text-foreground-tertiary">
-            /
-          </span>
-        )}
-      </div>
-
-      {/* Control strip — one bordered instrument, adjacent controls share a
-          border; scrolls horizontally rather than wrapping so it never
-          breaks into a second, disconnected row. */}
-      <div className="mt-3 flex divide-x divide-border overflow-x-auto border border-border">
+        </div>
         <FilterCell
           label="POS"
           value={filters.position}
@@ -136,7 +131,7 @@ export function PlayerDatabaseToolbar({
         />
       </div>
 
-      <div className="mt-2.5 flex items-center gap-4">
+      <div className="mt-2 flex items-center gap-4">
         {active && (
           <button
             type="button"

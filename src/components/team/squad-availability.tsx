@@ -24,24 +24,22 @@ export function SquadAvailability({
   counts: Record<PlayerAvailability, number>;
 }) {
   return (
-    <section>
-      <h2 className="text-sm font-semibold tracking-tight text-foreground">
-        Squad availability
-      </h2>
-
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-5 gap-y-2">
-        {order
-          .filter((status) => counts[status] > 0)
-          .map((status) => (
-            <div key={status} className="flex items-center gap-1.5">
+    <div className="divide-y divide-border">
+      {order
+        .filter((status) => counts[status] > 0)
+        .map((status) => (
+          <div key={status} className="flex items-center justify-between py-1.5">
+            <span className="flex items-center gap-1.5">
               <span className={cn("size-1.5 rounded-full", dotClass[status])} />
-              <span className={cn("label-system text-xs", textClass[status])}>
-                <span className="tabular-nums">{counts[status]}</span>{" "}
+              <span className={cn("label-system text-[11px]", textClass[status])}>
                 {availabilityLabel[status]}
               </span>
-            </div>
-          ))}
-      </div>
-    </section>
+            </span>
+            <span className={cn("label-system text-sm font-semibold tabular-nums", textClass[status])}>
+              {counts[status]}
+            </span>
+          </div>
+        ))}
+    </div>
   );
 }

@@ -1,29 +1,26 @@
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { Greeting } from "@/components/dashboard/greeting";
-import { MatchupHero } from "@/components/dashboard/matchup-hero";
-import { RoundStatus } from "@/components/dashboard/round-status";
-import { StandingsPreview } from "@/components/dashboard/standings-preview";
+import { MatchupCommand } from "@/components/dashboard/matchup-command";
+import { OperationsRail } from "@/components/dashboard/operations-rail";
 import { StartingXI } from "@/components/dashboard/starting-xi";
-import { FixturesList } from "@/components/football/fixtures-list";
+import { ModuleHeader } from "@/components/ui/module-header";
 import {
   activity,
   currentLeague,
   currentMatchup,
   currentRound,
   currentUserTeam,
+  opponentLineupBuckets,
   standings,
 } from "@/lib/mock/dashboard";
 import { roundFixtures } from "@/lib/mock/fixtures";
 import { squad } from "@/lib/mock/team";
 
 export default function Home() {
-  const liveFixtures = roundFixtures.filter(
-    (f) => f.state === "live" || f.state === "ht"
-  );
   const startingXI = squad.starters.map((slot) => slot.player);
 
   return (
-    <div className="flex flex-col gap-10 sm:gap-12">
+    <div className="flex flex-col gap-8">
       <Greeting
         managerName={currentUserTeam.manager.displayName}
         teamName={currentUserTeam.name}
@@ -31,45 +28,30 @@ export default function Home() {
         round={currentRound}
       />
 
-      <MatchupHero matchup={currentMatchup} />
-
-      <section className="order-3 lg:order-2">
-        <div className="grid grid-cols-1 gap-8 border-t border-border pt-8 lg:grid-cols-2 lg:gap-12">
-          <RoundStatus
-            starters={squad.starters}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
+        <div className="flex flex-col gap-6">
+          <MatchupCommand
             matchup={currentMatchup}
-            fixtures={roundFixtures}
+            starters={squad.starters}
+            opponentBuckets={opponentLineupBuckets}
           />
-          <div>
-            <h2 className="text-sm font-semibold tracking-tight text-foreground">
-              Live fixtures
-            </h2>
-            <div className="mt-2">
-              {liveFixtures.length > 0 ? (
-                <FixturesList fixtures={liveFixtures} />
-              ) : (
-                <p className="mt-1 text-sm text-foreground-tertiary">
-                  No fixtures in play right now.
-                </p>
-              )}
-            </div>
-          </div>
+          <StartingXI players={startingXI} />
+        </div>
+
+        <OperationsRail
+          starters={squad.starters}
+          fixtures={roundFixtures}
+          standings={standings}
+          highlightTeamId={currentUserTeam.id}
+        />
+      </div>
+
+      <section>
+        <ModuleHeader title="OPERATIONS_FEED" meta={activity.length} />
+        <div className="mt-1">
+          <ActivityFeed items={activity} />
         </div>
       </section>
-
-      <div className="order-2 lg:order-3">
-        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.3fr_1fr] lg:gap-12">
-          <StartingXI players={startingXI} />
-
-          <div className="space-y-10">
-            <StandingsPreview
-              entries={standings.slice(0, 6)}
-              highlightTeamId={currentUserTeam.id}
-            />
-            <ActivityFeed items={activity} />
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

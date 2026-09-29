@@ -9,6 +9,8 @@ import { RoundIntelligence } from "@/components/team/round-intelligence";
 import { SquadAvailability } from "@/components/team/squad-availability";
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { Button } from "@/components/ui/button";
+import { ModuleHeader } from "@/components/ui/module-header";
+import { RailModule } from "@/components/ui/rail-module";
 import {
   currentLeague,
   currentMatchup,
@@ -24,7 +26,7 @@ import {
   findStarterSlotForPlayer,
   swapPlayers,
 } from "@/lib/selectors/lineup";
-import { nextLock, pad2 } from "@/lib/team-fixture";
+import { nextLock, pad2, starterBuckets } from "@/lib/team-fixture";
 import type {
   LineupSlot,
   Player,
@@ -155,6 +157,7 @@ export default function TeamPage() {
     : false;
 
   const upcomingLock = nextLock(squad.starters);
+  const buckets = starterBuckets(squad.starters);
 
   useEffect(() => {
     if (!editing) return;
@@ -192,24 +195,23 @@ export default function TeamPage() {
         </Button>
       </div>
 
-      <div className="mt-3 flex items-center gap-2">
-        {editing && (
-          <span className="label-system flex items-center gap-1.5 border border-l-2 border-accent/40 border-l-accent bg-accent/5 px-2 py-1 text-[10px] font-semibold text-accent">
-            LINEUP_MODE / EDIT
-          </span>
-        )}
-        <p className="text-xs text-foreground-tertiary">
-          {editing
-            ? "Tap a starter, then a bench player in the same position to swap. Esc to cancel."
-            : "Lineup locks progressively as player matches begin."}
-        </p>
+      <div className="mt-4 flex divide-x divide-border overflow-x-auto border border-border">
+        <StripCell label="MODE" value={editing ? "EDIT" : "VIEW"} accent={editing} />
+        <StripCell label="FORMATION" value={squad.formation} />
+        <StripCell label="ACTIVE" value={pad2(buckets.live)} />
+        <StripCell label="LOCKED" value={pad2(buckets.locked + buckets.final)} />
+        <StripCell label="REMAINING" value={pad2(buckets.upcoming)} />
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12">
+      <p className="mt-2 text-xs text-foreground-tertiary">
+        {editing
+          ? "Tap a starter, then a bench player in the same position to swap. Esc to cancel."
+          : "Lineup locks progressively as player matches begin."}
+      </p>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_0.5fr] lg:items-start">
         <section>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">
-            Starting XI
-          </h2>
+          <ModuleHeader title="STARTING_XI" meta={squad.formation} />
           <div className="mt-3">
             <Pitch
               slots={squad.starters}
@@ -222,37 +224,16 @@ export default function TeamPage() {
           </div>
         </section>
 
-        <div className="space-y-8">
-          <section>
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-lg font-semibold tracking-tight text-foreground">
-                Bench
-              </h2>
-              <span className="label-system text-xs text-foreground-tertiary">
-                / {pad2(squad.bench.length)}
-              </span>
-            </div>
-
-            <div className="hidden gap-3 px-1 pt-3 pb-1 sm:grid sm:grid-cols-[1.25rem_2.25rem_1fr_3rem_4.5rem_5rem]">
+        <div className="flex flex-col divide-y divide-border border border-border">
+          <RailModule header="BENCH" meta={`/ ${pad2(squad.bench.length)}`}>
+            <div className="hidden gap-2 px-0 pb-1.5 sm:grid sm:grid-cols-[1.25rem_2rem_1fr_2.25rem_4.25rem]">
               <span />
-              <span className="label-system text-[10px] text-foreground-tertiary">
-                POS
-              </span>
-              <span className="label-system text-[10px] text-foreground-tertiary">
-                PLAYER
-              </span>
-              <span className="label-system text-[10px] text-foreground-tertiary">
-                CLUB
-              </span>
-              <span className="label-system text-[10px] text-foreground-tertiary">
-                FIXTURE
-              </span>
-              <span className="label-system text-right text-[10px] text-foreground-tertiary">
-                STATUS
-              </span>
+              <span className="label-system text-[10px] text-foreground-tertiary">POS</span>
+              <span className="label-system text-[10px] text-foreground-tertiary">PLAYER</span>
+              <span className="label-system text-[10px] text-foreground-tertiary">CLUB</span>
+              <span className="label-system text-right text-[10px] text-foreground-tertiary">STATUS</span>
             </div>
-
-            <div className="mt-1 divide-y divide-border sm:mt-0">
+            <div className="divide-y divide-border">
               {squad.bench.map((player, index) => (
                 <BenchRow
                   key={player.id}
@@ -265,22 +246,23 @@ export default function TeamPage() {
                 />
               ))}
             </div>
-          </section>
+          </RailModule>
 
-          <SquadAvailability counts={availabilityCounts} />
+          <RailModule header="SQUAD_STATUS">
+            <SquadAvailability counts={availabilityCounts} />
+          </RailModule>
 
-          <RoundIntelligence starters={squad.starters} matchup={currentMatchup} />
+          <RailModule header="ROUND_INTELLIGENCE">
+            <RoundIntelligence starters={squad.starters} matchup={currentMatchup} />
+          </RailModule>
 
-          <NextLock slot={upcomingLock} />
+          <RailModule header="NEXT_LOCK">
+            <NextLock slot={upcomingLock} />
+          </RailModule>
 
-          <section>
-            <h2 className="text-sm font-semibold tracking-tight text-foreground">
-              Round {pad2(currentRound.number)} fixtures
-            </h2>
-            <div className="mt-2">
-              <FixturesList fixtures={roundFixtures} />
-            </div>
-          </section>
+          <RailModule header="FIXTURE_FEED" meta={`MATCHDAY ${pad2(currentRound.number)}`}>
+            <FixturesList fixtures={roundFixtures} />
+          </RailModule>
         </div>
       </div>
 
@@ -300,6 +282,29 @@ export default function TeamPage() {
             : undefined
         }
       />
+    </div>
+  );
+}
+
+function StripCell({
+  label,
+  value,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="flex shrink-0 items-center gap-1.5 px-2.5 py-1.5">
+      <span className="label-system text-[10px] text-foreground-tertiary">{label}</span>
+      <span
+        className={`label-system text-[11px] font-semibold ${
+          accent ? "text-accent" : "text-foreground-secondary"
+        }`}
+      >
+        {value}
+      </span>
     </div>
   );
 }

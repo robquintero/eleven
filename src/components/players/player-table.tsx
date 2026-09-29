@@ -71,7 +71,7 @@ export function PlayerTable({
       <div
         className={cn(
           rowGrid,
-          "sticky top-0 z-10 border-b border-l-2 border-border border-l-transparent bg-surface py-2 pr-2 pl-3"
+          "sticky top-0 z-10 border-b border-l-2 border-border border-l-transparent bg-surface py-1.5 pr-2 pl-3"
         )}
       >
         <span />
@@ -113,7 +113,7 @@ export function PlayerTable({
               onClick={() => onSelect(player)}
               className={cn(
                 rowGrid,
-                "w-full border-l-2 border-l-transparent py-2.5 pr-2 pl-3 text-left transition-colors",
+                "w-full border-l-2 border-l-transparent py-2 pr-2 pl-3 text-left transition-colors",
                 isSelected && "border-l-accent bg-accent/10",
                 isHighlighted && "ring-1 ring-inset ring-accent/50",
                 !isSelected && !isHighlighted && "hover:bg-surface"
@@ -124,7 +124,12 @@ export function PlayerTable({
               </span>
 
               <span className="flex min-w-0 items-center gap-1.5">
-                <span className="truncate text-sm font-medium text-foreground">
+                <span
+                  className={cn(
+                    "truncate text-sm text-foreground",
+                    isSelected ? "font-semibold" : "font-medium"
+                  )}
+                >
                   {player.name}
                 </span>
                 {isUnavailable && (

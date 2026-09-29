@@ -584,12 +584,18 @@ check here first for any new round/fixture/status surface
   reimplement a second bar chart
 
 **Dashboard** (`@/components/dashboard`)
-- `Greeting`, `MatchupHero`, `StandingsPreview`, `ActivityFeed`,
-  `StartingXI`, `TeamCrest` — same patterns as v1, with `.label-system`
+- `Greeting`, `ActivityFeed`, `StartingXI`, `TeamCrest` — `.label-system`
   applied to their operational metadata
-- `RoundStatus` — the dashboard's terminal readout (matches complete,
-  player state buckets, my score/opponent score + projections); lives in
-  the full-width strip below the hero, see §12
+- `MatchupCommand` — the primary work surface (§22); replaced `MatchupHero`.
+  Bordered module, not a floating gradient card: score + crests up top,
+  then a `PROJECTED`/`ACTIVE`/`REMAINING` aligned readout per team, then a
+  shared `DELTA` row. Takes `starters` (for the user's own buckets) and a
+  small hand-authored `opponentBuckets` mock (`opponentLineupBuckets`,
+  `mock/dashboard.ts`) since no full opposing roster is mocked.
+- `OperationsRail` — the persistent secondary rail (§22); replaced the
+  old `RoundStatus` + `StandingsPreview` main-content sections. One
+  `divide-y divide-border border` column of `RailModule`s:
+  `ROUND_INTELLIGENCE`, `LIVE_FIXTURES`, `NEXT_LOCK`, `LEAGUE_TABLE`.
 
 **Players** (`@/components/players`)
 - `PlayerRow` (dashboard Starting XI) — compact list-row pattern,
@@ -603,10 +609,13 @@ check here first for any new round/fixture/status surface
 
 **Team** (`@/components/team`)
 - `Pitch`, `PlayerNode` (tactical marker, §11), `BenchRow` (roster table,
-  §7), `SquadAvailability` — reuse before building any new squad-management
-  UI. Selecting a pitch or bench player opens the shared `PlayerInspector`
-  (`@/components/players`, §21) with a `lineupContext` rather than a
-  Team-specific detail sheet.
+  §7 — now a 5-column `POS/PLAYER/CLUB/STATUS` grid, `FIXTURE` dropped to
+  fit the narrower operations-rail column, §22), `SquadAvailability` —
+  reuse before building any new squad-management UI. Selecting a pitch or
+  bench player opens the shared `PlayerInspector` (`@/components/players`,
+  §21) with a `lineupContext` rather than a Team-specific detail sheet.
+  `SquadAvailability`/`RoundIntelligence`/`NextLock` are now bare content
+  (no own `<h2>`) — the page wraps each in a `RailModule` for its header.
 - `RoundIntelligence` — PTS/PROJECTED/ACTIVE/REMAINING/LOCKED readout for
   the operations rail, derived from `starterBuckets()`
 - `NextLock` — soonest still-upcoming starter + live `Countdown` to their
@@ -618,6 +627,15 @@ style)
   `Tabs`, `Sheet`, `Dialog`, `Input`, `InputGroup`, `Textarea`
 - `TerminalPanel` / `TerminalPanelSection` — the bordered-pane primitive
   (§20); check here before building a new rounded-card container anywhere
+- `ModuleHeader` — standalone section header (§22): mono uppercase title +
+  right-aligned meta + its own `border-b`. Use for a section that isn't
+  nested inside a rail (`STARTING_XI`, `OPERATIONS_FEED`, `PLAYER_DATABASE`).
+- `RailModule` — one module inside a persistent operations rail (§22): same
+  header language as `ModuleHeader` but no border of its own — meant to be
+  stacked with siblings inside one `divide-y divide-border border` column
+  so the rail reads as one instrument. Used on both Dashboard
+  (`OperationsRail`) and Team (bench/squad-status/round-intelligence/
+  next-lock/fixture-feed rail).
 - `Command` (generic `cmdk` wrapper, shadcn-styled) — available but *not*
   what the command palette uses; kept for any future simple
   command-style picker that doesn't need Eleven-specific chrome
@@ -875,18 +893,16 @@ replaces.
 |---|---|---|
 | **Workspace** | The default page canvas, usually open. Information grouped through alignment/spacing/rules, not containers. | Dashboard's bare sections, the Team page's right rail |
 | **Module** | A defined functional region — thin border or `TerminalPanel`. | The pitch, the Player Inspector, the bench table |
-| **Focus surface** | Rare; the current high-value action or headline information, may take slightly stronger contrast. | `MatchupHero` |
+| **Focus surface** | Rare; the current high-value action or headline information, may take slightly stronger contrast. | `MatchupCommand`'s score block |
 
 Most of a screen is Workspace. Module is common. Focus surface is one
 moment per screen, not a default — treating every section as a Focus
 surface is the "dashboard tile overload" failure mode this principle
 exists to prevent.
 
-**Density philosophy**: every region earns its space (§12) — this pass
-specifically closes gaps where a module *could* say more without becoming
-noise: `RoundStatus`'s readout (FIXTURES/PLAYERS/SCORE/PROJECTED/OPPONENT/
-DELTA) and `MatchupHero`'s DELTA line are both cases of "integrate one more
-real number into an existing surface" rather than adding a new card.
+**Density philosophy**: every region earns its space (§12) — closes gaps
+where a module *could* say more without becoming noise. §22 documents the
+full desktop recomposition this principle drove.
 
 **Shared player inspection**: a manager should learn one rule — *selecting
 a footballer opens their dossier* — and have it hold everywhere. Dashboard's
@@ -921,6 +937,107 @@ new colors. `DELTA` and similar derived numbers reuse `--live`/
   fill it usefully (see Density philosophy above)
 - A second, independent player detail component instead of extending the
   shared `PlayerInspectorContent`
+
+---
+
+## 22. Desktop Recomposition
+
+§21 stated the professional-workstation *principle*; this section documents
+the concrete structural rebuild that made it visible. All three primary
+screens were rebuilt around the same pattern: a **primary work surface**, a
+**persistent operations rail** next to it, and — on Dashboard — a
+**full-width lower workspace** below both. This is a structural change, not
+a density/label pass — verify against a screenshot, not this text.
+
+**Shell**: `AppShell`'s outer container grew from `max-w-[1440px]` to
+`max-w-[1920px]` so real monitors wider than 1440px stop centering the app
+in a narrow column with black bars either side. The sidebar/header/main
+regions themselves are unchanged.
+
+**Dashboard** (`src/app/page.tsx`) — previously: `Greeting` → `MatchupHero`
+→ a `RoundStatus`/`FixturesList` 2-col row → a `StartingXI`/`Standings`+
+`ActivityFeed` 2-col row. Now:
+
+```
+Greeting
+┌─────────────────────────────────┬───────────────────┐
+│ MatchupCommand (primary surface) │ OperationsRail     │
+│ StartingXI                       │  ROUND_INTELLIGENCE│
+│                                   │  LIVE_FIXTURES     │
+│                                   │  NEXT_LOCK         │
+│                                   │  LEAGUE_TABLE      │
+├─────────────────────────────────┴───────────────────┤
+│ OPERATIONS_FEED (full width)                          │
+└───────────────────────────────────────────────────────┘
+```
+
+`grid-cols-1 lg:grid-cols-[1fr_360px]` — one primary column, one
+fixed-ish rail column, collapsing to a single mobile stack in the same
+priority order (matchup → squad → operational rail → feed) rather than a
+different order per breakpoint this time; the earlier per-breakpoint
+`order-*` trick wasn't needed because the new source order already reads
+correctly on mobile. `MatchupHero`, `RoundStatus`, and `StandingsPreview`
+were deleted outright — their content lives in `MatchupCommand` and
+`OperationsRail` now, not in three separate components plus a hero.
+
+**MatchupCommand**: no more `rounded-2xl` card with a decorative radial
+blur. It's a `border border-border` module: header strip (`MATCHUP_COMMAND`
++ live/matchday meta) → crests/score/progress bar → a
+`grid-cols-2 divide-x` readout (`PROJECTED`/`ACTIVE`/`REMAINING` per team)
+→ a shared `DELTA` row. The opponent's `ACTIVE`/`REMAINING` numbers come
+from a small hand-authored `opponentLineupBuckets` mock
+(`lib/mock/dashboard.ts`) — no full second roster exists, and this was the
+one case where a coherent, clearly-commented mock addition was preferable
+to leaving the opponent side data-empty.
+
+**Team** (`src/app/team/page.tsx`) — previously: a caption line, then
+`[1.15fr_0.85fr]` pitch/`space-y-8` loose section stack (Bench, Squad
+Availability, Round Intelligence, Next Lock, Fixtures each with their own
+`<h2>` and a large gap to the next). Now: a `MODE/FORMATION/ACTIVE/LOCKED/
+REMAINING` control strip above the pitch (the literal bordered-instrument
+row requested — `MODE` reflects `editing` state live), then
+`lg:grid-cols-[1.5fr_0.5fr]` with the pitch given real dominance and the
+right side rebuilt as **one** `divide-y divide-border border` rail:
+`BENCH` / `SQUAD_STATUS` / `ROUND_INTELLIGENCE` / `NEXT_LOCK` /
+`FIXTURE_FEED`, each a `RailModule` instead of a standalone section with
+its own heading and `space-y-8` gap. `SquadAvailability`, `RoundIntelligence`,
+and `NextLock` had their own `<h2>` stripped since the rail now supplies
+the header. `BenchRow`'s desktop column set dropped the `FIXTURE` column
+(5 columns instead of 6, tighter fixed widths) — the old 6-column template
+was sized for the previous, wider `0.85fr` rail and overflowed badly in
+the new narrower one; club/status still communicate enough context, and
+the dropped fixture code is available in `FIXTURE_FEED` /`NEXT_LOCK` below.
+
+**Players** (`src/app/players/page.tsx` + `player-database-toolbar.tsx` +
+`player-inspector-content.tsx`) — the split-pane/inspector-on-select
+structure from §19 was already correct and stayed; three things changed to
+make the *instrumentation* itself feel denser and more attached:
+- The search input and the six filter cells are now **one**
+  `divide-x divide-border border` strip (search was previously a separate
+  rounded `border` box sitting above the filter strip).
+- `PlayerTable` rows tightened (`py-2` from `py-2.5`, header `py-1.5` from
+  `py-2`); the selected row's name goes `font-semibold` (from `font-medium`)
+  so an active record reads as visually "current," not just left-edge
+  tinted.
+- `PlayerInspectorContent`'s identity block now shows `OWNERSHIP` and
+  `STATUS` as two aligned readout rows (previously one combined
+  `STATUS: <badge> <badge>` line), and the `Next` section gives the
+  kickoff its own row rather than sharing one with HOME/AWAY — both changes
+  make the record read as a denser, more structured pane rather than prose
+  with badges inline.
+- Header renamed `Player database` → `PLAYER_DATABASE` to match the
+  module-header vocabulary used everywhere else (see below).
+
+**Module headers**: `ModuleHeader` (standalone) and `RailModule` (nested in
+a rail) are the two new shared primitives (§17) — every section title that
+used to be a `text-lg font-semibold` human-register heading
+(`Starting XI`, `Standings`, `Recent activity`, `Bench`, `Squad
+availability`, `Round intelligence`, `Next lock`) is now one of these two:
+mono, uppercase, `STARTING_XI`/`LEAGUE_TABLE`/`OPERATIONS_FEED`/`BENCH`/
+`SQUAD_STATUS`/`ROUND_INTELLIGENCE`/`NEXT_LOCK`, with a right-aligned meta
+slot (count, a link, a formation code) instead of a second floating link
+element. Player and team names inside those sections stay human-register —
+only the section's own label moved to the system register.
 
 ---
 

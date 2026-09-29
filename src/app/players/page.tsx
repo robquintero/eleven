@@ -119,10 +119,10 @@ export default function PlayersPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-b border-border pb-4">
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-b border-border pb-3">
         <div>
           <h1 className="label-system text-sm font-semibold text-foreground">
-            Player database
+            PLAYER_DATABASE
           </h1>
           <p className="label-system mt-0.5 text-[11px] text-foreground-tertiary">
             Big Five · Matchday {pad2(currentRound.number)}
@@ -136,7 +136,7 @@ export default function PlayersPage() {
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1.5">
+      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
         <span className="label-system text-[11px] text-foreground-secondary">
           <span className="font-semibold text-foreground">{summary.free}</span> free agents
         </span>
@@ -151,7 +151,7 @@ export default function PlayersPage() {
         </span>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-4">
         <PlayerDatabaseToolbar
           filters={filters}
           onChange={updateFilters}

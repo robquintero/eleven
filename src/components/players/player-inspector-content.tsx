@@ -107,12 +107,15 @@ export function PlayerInspectorContent({
         <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-foreground">
           {player.name}
         </h2>
-        <div className="mt-2 flex items-center gap-2">
-          <span className="label-system text-[11px] text-foreground-tertiary">STATUS:</span>
-          <OwnershipStatus player={player} />
-          {player.availability && player.availability !== "available" && (
-            <AvailabilityStatus availability={player.availability} />
-          )}
+        <div className="mt-2.5">
+          <div className="flex items-baseline justify-between py-0.5">
+            <span className="label-system text-[11px] text-foreground-tertiary">OWNERSHIP</span>
+            <OwnershipStatus player={player} />
+          </div>
+          <div className="flex items-baseline justify-between py-0.5">
+            <span className="label-system text-[11px] text-foreground-tertiary">STATUS</span>
+            <AvailabilityStatus availability={player.availability ?? "available"} />
+          </div>
         </div>
         {(isFlagged || isDoubtful) && player.availability && (
           <p className="mt-2 flex items-start gap-2 text-xs text-foreground-secondary">
@@ -137,10 +140,12 @@ export function PlayerInspectorContent({
               ? `${player.club.shortName} — ${player.fixture.opponent}`
               : `${player.fixture.opponent} — ${player.club.shortName}`}
           </p>
+          <p className="label-system mt-1 text-xs text-foreground-tertiary">
+            {formatKickoff(player.fixture.kickoff)}
+          </p>
           <div className="mt-1 flex items-center justify-between">
             <span className="label-system text-xs text-foreground-tertiary">
-              {player.fixture.isHome ? "HOME" : "AWAY"} ·{" "}
-              {formatKickoff(player.fixture.kickoff)}
+              {player.fixture.isHome ? "HOME" : "AWAY"}
             </span>
             <FixtureStateBadge player={player} />
           </div>

@@ -230,6 +230,12 @@ export const currentMatchup: Matchup = {
   status: "live",
 };
 
+/** Camden Wolves' own lineup-lock progress for this round — no opposing
+ * roster is mocked in full, but this round-level readout is real enough to
+ * show alongside Robert FC's (from `starterBuckets(squad.starters)`) in the
+ * Matchup Command module without inventing per-player fake stats. */
+export const opponentLineupBuckets = { live: 2, locked: 3, upcoming: 6 };
+
 const otherTeams: FantasyTeam[] = [
   {
     id: "team_north_bank_ballers",
