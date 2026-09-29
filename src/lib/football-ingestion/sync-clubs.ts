@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getTeams } from "../football-providers/api-football/client.ts";
 import { normalizeClub } from "../football-providers/api-football/adapter.ts";
+import { resolveUniqueClubCode } from "./club-codes.ts";
 import { createMappings, getExistingMappings } from "./identity.ts";
 import { emptySyncCounts, planReconciliation } from "./reconcile.ts";
 import type { CompetitionSyncTarget, SyncResult } from "./types.ts";
@@ -77,10 +78,27 @@ export async function syncClubs(
     const plan = planReconciliation(normalized, existing);
 
     if (plan.toCreate.length > 0) {
+      // Guard against a real provider data quirk (discovered live): two
+      // distinct clubs in the same competition can report the SAME
+      // `team.code` (e.g. Bayern München and Bayer Leverkusen both "BAY").
+      // Without this, the whole batch insert fails atomically on the
+      // `(competition_id, code)` unique constraint — see club-codes.ts.
+      const { data: existingCodeRows } = await admin
+        .from("clubs")
+        .select("code")
+        .eq("competition_id", competitionRow.id);
+      const takenCodes = new Set((existingCodeRows ?? []).map((r) => r.code));
+
+      const toInsert = plan.toCreate.map((c) => {
+        const code = resolveUniqueClubCode(c.code, c.externalId, takenCodes);
+        takenCodes.add(code);
+        return { externalId: c.externalId, code, name: c.name, shortName: c.shortName };
+      });
+
       const { data: inserted, error: insertError } = await admin
         .from("clubs")
         .insert(
-          plan.toCreate.map((c) => ({
+          toInsert.map((c) => ({
             competition_id: competitionRow.id,
             code: c.code,
             name: c.name,
@@ -96,7 +114,7 @@ export async function syncClubs(
         await createMappings(
           admin,
           "club",
-          plan.toCreate.map((c, i) => ({ externalId: c.externalId, internalId: inserted[i].id }))
+          toInsert.map((c, i) => ({ externalId: c.externalId, internalId: inserted[i].id }))
         );
         counts.created += inserted.length;
       }
