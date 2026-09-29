@@ -496,16 +496,19 @@ overriding a real browser shortcut.
 interaction — it must never read as a generic component dropped in.
 
 - **Structure**: `ELEVEN COMMAND` label + search input + `ESC` hint in the
-  header row; sections below are `Navigation`, `Actions`, and (only once
-  the user has typed something) `Players`, each with a `.label-system`
-  group heading.
+  header row; sections below are `Navigation` and `Actions`, each with a
+  `.label-system` group heading.
 - **Actions that don't exist yet** (`Draft Room`, `Waivers`, `Propose
   Trade`, `Transactions`) are rendered `disabled` with a trailing `SOON`
   label — never fake-functional.
-- **Player search** is manual (`shouldFilter={false}` on the `Command`
-  root), matched against `allPlayers` from `@/lib/mock/team`, capped at 6
-  results, rendered as name (human) + `CLUB · POS · LEAGUE` (system) —
-  exactly the club·position compact format from §10.
+- **No player search** (Pass 7.5): the palette's mock player list was
+  removed rather than wired to the real (currently unseeded) player
+  database, which would have silently matched nothing. `cmdk`'s default
+  fuzzy filtering (`shouldFilter` at its default) applies to the
+  `Navigation`/`Actions` items via their `value` props. Re-add player
+  search once `getPlayerDatabase()` (`docs/product-state.md`) has real
+  rows to search, ideally server-scoped rather than fetched into this
+  client component wholesale.
 - **Visuals**: centered high (`top-[16vh]`), `max-w-xl`, `surface-elevated`
   with a `border` and `shadow-2xl` — not vertically centered like a
   standard dialog, not full-width, not glassy. Selection state is
@@ -645,13 +648,14 @@ style)
   `FixtureMatchState` for round-wide (not per-player) match data, and
   `PlayerOwnership`/`SeasonStats`/`totalPoints`/`averagePoints` on
   `Player` for the scouting database
-- `@/lib/mock/*` — typed mock data, always separate from presentation.
-  `team.ts` exports `allPlayers` and `clubs`; `fixtures.ts` exports
-  `roundFixtures` (kept consistent with the `live`/`locked` states
-  already on rostered players' own `fixture` field); `players-database.ts`
-  exports `playerDatabase` — built from a `Seed[]` + `buildPlayer()`
-  pair, not hand-written `Player` literals, and folds in `team.ts`'s
-  roster rather than duplicating it (§19)
+- `@/data-access/*` (Pass 7.5) — real Supabase reads powering every screen,
+  shaped to feed the same `@/lib/types/fantasy` view models the mock layer
+  described below used to. `roster.ts`/`players.ts`/`matchups.ts`/
+  `transactions.ts` all return the honest-empty shape (`[]`/`null`) until
+  the draft engine, football ingestion, and scoring engine exist — see
+  `docs/product-state.md`. `@/lib/mock/*` (the pre-7.5 mock layer this
+  section used to describe) was deleted; it is not coming back as a
+  fallback mode.
 - `@/lib/players-filters` — `PlayerFilters` type, option lists
   (`positionOptions`/`leagueOptions`/`clubOptions`/…), and the pure
   `filterAndSortPlayers()` used by `/players`; extend this rather than

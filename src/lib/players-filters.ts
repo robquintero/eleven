@@ -6,7 +6,6 @@ import type {
   PlayerPosition,
 } from "@/lib/types/fantasy";
 import { leagueCode } from "@/lib/leagues";
-import { playerDatabase } from "@/lib/mock/players-database";
 
 export type SortKey = "points" | "form" | "name" | "kickoff";
 
@@ -70,13 +69,15 @@ export const sortOptions: { value: SortKey; label: string }[] = [
   { value: "kickoff", label: "NEXT KICKOFF" },
 ];
 
-/** Club filter options, derived from the actual dataset rather than hardcoded. */
-export const clubOptions: { value: string; label: string }[] = [
-  { value: "ALL", label: "ALL" },
-  ...[...new Map(playerDatabase.map((p) => [p.club.id, p.club.shortName])).entries()]
-    .sort((a, b) => a[1].localeCompare(b[1]))
-    .map(([value, label]) => ({ value, label })),
-];
+/** Club filter options, derived from the real dataset passed in — never a hardcoded/mock list. */
+export function getClubOptions(players: Player[]): { value: string; label: string }[] {
+  return [
+    { value: "ALL", label: "ALL" },
+    ...[...new Map(players.map((p) => [p.club.id, p.club.shortName])).entries()]
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([value, label]) => ({ value, label })),
+  ];
+}
 
 export function filterAndSortPlayers(players: Player[], filters: PlayerFilters): Player[] {
   const q = filters.query.trim().toLowerCase();

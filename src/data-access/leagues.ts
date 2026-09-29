@@ -12,7 +12,17 @@ export interface LeagueSummary {
   inviteCode: string;
   status: "draft" | "active" | "completed" | "archived";
   memberCount: number;
+  maxTeams: number;
   role: "manager" | "commissioner";
+}
+
+/** Reads `maxTeams` out of the `LeagueSettings` JSONB column, defaulting to the same 10 the create_league() function defaults to when a league has no explicit override. */
+function maxTeamsFromSettings(settings: unknown): number {
+  if (settings && typeof settings === "object" && "maxTeams" in settings) {
+    const value = (settings as { maxTeams?: unknown }).maxTeams;
+    if (typeof value === "number" && Number.isFinite(value) && value > 0) return value;
+  }
+  return 10;
 }
 
 /**
@@ -39,7 +49,7 @@ export async function getUserLeagues(): Promise<LeagueSummary[]> {
 
   const { data: leagues, error: leaguesError } = await supabase
     .from("fantasy_leagues")
-    .select("id, name, invite_code, status")
+    .select("id, name, invite_code, status, settings")
     .in("id", leagueIds);
 
   if (leaguesError || !leagues) return [];
@@ -69,8 +79,84 @@ export async function getUserLeagues(): Promise<LeagueSummary[]> {
     // carry literal-union information into introspection.
     status: league.status as LeagueSummary["status"],
     memberCount: countByLeagueId.get(league.id) ?? 0,
+    maxTeams: maxTeamsFromSettings(league.settings),
     role: (roleByLeagueId.get(league.id) ?? "manager") as LeagueSummary["role"],
   }));
+}
+
+export interface LeagueMember {
+  userId: string;
+  displayName: string;
+  role: "manager" | "commissioner";
+  joinedAt: string;
+  teamName: string | null;
+}
+
+export interface LeagueDetail extends LeagueSummary {
+  createdByUserId: string;
+  members: LeagueMember[];
+}
+
+/**
+ * Full league detail for the League page: the summary fields plus the real
+ * member roster (profile display names + their team names, if any). `null`
+ * if the league doesn't exist or the caller isn't a member — RLS would
+ * return no rows in that case regardless, this just makes the "not found"
+ * path explicit for the page to render a truthful 404-equivalent state.
+ */
+export async function getLeagueDetail(leagueId: string): Promise<LeagueDetail | null> {
+  if (!isSupabaseConfigured()) return null;
+
+  const supabase = await createClient();
+
+  const { data: league, error: leagueError } = await supabase
+    .from("fantasy_leagues")
+    .select("id, name, invite_code, status, settings, created_by_user_id")
+    .eq("id", leagueId)
+    .maybeSingle();
+
+  if (leagueError || !league) return null;
+
+  const { data: memberships, error: membershipError } = await supabase
+    .from("league_memberships")
+    .select("user_id, role, joined_at")
+    .eq("league_id", leagueId)
+    .order("joined_at", { ascending: true });
+
+  if (membershipError || !memberships) return null;
+
+  const userIds = memberships.map((m) => m.user_id);
+
+  const [{ data: profiles }, { data: teams }] = await Promise.all([
+    supabase.from("profiles").select("id, display_name").in("id", userIds),
+    supabase.from("fantasy_teams").select("owner_user_id, name").eq("league_id", leagueId),
+  ]);
+
+  const displayNameByUserId = new Map((profiles ?? []).map((p) => [p.id, p.display_name]));
+  const teamNameByUserId = new Map((teams ?? []).map((t) => [t.owner_user_id, t.name]));
+
+  const {
+    data: userData,
+  } = await supabase.auth.getUser();
+  const callerRole = memberships.find((m) => m.user_id === userData.user?.id)?.role ?? "manager";
+
+  return {
+    id: league.id,
+    name: league.name,
+    inviteCode: league.invite_code,
+    status: league.status as LeagueSummary["status"],
+    memberCount: memberships.length,
+    maxTeams: maxTeamsFromSettings(league.settings),
+    role: callerRole as LeagueSummary["role"],
+    createdByUserId: league.created_by_user_id,
+    members: memberships.map((m) => ({
+      userId: m.user_id,
+      displayName: displayNameByUserId.get(m.user_id) ?? "Unknown manager",
+      role: m.role as LeagueMember["role"],
+      joinedAt: m.joined_at,
+      teamName: teamNameByUserId.get(m.user_id) ?? null,
+    })),
+  };
 }
 
 export interface CreateLeagueInput {

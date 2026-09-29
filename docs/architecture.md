@@ -159,25 +159,21 @@ static fixture JSON under `api-football/__fixtures__/`.
 | **Transaction processing** | The thing that actually executes waivers/trades/drops — validates invariants immediately before writing, then creates the `Transaction` audit record. |
 | **Operations feed** | Subscribes to `DomainEvent`s and renders them as `OperationsFeedEntry` rows for an activity-stream UI (not built this pass). |
 
-## Two mock layers — why both exist
+## Mock data — test/illustration only, never runtime (Pass 7.5)
 
-This pass added a **second** mock-data location, and it's intentional
-that the first one wasn't deleted:
+**Pass 7.5 deleted `src/lib/mock/*`.** Every screen (`/home`, `/team`,
+`/players`, the League page, the shell) now reads real (possibly empty)
+data through `src/data-access/*` — see `docs/product-state.md` for the
+full rule and the screen-by-screen source table. There is no "mock/demo"
+fallback mode left in the production runtime.
 
-- **`src/lib/mock/*`** — the existing UI-facing mock data
-  (`dashboard.ts`, `team.ts`, `players-database.ts`, `fixtures.ts`),
-  shaped as the **view models** in `src/lib/types/fantasy.ts`. Every
-  screen (`/`, `/team`, `/players`) still runs on this today, unchanged.
-  A `Player` here carries a single `ownership` field because, on a
-  single-manager screen showing one league, that's the correct
-  *presentation* shape — it is not making a claim about the canonical
-  data model.
-- **`src/data/mocks/*`** — new, small, illustrative sample data shaped
-  exactly like `src/domain/football` and `src/domain/fantasy`. It exists
-  to prove the canonical types are usable end-to-end (a league, a team, a
-  roster, a round, a matchup, a draft pick, a trade, a scoring result)
-  and to give a future migration something concrete to seed a Postgres
-  schema from. It is not imported by any screen.
+**`src/data/mocks/*`** remains: small, illustrative sample data shaped
+exactly like `src/domain/football` and `src/domain/fantasy`. It exists to
+prove the canonical types are usable end-to-end (a league, a team, a
+roster, a round, a matchup, a draft pick, a trade, a scoring result) and
+is explicitly not imported by any screen — a `Player` here does not
+represent a real footballer. `src/lib/no-runtime-mock-imports.test.ts`
+enforces this by failing the suite if any production module imports it.
 
 The **selectors** in `src/lib/selectors/` (`player.ts`, `lineup.ts`) are
 the adapter layer between these: pure functions like
@@ -224,8 +220,9 @@ src/
     selectors/
       player.ts       getOwnershipLabel, getNextFixtureLabel, getRecentFormAverage, getDatabaseSummary
       lineup.ts        swapPlayers, findStarterSlotForPlayer, findBenchPlayerAtPosition, ...
-    mock/              EXISTING — untouched, still powers every live screen
-    types/fantasy.ts    EXISTING — the UI's view-model types, untouched
+    types/fantasy.ts    EXISTING — the UI's view-model types (Pass 7.5: real data-access
+                        modules under src/data-access/ now populate these shapes;
+                        src/lib/mock/ was deleted — see docs/product-state.md)
     team-fixture.ts, players-filters.ts, leagues.ts, time.ts, utils.ts   EXISTING helpers
 
   components/, app/    EXISTING UI — unchanged by this pass except for
@@ -287,7 +284,14 @@ each one is small enough to land, verify, and stop:
 | **7B** | Football world ingestion — a real ingestion service that resolves `Normalized*` output through `provider_mappings` and writes `competitions`/`clubs`/`players` into Postgres. |
 | **7C** | Fixtures + match data — ingesting `fixtures` and (once coverage confirms it's available per competition) `player_match_stats`. |
 | **7D** | Sync system — the scheduled/triggered job(s) that actually run 7B/7C's ingestion on a cadence tied to real kickoffs, rather than one-off manual runs. |
-| **7E** | Replace mock football reads — Dashboard/Team/Players start reading real `competitions`/`clubs`/`players`/`fixtures` instead of `src/lib/mock/*`, behind the same kind of graceful-fallback pattern Pass 6 used for auth. |
+| **7E** | Replace mock football reads — Players' `getPlayerDatabase()` (see `docs/product-state.md`) starts returning ingested `competitions`/`clubs`/`players`/`fixtures` instead of an empty array; the function's shape doesn't change. |
 
 Pass 7A does not start 7B. Fantasy scoring and the draft engine are not
 on this list at all yet — they depend on 7C's real stats existing first.
+
+**Pass 7.5** (see `docs/product-state.md`) landed between 7A and 7B: it
+removed the fantasy-side mock layer (`src/lib/mock/*`) that every screen
+ran on, and made Dashboard/Team/Players/League read real (currently
+mostly empty) Supabase data through `src/data-access/*` instead. It did
+not touch football ingestion — Players' `getPlayerDatabase()` reads the
+real `players` table, which 7B still has to populate.

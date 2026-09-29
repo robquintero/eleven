@@ -8,9 +8,9 @@ import { NextResponse, type NextRequest } from "next/server";
  * 03-file-conventions/proxy.md) doing the same job the Supabase Next.js
  * guides normally wire up in `middleware.ts`: nothing else changed.
  *
- * If Supabase isn't configured (no env vars — the app's existing mock/demo
- * experience doesn't require it), this no-ops rather than throwing, so the
- * rest of the app keeps working exactly as it did before this pass.
+ * If Supabase isn't configured (no env vars) this no-ops rather than
+ * throwing — `(app)/layout.tsx`'s auth guard falls back gracefully in the
+ * same environments, so nothing downstream assumes a session exists.
  */
 export async function proxy(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;

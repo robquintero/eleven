@@ -18,3 +18,21 @@ export const leagueCode: Record<BigFiveLeague, string> = {
 };
 
 export const leagueCodes = Object.values(leagueCode);
+
+const bigFiveLeagueByCode: Record<string, BigFiveLeague> = {
+  ENG: "premier-league",
+  ESP: "la-liga",
+  GER: "bundesliga",
+  ITA: "serie-a",
+  FRA: "ligue-1",
+};
+
+/**
+ * Maps a real `competitions.code` (see supabase/migrations/…football_foundation.sql)
+ * back to the UI's `BigFiveLeague` slug. Falls back to `"premier-league"`
+ * only as a type-safe default for an unrecognized/null code — real
+ * ingested data (Pass 8+) will always carry one of the five known codes.
+ */
+export function bigFiveLeagueFromCompetitionCode(code: string | null | undefined): BigFiveLeague {
+  return (code && bigFiveLeagueByCode[code]) || "premier-league";
+}

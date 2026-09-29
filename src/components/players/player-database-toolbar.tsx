@@ -4,7 +4,6 @@ import type { RefObject } from "react";
 import { Search, X } from "lucide-react";
 import {
   availabilityOptions,
-  clubOptions,
   isFiltersActive,
   leagueOptions,
   ownershipOptions,
@@ -49,6 +48,7 @@ export function PlayerDatabaseToolbar({
   resultCount,
   totalCount,
   searchInputRef,
+  clubOptions,
 }: {
   filters: PlayerFilters;
   onChange: (patch: Partial<PlayerFilters>) => void;
@@ -56,6 +56,7 @@ export function PlayerDatabaseToolbar({
   resultCount: number;
   totalCount: number;
   searchInputRef: RefObject<HTMLInputElement | null>;
+  clubOptions: { value: string; label: string }[];
 }) {
   const active = isFiltersActive(filters);
 

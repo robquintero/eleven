@@ -10,8 +10,9 @@ export interface Profile {
 
 /**
  * The signed-in user's own profile, or `null` if there's no session or
- * Supabase isn't configured (the existing mock/demo screens must keep
- * working with zero setup — see src/lib/supabase/config.ts).
+ * Supabase isn't configured for this environment — see
+ * src/lib/supabase/config.ts. Callers must render a truthful
+ * unavailable/signed-out state for `null`, never a fabricated identity.
  */
 export async function getCurrentProfile(): Promise<Profile | null> {
   if (!isSupabaseConfigured()) return null;

@@ -6,25 +6,21 @@ import { LeagueSwitcher } from "@/components/shell/league-switcher";
 import { ProfileControl } from "@/components/shell/profile-control";
 import { StatusBar } from "@/components/shell/status-bar";
 import { Wordmark } from "@/components/shell/wordmark";
+import { getActiveLeagueId } from "@/data-access/active-league";
 import { getUserLeagues } from "@/data-access/leagues";
 import { getCurrentProfile } from "@/data-access/profiles";
-import { currentUserTeam, leagues as mockLeagues } from "@/lib/mock/dashboard";
 
+/**
+ * The authenticated workstation chrome. Every value here is real: the
+ * league switcher lists only the caller's actual memberships (`[]` renders
+ * a "no league" affordance instead of a switcher), and the profile control
+ * always reflects the real signed-in profile — `(app)/layout.tsx` already
+ * guarantees a session exists before this ever renders. See
+ * docs/product-state.md "Runtime mock prohibition."
+ */
 export async function AppShell({ children }: { children: ReactNode }) {
-  const [profile, realLeagues] = await Promise.all([
-    getCurrentProfile(),
-    getUserLeagues(),
-  ]);
-
-  // Real leagues take over the switcher the moment the signed-in user has
-  // at least one; otherwise it keeps showing the mock leagues exactly as
-  // before — see docs/architecture.md-style "two data sources" note in
-  // the Pass 6 report for why this fallback exists rather than an empty
-  // switcher.
-  const switcherLeagues =
-    realLeagues.length > 0
-      ? realLeagues.map((l) => ({ id: l.id, name: l.name, memberCount: l.memberCount }))
-      : mockLeagues;
+  const [profile, leagues] = await Promise.all([getCurrentProfile(), getUserLeagues()]);
+  const activeLeagueId = await getActiveLeagueId(leagues);
 
   return (
     <div className="mx-auto min-h-dvh max-w-[1920px] lg:grid lg:grid-cols-[240px_1fr]">
@@ -41,14 +37,11 @@ export async function AppShell({ children }: { children: ReactNode }) {
               <div className="lg:hidden">
                 <Wordmark />
               </div>
-              <LeagueSwitcher
-                leagues={switcherLeagues}
-                initialLeagueId={switcherLeagues[0].id}
-              />
+              <LeagueSwitcher leagues={leagues} activeLeagueId={activeLeagueId} />
             </div>
             <div className="flex items-center gap-3">
               <CommandPalette />
-              <ProfileControl manager={currentUserTeam.manager} profile={profile} />
+              <ProfileControl profile={profile} />
             </div>
           </div>
           <StatusBar />
