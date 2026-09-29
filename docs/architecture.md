@@ -49,10 +49,12 @@ anything is written to a canonical table, so switching providers is a
 matter of writing a new normalization step, not rebuilding the schema or
 the application.
 
-**Status as of Pass 7A**: the first two stages of this pipeline are real
-— see "Football data provider" below. INGESTION (writing normalized data
-into Postgres, resolving through `provider_mappings`) does not exist yet;
-that's Pass 7B.
+**Status as of Pass 8**: the whole pipeline is real, end to end — see
+`docs/football-data-system.md` for the full detail (identity resolution,
+idempotency, quota strategy, season/timezone handling, deferred stats).
+Ingestion is a manually-invoked CLI (`npm run football:sync`), not a
+scheduled job yet, and only a small controlled sample has been ingested,
+not the full Big Five — see the Pass 8 final report.
 
 ## Football data provider (Pass 7A)
 
@@ -257,6 +259,27 @@ src/lib/
       __fixtures__/                Sanitized sample JSON the test suite runs against (no network, no secrets)
 ```
 
+**Added in Pass 8** (see `docs/football-data-system.md` for the full detail):
+
+```
+src/lib/
+  football-ingestion/               server-only, never imported by application code
+    reconcile.ts                    planReconciliation() — pure create-vs-update logic, unit-tested
+    quota.ts                        shouldStopForQuota(), hasMorePages() — pure, unit-tested
+    identity.ts                     provider_mappings reads/writes
+    types.ts                        SyncResult
+    sync-competitions.ts            sync-clubs.ts / sync-players.ts / sync-fixtures.ts / sync-fixture-stats.ts
+    record-sync-event.ts            writes a domain_events row per sync run
+    cli.ts                          npm run football:sync -- <op> [flags] — the only entry point
+  supabase/
+    admin.ts                        the one service-role (RLS-bypassing) Supabase client — ingestion-only
+  selectors/
+    usage-trend.ts                  getUsageTrend() — pure, unit-tested; powers the Player Inspector's recent-usage section
+
+src/data-access/
+  players.ts                        rewritten: server-side filtered/paginated getPlayerDatabase(), getCompetitionFilters(), getClubFilters(), getPlayerRecentMatches()
+```
+
 Several files split pure logic (`config.ts`, `response-helpers.ts`) out of
 the actual network-calling `client.ts` (which carries `"server-only"`) —
 same reasoning as Pass 6's `src/lib/errors/league-action-error.ts` split
@@ -280,18 +303,10 @@ each one is small enough to land, verify, and stop:
 
 | Pass | Scope |
 |---|---|
-| **7A** | Provider foundation — API-Football client/adapter/errors, normalized contracts, Big Five config, coverage discovery, quota awareness, manual connectivity check. **This pass. No ingestion, no UI change.** |
-| **7B** | Football world ingestion — a real ingestion service that resolves `Normalized*` output through `provider_mappings` and writes `competitions`/`clubs`/`players` into Postgres. |
-| **7C** | Fixtures + match data — ingesting `fixtures` and (once coverage confirms it's available per competition) `player_match_stats`. |
-| **7D** | Sync system — the scheduled/triggered job(s) that actually run 7B/7C's ingestion on a cadence tied to real kickoffs, rather than one-off manual runs. |
-| **7E** | Replace mock football reads — Players' `getPlayerDatabase()` (see `docs/product-state.md`) starts returning ingested `competitions`/`clubs`/`players`/`fixtures` instead of an empty array; the function's shape doesn't change. |
+| **7A** | Provider foundation — API-Football client/adapter/errors, normalized contracts, Big Five config, coverage discovery, quota awareness, manual connectivity check. No ingestion, no UI change. |
+| **7.5** | Product Reality — removed the fantasy-side mock layer (`src/lib/mock/*`), made Dashboard/Team/Players/League read real Supabase data. Did not touch football ingestion. |
+| **8** | Football data system — the real ingestion pipeline (`src/lib/football-ingestion/*`, `npm run football:sync`): competitions/clubs/players/fixtures/player_match_stats, provider identity resolution, idempotency, quota discipline. Restored the full Players scouting workspace on real data. **This pass.** Only a small controlled sample was ingested — see `docs/football-data-system.md` and the Pass 8 final report for the full-population strategy still awaiting approval. |
+| **9** | Fantasy scoring engine — `ScoringRule` → `FantasyPlayerScore`, Form Tracker (real fantasy production over recent rounds), the draft engine. Depends on Pass 8's real `player_match_stats` existing, which they now do (for the ingested sample). |
 
-Pass 7A does not start 7B. Fantasy scoring and the draft engine are not
-on this list at all yet — they depend on 7C's real stats existing first.
-
-**Pass 7.5** (see `docs/product-state.md`) landed between 7A and 7B: it
-removed the fantasy-side mock layer (`src/lib/mock/*`) that every screen
-ran on, and made Dashboard/Team/Players/League read real (currently
-mostly empty) Supabase data through `src/data-access/*` instead. It did
-not touch football ingestion — Players' `getPlayerDatabase()` reads the
-real `players` table, which 7B still has to populate.
+Pass 8 did not begin Pass 9 — no fantasy points are computed anywhere in
+the codebase.

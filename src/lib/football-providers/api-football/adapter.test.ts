@@ -9,12 +9,14 @@ import {
   normalizeCompetition,
   normalizeCoverage,
   normalizeFixture,
+  normalizeFixturePlayerStats,
   normalizePlayer,
 } from "./adapter.ts";
 import { getBigFiveCompetition } from "./big-five-competitions.ts";
 import type {
   ApiFootballEnvelope,
   ApiFootballFixtureItem,
+  ApiFootballFixturePlayersItem,
   ApiFootballLeagueItem,
   ApiFootballPlayerItem,
   ApiFootballTeamItem,
@@ -29,6 +31,7 @@ const leagues = loadFixture<ApiFootballLeagueItem>("leagues-premier-league.json"
 const teams = loadFixture<ApiFootballTeamItem>("teams-premier-league.json");
 const players = loadFixture<ApiFootballPlayerItem>("players-team.json");
 const fixtures = loadFixture<ApiFootballFixtureItem>("fixtures-premier-league.json");
+const fixturePlayers = loadFixture<ApiFootballFixturePlayersItem>("fixture-players.json");
 
 // ---------------------------------------------------------------------
 // normalizeCompetition
@@ -172,6 +175,52 @@ test("normalizeFixture maps a postponed fixture correctly", () => {
 test("normalizeFixture never carries an Eleven-style 'id' field", () => {
   const normalized = normalizeFixture(fixtures.response[0]);
   assert.equal("id" in normalized, false);
+});
+
+// ---------------------------------------------------------------------
+// normalizeFixturePlayerStats
+// ---------------------------------------------------------------------
+
+test("normalizeFixturePlayerStats flattens both teams into one row per player", () => {
+  const rows = normalizeFixturePlayerStats(fixturePlayers.response, "900002");
+  assert.equal(rows.length, 4);
+  assert.deepEqual(
+    rows.map((r) => r.playerExternalId),
+    ["1200", "1201", "1100", "1101"]
+  );
+  assert.ok(rows.every((r) => r.fixtureExternalId === "900002"));
+});
+
+test("normalizeFixturePlayerStats maps a starter's stats and started=true", () => {
+  const rows = normalizeFixturePlayerStats(fixturePlayers.response, "900002");
+  const scorer = rows.find((r) => r.playerExternalId === "1200")!;
+  assert.equal(scorer.started, true);
+  assert.equal(scorer.minutes, 90);
+  assert.equal(scorer.goals, 1);
+  assert.equal(scorer.shotsOnTarget, 3);
+  assert.equal(scorer.chancesCreated, 2);
+  assert.equal(scorer.interceptions, 2);
+});
+
+test("normalizeFixturePlayerStats maps a substitute's stats and started=false", () => {
+  const rows = normalizeFixturePlayerStats(fixturePlayers.response, "900002");
+  const sub = rows.find((r) => r.playerExternalId === "1201")!;
+  assert.equal(sub.started, false);
+  assert.equal(sub.minutes, 12);
+  assert.equal(sub.assists, 1);
+  assert.equal(sub.yellowCards, 1);
+});
+
+test("normalizeFixturePlayerStats maps a goalkeeper's saves via the goals.saves field", () => {
+  const rows = normalizeFixturePlayerStats(fixturePlayers.response, "900002");
+  const keeper = rows.find((r) => r.playerExternalId === "1101")!;
+  assert.equal(keeper.saves, 5);
+});
+
+test("normalizeFixturePlayerStats defaults null provider fields to 0, never undefined", () => {
+  const rows = normalizeFixturePlayerStats(fixturePlayers.response, "900002");
+  const outfielder = rows.find((r) => r.playerExternalId === "1200")!;
+  assert.equal(outfielder.saves, 0);
 });
 
 // ---------------------------------------------------------------------

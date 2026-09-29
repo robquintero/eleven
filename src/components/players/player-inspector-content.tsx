@@ -8,8 +8,9 @@ import { AvailabilityStatus } from "@/components/players/availability-status";
 import { OwnershipStatus } from "@/components/players/ownership-status";
 import { Button } from "@/components/ui/button";
 import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-panel";
-import { getRecentFormAverage } from "@/lib/selectors/player";
-import { availabilityLabel, formatKickoff } from "@/lib/team-fixture";
+import type { RecentMatchRow } from "@/data-access/players";
+import { getUsageTrend } from "@/lib/selectors/usage-trend";
+import { availabilityLabel, formatKickoff, formatKickoffTime } from "@/lib/team-fixture";
 import type { Player, PlayerOwnership } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
@@ -79,18 +80,21 @@ function StatRow({ label, value }: { label: string; value: ReactNode }) {
 export function PlayerInspectorContent({
   player,
   index,
+  recentMatches,
   lineupContext,
 }: {
   player: Player;
   index?: number;
+  /** `null` while loading, `[]` for INSUFFICIENT MATCH DATA, real rows otherwise — see src/data-access/players.ts. */
+  recentMatches?: RecentMatchRow[] | null;
   lineupContext?: LineupInspectorContext;
 }) {
   const router = useRouter();
   const [showNote, setShowNote] = useState(false);
 
-  const ownership = player.ownership ?? "free";
+  const ownership = player.ownership;
   const stats = player.seasonStats;
-  const last5 = getRecentFormAverage(player);
+  const usageTrend = recentMatches ? getUsageTrend(recentMatches) : undefined;
   const isFlagged = player.availability === "injured" || player.availability === "suspended";
   const isDoubtful = player.availability === "doubtful";
 
@@ -108,10 +112,12 @@ export function PlayerInspectorContent({
           {player.name}
         </h2>
         <div className="mt-2.5">
-          <div className="flex items-baseline justify-between py-0.5">
-            <span className="label-system text-[11px] text-foreground-tertiary">OWNERSHIP</span>
-            <OwnershipStatus player={player} />
-          </div>
+          {ownership && (
+            <div className="flex items-baseline justify-between py-0.5">
+              <span className="label-system text-[11px] text-foreground-tertiary">OWNERSHIP</span>
+              <OwnershipStatus player={player} />
+            </div>
+          )}
           <div className="flex items-baseline justify-between py-0.5">
             <span className="label-system text-[11px] text-foreground-tertiary">STATUS</span>
             <AvailabilityStatus availability={player.availability ?? "available"} />
@@ -153,41 +159,49 @@ export function PlayerInspectorContent({
       )}
 
       <TerminalPanelSection>
-        <p className="label-system text-[11px] text-foreground-tertiary">Fantasy</p>
+        <p className="label-system text-[11px] text-foreground-tertiary">Season</p>
         <div className="mt-1">
-          <StatRow label="TOTAL" value={player.totalPoints ?? player.fantasyPoints} />
-          <StatRow
-            label="AVG"
-            value={(player.averagePoints ?? player.fantasyPoints).toFixed(1)}
-          />
-          {last5 !== null && <StatRow label="LAST 5" value={last5.toFixed(1)} />}
+          <StatRow label="APP" value={stats ? stats.appearances : "—"} />
+          <StatRow label="STARTS" value={stats ? stats.starts : "—"} />
+          <StatRow label="MIN" value={stats ? stats.minutes : "—"} />
+          <StatRow label="G" value={stats ? stats.goals : "—"} />
+          <StatRow label="A" value={stats ? stats.assists : "—"} />
+          {stats?.cleanSheets !== undefined && <StatRow label="CS" value={stats.cleanSheets} />}
+          {stats?.saves !== undefined && <StatRow label="SAVES" value={stats.saves} />}
         </div>
       </TerminalPanelSection>
 
-      {player.recentForm && player.recentForm.length > 0 && (
-        <TerminalPanelSection>
-          <p className="label-system text-[11px] text-foreground-tertiary">Recent_form</p>
-          <div className="mt-3">
-            <FormSparkline values={player.recentForm} />
-          </div>
-        </TerminalPanelSection>
-      )}
-
-      {stats && (
-        <TerminalPanelSection>
-          <p className="label-system text-[11px] text-foreground-tertiary">Season</p>
-          <div className="mt-1">
-            <StatRow label="APP" value={stats.appearances} />
-            <StatRow label="MIN" value={stats.minutes} />
-            <StatRow label="G" value={stats.goals} />
-            <StatRow label="A" value={stats.assists} />
-            {stats.cleanSheets !== undefined && (
-              <StatRow label="CS" value={stats.cleanSheets} />
-            )}
-            {stats.saves !== undefined && <StatRow label="SAVES" value={stats.saves} />}
-          </div>
-        </TerminalPanelSection>
-      )}
+      <TerminalPanelSection>
+        <p className="label-system text-[11px] text-foreground-tertiary">Recent_usage</p>
+        {recentMatches === undefined || recentMatches === null ? (
+          <p className="mt-2 text-xs text-foreground-tertiary">Loading…</p>
+        ) : !usageTrend ? (
+          <p className="mt-2 text-xs text-foreground-tertiary">INSUFFICIENT MATCH DATA</p>
+        ) : (
+          <>
+            <div className="mt-1">
+              <StatRow label="AVG MIN" value={usageTrend.averageMinutes} />
+              <StatRow label="START RATE" value={`${Math.round(usageTrend.startRate * 100)}%`} />
+            </div>
+            <div className="mt-3">
+              <FormSparkline values={usageTrend.minutesByMatch} />
+            </div>
+            <div className="mt-3 divide-y divide-border">
+              {recentMatches.map((match) => (
+                <div key={match.fixtureId} className="flex items-center justify-between py-1.5">
+                  <span className="label-system text-[11px] text-foreground-tertiary">
+                    {match.isHome ? "vs" : "@"} {match.opponent} ·{" "}
+                    {formatKickoffTime(match.kickoffAt)}
+                  </span>
+                  <span className="label-system text-[11px] text-foreground-secondary">
+                    {match.minutes}&apos; {match.started ? "" : "(SUB)"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+      </TerminalPanelSection>
 
       <TerminalPanelSection>
         {lineupContext ? (
@@ -202,28 +216,38 @@ export function PlayerInspectorContent({
           >
             {lineupContext.isStarter ? "Move to bench" : "Move to starting XI"}
           </Button>
-        ) : ownership === "mine" ? (
-          <Button
-            className="w-full rounded-control"
-            onClick={() => router.push("/team")}
-          >
-            View in squad
-          </Button>
-        ) : (
+        ) : ownership === "owned" ? (
           <>
-            <Button
-              className="w-full rounded-control"
-              onClick={() => setShowNote(true)}
-            >
-              {actionCopy[ownership]?.label}
+            <Button className="w-full rounded-control" onClick={() => setShowNote(true)}>
+              {actionCopy.owned?.label}
             </Button>
             {showNote && (
               <p className="mt-2 flex items-start gap-1.5 text-xs text-foreground-tertiary">
                 <Info className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
-                {actionCopy[ownership]?.note}
+                {actionCopy.owned?.note}
               </p>
             )}
           </>
+        ) : ownership === "free" ? (
+          <>
+            <Button className="w-full rounded-control" onClick={() => setShowNote(true)}>
+              {actionCopy.free?.label}
+            </Button>
+            {showNote && (
+              <p className="mt-2 flex items-start gap-1.5 text-xs text-foreground-tertiary">
+                <Info className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
+                {actionCopy.free?.note}
+              </p>
+            )}
+          </>
+        ) : (
+          <Button
+            className="w-full rounded-control"
+            variant="outline"
+            onClick={() => router.push("/league")}
+          >
+            Join a league to see roster actions
+          </Button>
         )}
       </TerminalPanelSection>
     </TerminalPanel>

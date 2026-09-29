@@ -2,24 +2,32 @@
 
 High-level flows through the architecture described in
 `docs/architecture.md`, using the entities from `docs/domain-model.md`.
-None of these are implemented yet — this documents the target shape for
-the backend passes that follow.
+Flow 1 is real as of Pass 8 (see `docs/football-data-system.md` for the
+full detail); flows 2 onward remain the target shape for the backend
+passes that follow.
 
-## 1. Football API ingestion
+## 1. Football API ingestion (Pass 8 — real)
 
 ```
-Provider payload
-  → Ingestion job pulls raw data on a schedule
-  → Normalization maps it into Competition/Club/Player/Fixture/PlayerMatchStats shapes
-  → ProviderMapping resolves each external id to an Eleven internal id
+API-Football payload
+  → npm run football:sync -- <op> [flags] pulls raw data — manually invoked, never scheduled/automatic yet
+  → Normalization (api-football/adapter.ts) maps it into Normalized{Competition,Club,Player,Fixture,FixturePlayerStats} shapes
+  → planReconciliation() + provider_mappings resolve each external id to an Eleven internal id
     (creating a new canonical row + mapping if this is the first time
-    Eleven has seen that provider entity)
-  → Canonical rows are written/updated in Postgres
-  → The application only ever reads the canonical tables
+    Eleven has seen that provider entity; updating the existing row in
+    place otherwise — this is what lets a transferred player's club
+    change without a new player being created)
+  → Canonical rows are written/updated in Postgres via the service-role
+    admin client (src/lib/supabase/admin.ts) — every football table's RLS
+    is read-only for `authenticated`
+  → The application (src/data-access/players.ts) only ever reads the
+    canonical tables, filtered/paginated server-side
 ```
 
 Nothing downstream of "Canonical rows are written" ever sees a provider's
-own ID format or schema shape again.
+own ID format or schema shape again. A future scheduled sync job would
+call the exact same `sync-*.ts` functions the CLI calls — see
+`docs/football-data-system.md` "Future scheduled sync."
 
 ## 2. Draft pick → player ownership
 

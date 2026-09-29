@@ -1,32 +1,34 @@
-import type {
-  BigFiveLeague,
-  Player,
-  PlayerAvailability,
-  PlayerOwnership,
-  PlayerPosition,
-} from "@/lib/types/fantasy";
-import { leagueCode } from "@/lib/leagues";
+import type { PlayerAvailability, PlayerOwnership, PlayerPosition } from "@/lib/types/fantasy";
 
-export type SortKey = "points" | "form" | "name" | "kickoff";
+/**
+ * Filter/sort vocabulary for the Players workspace — option lists only.
+ * The actual filtering/sorting/pagination happens server-side in
+ * `getPlayerDatabase` (src/data-access/players.ts), never client-side over
+ * a fully-fetched array — see docs/football-data-system.md "Players
+ * workspace performance." This module just describes the choices the
+ * toolbar renders and turns them into URL search params.
+ */
+
+export type SortKey = "name" | "club";
 
 export interface PlayerFilters {
   query: string;
   position: "ALL" | PlayerPosition;
-  league: "ALL" | BigFiveLeague;
-  ownership: "ALL" | PlayerOwnership;
+  competitionId: "ALL" | string;
+  clubId: "ALL" | string;
+  ownership: "ALL" | Extract<PlayerOwnership, "free" | "owned">;
   availability: "ALL" | PlayerAvailability;
-  club: "ALL" | string;
   sort: SortKey;
 }
 
 export const defaultFilters: PlayerFilters = {
   query: "",
   position: "ALL",
-  league: "ALL",
+  competitionId: "ALL",
+  clubId: "ALL",
   ownership: "ALL",
   availability: "ALL",
-  club: "ALL",
-  sort: "points",
+  sort: "name",
 };
 
 export const positionOptions: { value: PlayerFilters["position"]; label: string }[] = [
@@ -35,23 +37,6 @@ export const positionOptions: { value: PlayerFilters["position"]; label: string 
   { value: "DEF", label: "DEF" },
   { value: "MID", label: "MID" },
   { value: "FWD", label: "FWD" },
-];
-
-export const leagueOptions: { value: PlayerFilters["league"]; label: string }[] = [
-  { value: "ALL", label: "ALL" },
-  { value: "premier-league", label: leagueCode["premier-league"] },
-  { value: "la-liga", label: leagueCode["la-liga"] },
-  { value: "bundesliga", label: leagueCode["bundesliga"] },
-  { value: "serie-a", label: leagueCode["serie-a"] },
-  { value: "ligue-1", label: leagueCode["ligue-1"] },
-];
-
-export const ownershipOptions: { value: PlayerFilters["ownership"]; label: string }[] = [
-  { value: "ALL", label: "ALL" },
-  { value: "free", label: "FREE" },
-  { value: "mine", label: "MINE" },
-  { value: "owned", label: "OWNED" },
-  { value: "waivers", label: "WAIVERS" },
 ];
 
 export const availabilityOptions: { value: PlayerFilters["availability"]; label: string }[] = [
@@ -63,71 +48,75 @@ export const availabilityOptions: { value: PlayerFilters["availability"]; label:
 ];
 
 export const sortOptions: { value: SortKey; label: string }[] = [
-  { value: "points", label: "PTS ↓" },
-  { value: "form", label: "FORM ↓" },
   { value: "name", label: "NAME A–Z" },
-  { value: "kickoff", label: "NEXT KICKOFF" },
+  { value: "club", label: "CLUB A–Z" },
 ];
 
-/** Club filter options, derived from the real dataset passed in — never a hardcoded/mock list. */
-export function getClubOptions(players: Player[]): { value: string; label: string }[] {
-  return [
-    { value: "ALL", label: "ALL" },
-    ...[...new Map(players.map((p) => [p.club.id, p.club.shortName])).entries()]
-      .sort((a, b) => a[1].localeCompare(b[1]))
-      .map(([value, label]) => ({ value, label })),
-  ];
+/** Real ownership options only shown when an active league exists (see PlayersWorkspace) — no MINE/WAIVERS, since no draft/waiver engine exists to make those real. */
+export const ownershipOptions: { value: PlayerFilters["ownership"]; label: string }[] = [
+  { value: "ALL", label: "ALL" },
+  { value: "free", label: "FREE" },
+  { value: "owned", label: "OWNED" },
+];
+
+export type SearchParamsInput = Record<string, string | string[] | undefined>;
+
+/** Parses the Players page's URL search params into a `PlayerFilters` + page number — pure, so the URL <-> filters mapping is unit-testable without a Next.js request. */
+export function parseFiltersFromSearchParams(sp: SearchParamsInput): { filters: PlayerFilters; page: number } {
+  const get = (key: string) => {
+    const value = sp[key];
+    return Array.isArray(value) ? value[0] : value;
+  };
+
+  const isPosition = (v: string | undefined): v is PlayerFilters["position"] =>
+    v === "GK" || v === "DEF" || v === "MID" || v === "FWD";
+  const isAvailability = (v: string | undefined): v is PlayerFilters["availability"] =>
+    v === "available" || v === "doubtful" || v === "injured" || v === "suspended";
+  const isOwnership = (v: string | undefined): v is PlayerFilters["ownership"] => v === "free" || v === "owned";
+  const isSort = (v: string | undefined): v is SortKey => v === "name" || v === "club";
+
+  const positionRaw = get("pos");
+  const availabilityRaw = get("avail");
+  const ownershipRaw = get("own");
+  const sortRaw = get("sort");
+
+  const page = Math.max(1, Number(get("page") ?? "1") || 1);
+
+  return {
+    filters: {
+      query: get("q") ?? "",
+      position: isPosition(positionRaw) ? positionRaw : "ALL",
+      competitionId: get("comp") || "ALL",
+      clubId: get("club") || "ALL",
+      ownership: isOwnership(ownershipRaw) ? ownershipRaw : "ALL",
+      availability: isAvailability(availabilityRaw) ? availabilityRaw : "ALL",
+      sort: isSort(sortRaw) ? sortRaw : "name",
+    },
+    page,
+  };
 }
 
-export function filterAndSortPlayers(players: Player[], filters: PlayerFilters): Player[] {
-  const q = filters.query.trim().toLowerCase();
-
-  const filtered = players.filter((player) => {
-    if (filters.position !== "ALL" && player.position !== filters.position) return false;
-    if (filters.league !== "ALL" && player.club.league !== filters.league) return false;
-    if (filters.club !== "ALL" && player.club.id !== filters.club) return false;
-    if (filters.ownership !== "ALL" && (player.ownership ?? "free") !== filters.ownership) {
-      return false;
-    }
-    if (
-      filters.availability !== "ALL" &&
-      (player.availability ?? "available") !== filters.availability
-    ) {
-      return false;
-    }
-    if (q) {
-      const haystack = `${player.name} ${player.club.name} ${player.club.shortName}`.toLowerCase();
-      if (!haystack.includes(q)) return false;
-    }
-    return true;
-  });
-
-  return [...filtered].sort((a, b) => {
-    switch (filters.sort) {
-      case "points":
-        return (b.totalPoints ?? b.fantasyPoints) - (a.totalPoints ?? a.fantasyPoints);
-      case "form":
-        return (b.averagePoints ?? b.fantasyPoints) - (a.averagePoints ?? a.fantasyPoints);
-      case "name":
-        return a.name.localeCompare(b.name);
-      case "kickoff": {
-        const ka = a.fixture ? new Date(a.fixture.kickoff).getTime() : Infinity;
-        const kb = b.fixture ? new Date(b.fixture.kickoff).getTime() : Infinity;
-        return ka - kb;
-      }
-      default:
-        return 0;
-    }
-  });
+/** Inverse of `parseFiltersFromSearchParams` — builds the query string for a filters+page state, omitting any field at its default. */
+export function filtersToSearchParams(filters: PlayerFilters, page: number): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.query.trim()) params.set("q", filters.query.trim());
+  if (filters.position !== "ALL") params.set("pos", filters.position);
+  if (filters.competitionId !== "ALL") params.set("comp", filters.competitionId);
+  if (filters.clubId !== "ALL") params.set("club", filters.clubId);
+  if (filters.ownership !== "ALL") params.set("own", filters.ownership);
+  if (filters.availability !== "ALL") params.set("avail", filters.availability);
+  if (filters.sort !== "name") params.set("sort", filters.sort);
+  if (page > 1) params.set("page", String(page));
+  return params;
 }
 
 export function isFiltersActive(filters: PlayerFilters) {
   return (
     filters.query.trim() !== "" ||
     filters.position !== "ALL" ||
-    filters.league !== "ALL" ||
+    filters.competitionId !== "ALL" ||
+    filters.clubId !== "ALL" ||
     filters.ownership !== "ALL" ||
-    filters.availability !== "ALL" ||
-    filters.club !== "ALL"
+    filters.availability !== "ALL"
   );
 }

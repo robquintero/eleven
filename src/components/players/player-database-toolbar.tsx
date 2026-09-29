@@ -5,7 +5,6 @@ import { Search, X } from "lucide-react";
 import {
   availabilityOptions,
   isFiltersActive,
-  leagueOptions,
   ownershipOptions,
   positionOptions,
   sortOptions,
@@ -49,6 +48,8 @@ export function PlayerDatabaseToolbar({
   totalCount,
   searchInputRef,
   clubOptions,
+  competitionOptions,
+  showOwnershipFilter,
 }: {
   filters: PlayerFilters;
   onChange: (patch: Partial<PlayerFilters>) => void;
@@ -57,6 +58,8 @@ export function PlayerDatabaseToolbar({
   totalCount: number;
   searchInputRef: RefObject<HTMLInputElement | null>;
   clubOptions: { value: string; label: string }[];
+  competitionOptions: { value: string; label: string }[];
+  showOwnershipFilter: boolean;
 }) {
   const active = isFiltersActive(filters);
 
@@ -76,7 +79,7 @@ export function PlayerDatabaseToolbar({
             type="text"
             value={filters.query}
             onChange={(e) => onChange({ query: e.target.value })}
-            placeholder="Search player or club…"
+            placeholder="Search player…"
             className="h-9 w-full bg-transparent pr-9 pl-8 text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
           />
           {filters.query ? (
@@ -102,15 +105,15 @@ export function PlayerDatabaseToolbar({
         />
         <FilterCell
           label="LGE"
-          value={filters.league}
-          options={leagueOptions}
-          onChange={(v) => onChange({ league: v })}
+          value={filters.competitionId}
+          options={competitionOptions}
+          onChange={(v) => onChange({ competitionId: v })}
         />
         <FilterCell
           label="CLUB"
-          value={filters.club}
+          value={filters.clubId}
           options={clubOptions}
-          onChange={(v) => onChange({ club: v })}
+          onChange={(v) => onChange({ clubId: v })}
         />
         <FilterCell
           label="STATUS"
@@ -118,12 +121,14 @@ export function PlayerDatabaseToolbar({
           options={availabilityOptions}
           onChange={(v) => onChange({ availability: v })}
         />
-        <FilterCell
-          label="OWN"
-          value={filters.ownership}
-          options={ownershipOptions}
-          onChange={(v) => onChange({ ownership: v })}
-        />
+        {showOwnershipFilter && (
+          <FilterCell
+            label="OWN"
+            value={filters.ownership}
+            options={ownershipOptions}
+            onChange={(v) => onChange({ ownership: v })}
+          />
+        )}
         <FilterCell
           label="SORT"
           value={filters.sort}

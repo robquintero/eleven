@@ -1,13 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@base-ui/react/unstable-use-media-query";
 import { PlayerDatabaseToolbar } from "@/components/players/player-database-toolbar";
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { PlayerListMobile } from "@/components/players/player-list-mobile";
 import { PlayerTable } from "@/components/players/player-table";
-import { defaultFilters, filterAndSortPlayers, getClubOptions, type PlayerFilters } from "@/lib/players-filters";
-import { getDatabaseSummary } from "@/lib/selectors/player";
+import type { ClubFilterOption, CompetitionFilterOption, PlayerDatabasePage } from "@/data-access/players";
+import { defaultFilters, filtersToSearchParams, type PlayerFilters } from "@/lib/players-filters";
 import type { Player } from "@/lib/types/fantasy";
 
 function isEditableTarget(target: EventTarget | null) {
@@ -21,41 +22,62 @@ function isEditableTarget(target: EventTarget | null) {
 }
 
 /**
- * The interactive scouting-terminal shell, driven entirely by the real
- * `players` prop the server-rendered page fetched (`getPlayerDatabase()`).
- * `players` is `[]` until Pass 8's ingestion pass runs — this never falls
- * back to a mock roster.
+ * The interactive scouting-terminal shell. Filtering/sorting/pagination all
+ * live in the URL and are executed server-side by `getPlayerDatabase`
+ * (src/data-access/players.ts) — this component only holds truly-local UI
+ * state (selection, highlight, inspector open/closed) and never filters a
+ * fetched array further client-side. Changing a filter navigates to a new
+ * URL, which re-runs the server query for the new page/scope.
  */
-export function PlayersWorkspace({ players: playerDatabase }: { players: Player[] }) {
-  const [filters, setFilters] = useState<PlayerFilters>(defaultFilters);
+export function PlayersWorkspace({
+  data,
+  filters,
+  page,
+  competitions,
+  clubs,
+  hasActiveLeague,
+}: {
+  data: PlayerDatabasePage;
+  filters: PlayerFilters;
+  page: number;
+  competitions: CompetitionFilterOption[];
+  clubs: ClubFilterOption[];
+  hasActiveLeague: boolean;
+}) {
+  const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [queryDraft, setQueryDraft] = useState(filters.query);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isDesktopTable = useMediaQuery("(min-width: 768px)", {
-    defaultMatches: true,
-  });
-  const isInlineInspector = useMediaQuery("(min-width: 1280px)", {
-    defaultMatches: false,
-  });
+  const isDesktopTable = useMediaQuery("(min-width: 768px)", { defaultMatches: true });
+  const isInlineInspector = useMediaQuery("(min-width: 1280px)", { defaultMatches: false });
 
-  const filtered = useMemo(() => filterAndSortPlayers(playerDatabase, filters), [playerDatabase, filters]);
-  const selectedPlayer = playerDatabase.find((p) => p.id === selectedId) ?? null;
-  const selectedIndex = selectedPlayer
-    ? (() => {
-        const inFiltered = filtered.findIndex((p) => p.id === selectedPlayer.id);
-        return inFiltered !== -1
-          ? inFiltered
-          : playerDatabase.findIndex((p) => p.id === selectedPlayer.id);
-      })()
-    : undefined;
+  const players = data.players;
+  const selectedPlayer = players.find((p) => p.id === selectedId) ?? null;
+  const selectedIndex = selectedPlayer ? players.findIndex((p) => p.id === selectedPlayer.id) : undefined;
+  const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
 
-  const summary = useMemo(() => getDatabaseSummary(playerDatabase), [playerDatabase]);
-  const clubOptions = useMemo(() => getClubOptions(playerDatabase), [playerDatabase]);
+  function navigate(nextFilters: PlayerFilters, nextPage: number) {
+    const params = filtersToSearchParams(nextFilters, nextPage);
+    const qs = params.toString();
+    router.push(qs ? `/players?${qs}` : "/players");
+  }
 
   function updateFilters(patch: Partial<PlayerFilters>) {
-    setFilters((prev) => ({ ...prev, ...patch }));
+    navigate({ ...filters, ...patch }, 1);
+  }
+
+  function onQueryChange(value: string) {
+    setQueryDraft(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => updateFilters({ query: value }), 350);
+  }
+
+  function goToPage(nextPage: number) {
+    navigate(filters, Math.min(Math.max(1, nextPage), totalPages));
   }
 
   function selectPlayer(player: Player) {
@@ -66,7 +88,7 @@ export function PlayersWorkspace({ players: playerDatabase }: { players: Player[
 
   function openHighlighted() {
     if (!highlightedId) return;
-    const player = filtered.find((p) => p.id === highlightedId);
+    const player = players.find((p) => p.id === highlightedId);
     if (player) selectPlayer(player);
   }
 
@@ -95,14 +117,14 @@ export function PlayersWorkspace({ players: playerDatabase }: { players: Player[
       }
 
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-        if (filtered.length === 0) return;
+        if (players.length === 0) return;
         e.preventDefault();
-        const currentIndex = filtered.findIndex((p) => p.id === highlightedId);
+        const currentIndex = players.findIndex((p) => p.id === highlightedId);
         const nextIndex =
           e.key === "ArrowDown"
-            ? Math.min(currentIndex + 1, filtered.length - 1)
+            ? Math.min(currentIndex + 1, players.length - 1)
             : Math.max(currentIndex - 1, 0);
-        const next = filtered[currentIndex === -1 ? 0 : nextIndex];
+        const next = players[currentIndex === -1 ? 0 : nextIndex];
         setHighlightedId(next.id);
         document.getElementById(`player-row-${next.id}`)?.scrollIntoView({ block: "nearest" });
       }
@@ -111,23 +133,12 @@ export function PlayersWorkspace({ players: playerDatabase }: { players: Player[
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filtered, highlightedId, inspectorOpen, isInlineInspector]);
+  }, [players, highlightedId, inspectorOpen, isInlineInspector]);
 
-  if (playerDatabase.length === 0) {
+  if (data.total === 0 && !hasAnyFilterOrIngestedData(filters, competitions)) {
     return (
       <div>
-        <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-b border-border pb-3">
-          <div>
-            <h1 className="label-system text-sm font-semibold text-foreground">
-              PLAYER_DATABASE
-            </h1>
-            <p className="label-system mt-0.5 text-[11px] text-foreground-tertiary">Big Five</p>
-          </div>
-          <div className="text-right">
-            <p className="label-system text-sm font-semibold text-foreground">0 players</p>
-          </div>
-        </div>
-
+        <Header total={0} />
         <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
           <p className="label-system text-sm text-foreground-secondary">NO PLAYER DATA AVAILABLE</p>
           <p className="max-w-sm text-xs text-foreground-tertiary">
@@ -140,44 +151,31 @@ export function PlayersWorkspace({ players: playerDatabase }: { players: Player[
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-b border-border pb-3">
-        <div>
-          <h1 className="label-system text-sm font-semibold text-foreground">
-            PLAYER_DATABASE
-          </h1>
-          <p className="label-system mt-0.5 text-[11px] text-foreground-tertiary">Big Five</p>
-        </div>
-        <div className="text-right">
-          <p className="label-system text-sm font-semibold text-foreground">
-            {playerDatabase.length} players
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5">
-        <span className="label-system text-[11px] text-foreground-secondary">
-          <span className="font-semibold text-foreground">{summary.free}</span> free agents
-        </span>
-        <span className="label-system text-[11px] text-foreground-secondary">
-          <span className="font-semibold text-foreground">{summary.owned}</span> owned
-        </span>
-        <span className="label-system text-[11px] text-foreground-secondary">
-          <span className="font-semibold text-foreground">{summary.waivers}</span> waivers
-        </span>
-        <span className="label-system text-[11px] text-destructive">
-          <span className="font-semibold">{summary.flagged}</span> inj / susp
-        </span>
-      </div>
+      <Header total={data.total} />
 
       <div className="mt-4">
         <PlayerDatabaseToolbar
-          filters={filters}
-          onChange={updateFilters}
-          onReset={() => setFilters(defaultFilters)}
-          resultCount={filtered.length}
-          totalCount={playerDatabase.length}
+          filters={{ ...filters, query: queryDraft }}
+          onChange={(patch) => {
+            if ("query" in patch && patch.query !== undefined) {
+              onQueryChange(patch.query);
+            } else {
+              updateFilters(patch);
+            }
+          }}
+          onReset={() => {
+            setQueryDraft("");
+            navigate(defaultFilters, 1);
+          }}
+          resultCount={players.length}
+          totalCount={data.total}
           searchInputRef={searchInputRef}
-          clubOptions={clubOptions}
+          clubOptions={[
+            { value: "ALL", label: "ALL" },
+            ...clubs.filter((c) => filters.competitionId === "ALL" || c.competitionId === filters.competitionId).map((c) => ({ value: c.id, label: c.shortName })),
+          ]}
+          competitionOptions={[{ value: "ALL", label: "ALL" }, ...competitions.map((c) => ({ value: c.id, label: c.code }))]}
+          showOwnershipFilter={hasActiveLeague}
         />
       </div>
 
@@ -189,10 +187,10 @@ export function PlayersWorkspace({ players: playerDatabase }: { players: Player[
         }
       >
         <div className={isInlineInspector && selectedPlayer ? "pr-4" : undefined}>
-          {filtered.length > 0 ? (
+          {players.length > 0 ? (
             isDesktopTable ? (
               <PlayerTable
-                players={filtered}
+                players={players}
                 selectedId={selectedId}
                 highlightedId={highlightedId}
                 sort={filters.sort}
@@ -200,13 +198,46 @@ export function PlayersWorkspace({ players: playerDatabase }: { players: Player[
                 onSelect={selectPlayer}
               />
             ) : (
-              <PlayerListMobile players={filtered} selectedId={selectedId} onSelect={selectPlayer} />
+              <PlayerListMobile players={players} selectedId={selectedId} onSelect={selectPlayer} />
             )
           ) : (
-            <EmptyState
-              reason={filters.query.trim() ? "query" : "filters"}
-              onReset={() => setFilters(defaultFilters)}
-            />
+            <div className="flex flex-col items-center justify-center gap-2 py-20 text-center">
+              <p className="label-system text-sm text-foreground-secondary">No players match these filters</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setQueryDraft("");
+                  navigate(defaultFilters, 1);
+                }}
+                className="label-system text-xs text-accent hover:underline"
+              >
+                Reset filters
+              </button>
+            </div>
+          )}
+
+          {totalPages > 1 && (
+            <div className="mt-3 flex items-center justify-between">
+              <button
+                type="button"
+                disabled={page <= 1}
+                onClick={() => goToPage(page - 1)}
+                className="label-system text-[11px] text-foreground-secondary hover:text-foreground disabled:opacity-40"
+              >
+                ← PREV
+              </button>
+              <span className="label-system text-[11px] text-foreground-tertiary">
+                PAGE {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                disabled={page >= totalPages}
+                onClick={() => goToPage(page + 1)}
+                className="label-system text-[11px] text-foreground-secondary hover:text-foreground disabled:opacity-40"
+              >
+                NEXT →
+              </button>
+            </div>
           )}
         </div>
 
@@ -234,19 +265,28 @@ export function PlayersWorkspace({ players: playerDatabase }: { players: Player[
   );
 }
 
-function EmptyState({ reason, onReset }: { reason: "query" | "filters"; onReset: () => void }) {
+function Header({ total }: { total: number }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-2 py-20 text-center">
-      <p className="label-system text-sm text-foreground-secondary">
-        {reason === "query" ? "No players match query" : "No players match active filters"}
-      </p>
-      <button
-        type="button"
-        onClick={onReset}
-        className="label-system text-xs text-accent hover:underline"
-      >
-        Reset filters
-      </button>
+    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-b border-border pb-3">
+      <div>
+        <h1 className="label-system text-sm font-semibold text-foreground">PLAYER_DATABASE</h1>
+        <p className="label-system mt-0.5 text-[11px] text-foreground-tertiary">Big Five</p>
+      </div>
+      <div className="text-right">
+        <p className="label-system text-sm font-semibold text-foreground">{total} players</p>
+      </div>
     </div>
   );
+}
+
+/** True zero-data (nothing ingested at all) vs. zero results from an active filter — only the former shows the "sync hasn't run" empty state. */
+function hasAnyFilterOrIngestedData(filters: PlayerFilters, competitions: CompetitionFilterOption[]) {
+  const filtersActive =
+    filters.query.trim() !== "" ||
+    filters.position !== "ALL" ||
+    filters.competitionId !== "ALL" ||
+    filters.clubId !== "ALL" ||
+    filters.ownership !== "ALL" ||
+    filters.availability !== "ALL";
+  return filtersActive || competitions.length > 0;
 }

@@ -10,6 +10,7 @@
 import type { BigFiveCompetitionConfig } from "@/lib/football-providers/api-football/big-five-competitions";
 import type {
   ApiFootballFixtureItem,
+  ApiFootballFixturePlayersItem,
   ApiFootballLeagueItem,
   ApiFootballPlayerItem,
   ApiFootballSeason,
@@ -19,6 +20,7 @@ import type {
   NormalizedClub,
   NormalizedCompetition,
   NormalizedFixture,
+  NormalizedFixturePlayerStats,
   NormalizedPlayer,
   ProviderCoverage,
 } from "@/lib/football-providers/types";
@@ -134,6 +136,51 @@ export function normalizeFixture(item: ApiFootballFixtureItem): NormalizedFixtur
     kickoffAt: new Date(item.fixture.date).toISOString(),
     status: mapFixtureStatus(item.fixture.status.short),
   };
+}
+
+/**
+ * Flattens `/fixtures/players`' per-team grouping into one normalized row
+ * per player. `NormalizedFixturePlayerStats` intentionally only carries
+ * the fields `player_match_stats` has columns for — the raw endpoint
+ * returns considerably more (rating, passes, duels, dribbles, fouls,
+ * penalties); see docs/football-data-system.md "Stats deliberately not
+ * modeled" for why those stop here rather than being persisted.
+ *
+ * `chancesCreated` is mapped from the provider's "key passes" — the
+ * closest available proxy for Eleven's chances-created stat; not a
+ * provider field named identically.
+ */
+export function normalizeFixturePlayerStats(
+  teams: ApiFootballFixturePlayersItem[],
+  fixtureExternalId: string
+): NormalizedFixturePlayerStats[] {
+  const rows: NormalizedFixturePlayerStats[] = [];
+
+  for (const team of teams) {
+    for (const entry of team.players) {
+      const stats = entry.statistics[0];
+      if (!stats) continue;
+
+      rows.push({
+        fixtureExternalId,
+        playerExternalId: String(entry.player.id),
+        minutes: stats.games.minutes ?? 0,
+        started: !stats.games.substitute,
+        goals: stats.goals.total ?? 0,
+        assists: stats.goals.assists ?? 0,
+        shotsOnTarget: stats.shots.on ?? 0,
+        chancesCreated: stats.passes.key ?? 0,
+        tackles: stats.tackles.total ?? 0,
+        interceptions: stats.tackles.interceptions ?? 0,
+        blocks: stats.tackles.blocks ?? 0,
+        saves: stats.goals.saves ?? 0,
+        yellowCards: stats.cards.yellow,
+        redCards: stats.cards.red,
+      });
+    }
+  }
+
+  return rows;
 }
 
 export function normalizeCoverage(season: ApiFootballSeason): ProviderCoverage {

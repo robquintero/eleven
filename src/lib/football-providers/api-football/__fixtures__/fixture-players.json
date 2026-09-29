@@ -1,0 +1,71 @@
+{
+  "get": "fixtures/players",
+  "parameters": { "fixture": "900002" },
+  "errors": [],
+  "results": 2,
+  "paging": { "current": 1, "total": 1 },
+  "response": [
+    {
+      "team": { "id": 42 },
+      "players": [
+        {
+          "player": { "id": 1200 },
+          "statistics": [
+            {
+              "games": { "minutes": 90, "substitute": false },
+              "shots": { "on": 3 },
+              "goals": { "total": 1, "assists": 0, "saves": null },
+              "passes": { "key": 2 },
+              "tackles": { "total": 1, "blocks": 0, "interceptions": 2 },
+              "cards": { "yellow": 0, "red": 0 }
+            }
+          ]
+        },
+        {
+          "player": { "id": 1201 },
+          "statistics": [
+            {
+              "games": { "minutes": 12, "substitute": true },
+              "shots": { "on": 0 },
+              "goals": { "total": 0, "assists": 1, "saves": null },
+              "passes": { "key": 0 },
+              "tackles": { "total": 0, "blocks": 0, "interceptions": 0 },
+              "cards": { "yellow": 1, "red": 0 }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "team": { "id": 50 },
+      "players": [
+        {
+          "player": { "id": 1100 },
+          "statistics": [
+            {
+              "games": { "minutes": 90, "substitute": false },
+              "shots": { "on": 4 },
+              "goals": { "total": 0, "assists": 0, "saves": null },
+              "passes": { "key": 1 },
+              "tackles": { "total": 0, "blocks": 0, "interceptions": 0 },
+              "cards": { "yellow": 0, "red": 0 }
+            }
+          ]
+        },
+        {
+          "player": { "id": 1101 },
+          "statistics": [
+            {
+              "games": { "minutes": 90, "substitute": false },
+              "shots": { "on": 0 },
+              "goals": { "total": 0, "assists": 0, "saves": 5 },
+              "passes": { "key": 0 },
+              "tackles": { "total": 0, "blocks": 0, "interceptions": 0 },
+              "cards": { "yellow": 0, "red": 0 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

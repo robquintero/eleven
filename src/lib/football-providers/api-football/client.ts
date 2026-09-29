@@ -10,6 +10,7 @@ import {
 import type {
   ApiFootballEnvelope,
   ApiFootballFixtureItem,
+  ApiFootballFixturePlayersItem,
   ApiFootballLeagueItem,
   ApiFootballPlayerItem,
   ApiFootballStatusResponse,
@@ -103,6 +104,18 @@ export function getPlayers(params: { team: number; season: number; page?: number
   return request<ApiFootballPlayerItem>("/players", params);
 }
 
-export function getFixtures(params: { league: number; season: number; page?: number }) {
+export function getFixtures(params: {
+  league: number;
+  season: number;
+  page?: number;
+  /** YYYY-MM-DD — bounds a fixtures sync to a date range instead of an entire season at once. */
+  from?: string;
+  to?: string;
+}) {
   return request<ApiFootballFixtureItem>("/fixtures", params);
+}
+
+/** One completed fixture's per-player statistics, grouped by team (two items: home, away). */
+export function getFixturePlayers(params: { fixture: number }) {
+  return request<ApiFootballFixturePlayersItem>("/fixtures/players", params);
 }
