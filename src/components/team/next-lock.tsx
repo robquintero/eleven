@@ -2,11 +2,11 @@ import { Countdown } from "@/components/football/countdown";
 import { fixtureOpponentLabel, formatKickoff } from "@/lib/team-fixture";
 import type { LineupSlot } from "@/lib/types/fantasy";
 
-export function NextLock({ slot }: { slot: LineupSlot | null }) {
+export function NextLock({ slot, hasStarters = true }: { slot: LineupSlot | null; hasStarters?: boolean }) {
   if (!slot?.player.fixture) {
     return (
       <p className="text-xs text-foreground-tertiary">
-        All starters are locked in for this matchday.
+        {hasStarters ? "All starters are locked in for this matchday." : "NOT SCHEDULED"}
       </p>
     );
   }

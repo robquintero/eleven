@@ -3,9 +3,11 @@
  *
  * This is deliberately small — a handful of records, not a full dataset —
  * because its job is to prove the shapes in `@/domain/football/types` are
- * usable and to give Pass 6 something concrete to seed a Postgres schema
- * from. It is NOT wired into any screen; the live UI still runs on
- * `@/lib/mock/*`. See docs/architecture.md "Two mock layers."
+ * usable and to give a future migration something concrete to seed a
+ * Postgres schema from. It is NOT wired into any screen — the live UI
+ * reads real (possibly empty) Supabase data via `@/data-access/*`. See
+ * docs/product-state.md and docs/architecture.md "Mock data — test/
+ * illustration only, never runtime."
  */
 
 import type {

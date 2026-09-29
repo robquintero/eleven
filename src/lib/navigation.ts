@@ -10,7 +10,7 @@ export interface NavDestination {
 }
 
 export const primaryNav: NavDestination[] = [
-  { href: "/", label: "Home", icon: House, shortcutKey: "h" },
+  { href: "/home", label: "Home", icon: House, shortcutKey: "h" },
   { href: "/matchup", label: "Matchup", icon: Swords, shortcutKey: "m" },
   { href: "/team", label: "Team", icon: Shirt, shortcutKey: "t" },
   { href: "/players", label: "Players", icon: Users, shortcutKey: "p" },

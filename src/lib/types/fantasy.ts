@@ -78,7 +78,8 @@ export interface Player {
   ownerTeamName?: string;
 }
 
-export type Formation = "4-3-3" | "4-4-2" | "3-5-2";
+/** "—" means no formation has been set yet — no draft/lineup exists for this squad. */
+export type Formation = "4-3-3" | "4-4-2" | "3-5-2" | "—";
 
 /** A single position on the pitch, expressed as a percentage of pitch width/height. */
 export interface LineupSlot {

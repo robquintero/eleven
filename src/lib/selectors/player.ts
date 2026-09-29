@@ -2,8 +2,8 @@
  * Selectors — pure functions that derive presentation-ready values from the
  * existing UI-facing `Player` view-model (`@/lib/types/fantasy`). Domain
  * logic like this belongs here, not inline in page components; see
- * docs/architecture.md "Two mock layers" for how this relates to the newer
- * canonical types in `@/domain`.
+ * docs/architecture.md "Mock data — test/illustration only, never runtime"
+ * for how this relates to the newer canonical types in `@/domain`.
  */
 
 import { fixtureOpponentLabel } from "../team-fixture.ts";

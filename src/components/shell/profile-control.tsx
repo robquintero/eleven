@@ -5,7 +5,6 @@ import { LogOut } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { Profile } from "@/data-access/profiles";
 import { signOut } from "@/data-access/auth";
-import type { FantasyManager } from "@/lib/types/fantasy";
 
 function initialsFor(name: string) {
   return name
@@ -18,32 +17,27 @@ function initialsFor(name: string) {
 }
 
 /**
- * Falls back to the existing mock `manager` avatar (no dropdown, exact
- * prior behavior) when `profile` is null — signed out, or Supabase isn't
- * configured. Demo screens must keep working with zero auth setup.
+ * `(app)/layout.tsx` guarantees a real session before `AppShell` ever
+ * renders, so `profile` is only ever null in the narrow edge case where a
+ * session cookie exists but the `profiles` row lookup itself fails — a
+ * neutral placeholder avatar (no name, no dropdown) is the honest state
+ * for that, never a fabricated identity.
  */
-export function ProfileControl({
-  manager,
-  profile,
-}: {
-  manager: FantasyManager;
-  profile: Profile | null;
-}) {
+export function ProfileControl({ profile }: { profile: Profile | null }) {
   const [open, setOpen] = useState(false);
 
   if (!profile) {
     return (
-      <button
-        type="button"
-        className="flex items-center rounded-full transition-opacity hover:opacity-80"
-        aria-label={`${manager.displayName} profile`}
+      <span
+        className="flex items-center rounded-full"
+        aria-label="Profile unavailable"
       >
         <Avatar>
-          <AvatarFallback className="bg-accent/15 font-semibold text-accent">
-            {manager.initials}
+          <AvatarFallback className="bg-muted font-semibold text-foreground-tertiary">
+            —
           </AvatarFallback>
         </Avatar>
-      </button>
+      </span>
     );
   }
 

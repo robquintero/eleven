@@ -1,79 +1,48 @@
 import Link from "next/link";
-import { Countdown } from "@/components/football/countdown";
-import { FixturesList } from "@/components/football/fixtures-list";
 import { OperationalRow } from "@/components/football/operational-row";
-import { TeamCrest } from "@/components/dashboard/team-crest";
 import { RailModule } from "@/components/ui/rail-module";
-import { fixtureOpponentLabel, formatKickoff, nextLock, pad2, starterBuckets } from "@/lib/team-fixture";
-import type { LineupSlot, RoundFixture, StandingsEntry } from "@/lib/types/fantasy";
-import { cn } from "@/lib/utils";
+import type { StandingsRow } from "@/data-access/matchups";
+import { starterBuckets } from "@/lib/team-fixture";
+import type { LineupSlot } from "@/lib/types/fantasy";
 
 /**
- * Dashboard's secondary operations rail — a persistent, bordered column of
- * compact modules (round intelligence, live fixtures, next lock, league
- * table) standing next to the primary MatchupCommand/StartingXI surface.
- * One continuous instrument, not four floating cards.
+ * Dashboard's secondary operations rail. Every module here renders a
+ * truthful empty state until the systems behind it exist — round
+ * scheduling, live fixture ingestion, and the scoring engine are all
+ * Pass 8+, so `fixtures`/`standings` are `[]` for every league today.
  */
 export function OperationsRail({
   starters,
-  fixtures,
   standings,
-  highlightTeamId,
+  hasActiveRound,
 }: {
   starters: LineupSlot[];
-  fixtures: RoundFixture[];
-  standings: StandingsEntry[];
-  highlightTeamId?: string;
+  standings: StandingsRow[];
+  hasActiveRound: boolean;
 }) {
   const buckets = starterBuckets(starters);
-  const complete = fixtures.filter((f) => f.state === "final").length;
-  const liveFixtures = fixtures.filter((f) => f.state === "live" || f.state === "ht");
-  const lock = nextLock(starters);
 
   return (
     <div className="flex flex-col divide-y divide-border border border-border">
       <RailModule header="ROUND_INTELLIGENCE">
-        <OperationalRow
-          label="FIXTURES"
-          value={`${complete} / ${fixtures.length}`}
-          secondary="complete"
-        />
-        <OperationalRow
-          label="PLAYERS"
-          value={`${buckets.live} live / ${buckets.locked + buckets.final} locked / ${buckets.upcoming} remaining`}
-        />
+        {hasActiveRound ? (
+          <>
+            <OperationalRow
+              label="PLAYERS"
+              value={`${buckets.live} live / ${buckets.locked + buckets.final} locked / ${buckets.upcoming} remaining`}
+            />
+          </>
+        ) : (
+          <p className="text-xs text-foreground-tertiary">NO ACTIVE ROUND</p>
+        )}
       </RailModule>
 
-      <RailModule header="LIVE_FIXTURES" meta={pad2(liveFixtures.length)}>
-        {liveFixtures.length > 0 ? (
-          <FixturesList fixtures={liveFixtures} />
-        ) : (
-          <p className="text-xs text-foreground-tertiary">No fixtures in play right now.</p>
-        )}
+      <RailModule header="LIVE_FIXTURES" meta="00">
+        <p className="text-xs text-foreground-tertiary">NO FIXTURE DATA</p>
       </RailModule>
 
       <RailModule header="NEXT_LOCK">
-        {lock?.player.fixture ? (
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-foreground">
-                {lock.player.name}
-              </p>
-              <p className="label-system truncate text-[11px] text-foreground-tertiary">
-                {lock.player.club.shortName} {fixtureOpponentLabel(lock.player)} ·{" "}
-                {formatKickoff(lock.player.fixture.kickoff)}
-              </p>
-            </div>
-            <Countdown
-              target={lock.player.fixture.kickoff}
-              className="label-system shrink-0 text-sm font-semibold text-accent"
-            />
-          </div>
-        ) : (
-          <p className="text-xs text-foreground-tertiary">
-            All starters are locked in for this matchday.
-          </p>
-        )}
+        <p className="text-xs text-foreground-tertiary">NOT SCHEDULED</p>
       </RailModule>
 
       <RailModule
@@ -84,28 +53,25 @@ export function OperationsRail({
           </Link>
         }
       >
-        <div className="divide-y divide-border">
-          {standings.slice(0, 6).map(({ rank, team }) => (
-            <div
-              key={team.id}
-              className={cn(
-                "flex items-center gap-2.5 border-l-2 border-l-transparent py-2 pl-1.5",
-                team.id === highlightTeamId && "border-l-accent bg-accent/5"
-              )}
-            >
-              <span className="label-system w-4 shrink-0 text-xs font-medium text-foreground-tertiary">
-                {rank}
-              </span>
-              <TeamCrest team={team} size="sm" />
-              <p className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
-                {team.name}
-              </p>
-              <span className="label-system shrink-0 text-xs font-semibold text-foreground">
-                {team.pointsFor}
-              </span>
-            </div>
-          ))}
-        </div>
+        {standings.length === 0 ? (
+          <p className="text-xs text-foreground-tertiary">NO RESULTS YET</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {standings.slice(0, 6).map((row, index) => (
+              <div key={row.fantasyTeamId} className="flex items-center gap-2.5 py-2 pl-1.5">
+                <span className="label-system w-4 shrink-0 text-xs font-medium text-foreground-tertiary">
+                  {index + 1}
+                </span>
+                <p className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
+                  {row.teamName}
+                </p>
+                <span className="label-system shrink-0 text-xs font-semibold text-foreground">
+                  {row.pointsFor}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </RailModule>
     </div>
   );

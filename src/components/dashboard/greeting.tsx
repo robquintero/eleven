@@ -1,17 +1,19 @@
-import type { FantasyLeague, FantasyRound } from "@/lib/types/fantasy";
+import type { FantasyRound } from "@/lib/types/fantasy";
 import { formatDeadline, greetingForHour } from "@/lib/time";
 import { pad2 } from "@/lib/team-fixture";
 
 export function Greeting({
   managerName,
   teamName,
-  league,
+  leagueName,
   round,
 }: {
   managerName: string;
   teamName: string;
-  league: FantasyLeague;
-  round: FantasyRound;
+  leagueName: string;
+  /** `null` when the league has no active fantasy round yet — no round
+   * scheduler exists (Pass 8+), so this is `null` for every league today. */
+  round: FantasyRound | null;
 }) {
   const greeting = greetingForHour(new Date().getHours());
 
@@ -24,15 +26,23 @@ export function Greeting({
         {teamName}
       </h1>
       <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-foreground-secondary">
-        <span>{league.name}</span>
+        <span>{leagueName}</span>
         <span className="text-foreground-tertiary">·</span>
-        <span className="label-system text-xs text-foreground-tertiary">
-          MATCHDAY {pad2(round.number)}
-        </span>
-        <span className="text-foreground-tertiary">·</span>
-        <span className="label-system text-xs text-foreground-tertiary">
-          LOCKS {formatDeadline(round.deadline)}
-        </span>
+        {round ? (
+          <>
+            <span className="label-system text-xs text-foreground-tertiary">
+              MATCHDAY {pad2(round.number)}
+            </span>
+            <span className="text-foreground-tertiary">·</span>
+            <span className="label-system text-xs text-foreground-tertiary">
+              LOCKS {formatDeadline(round.deadline)}
+            </span>
+          </>
+        ) : (
+          <span className="label-system text-xs text-foreground-tertiary">
+            NO ACTIVE ROUND
+          </span>
+        )}
       </p>
     </div>
   );

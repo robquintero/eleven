@@ -1,13 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Command as CommandPrimitive } from "cmdk";
 import { Search } from "lucide-react";
 import { primaryNav } from "@/lib/navigation";
-import { playerDatabase } from "@/lib/mock/players-database";
-import { leagueLabels } from "@/lib/leagues";
 import { cn } from "@/lib/utils";
 
 const actions = [
@@ -76,12 +74,6 @@ export function CommandPalette() {
     if (!next) setQuery("");
   }
 
-  const matchingPlayers = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (!q) return [];
-    return playerDatabase.filter((p) => p.name.toLowerCase().includes(q)).slice(0, 6);
-  }, [query]);
-
   function go(href: string) {
     handleOpenChange(false);
     router.push(href);
@@ -109,10 +101,10 @@ export function CommandPalette() {
               Eleven command
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">
-              Search players, jump to a screen, or run an action.
+              Jump to a screen or run an action.
             </DialogPrimitive.Description>
 
-            <CommandPrimitive shouldFilter={false} className="flex flex-col">
+            <CommandPrimitive className="flex flex-col">
               <div className="flex items-center gap-3 border-b border-border px-4 py-3">
                 <span className="label-system hidden shrink-0 text-[10px] text-foreground-tertiary sm:inline">
                   ELEVEN COMMAND
@@ -121,7 +113,7 @@ export function CommandPalette() {
                   autoFocus
                   value={query}
                   onValueChange={setQuery}
-                  placeholder="Search players, navigation, actions…"
+                  placeholder="Search navigation or actions…"
                   className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
                 />
                 <span className="label-system shrink-0 text-[10px] text-foreground-tertiary">
@@ -178,30 +170,6 @@ export function CommandPalette() {
                     </CommandPrimitive.Item>
                   ))}
                 </CommandPrimitive.Group>
-
-                {matchingPlayers.length > 0 && (
-                  <CommandPrimitive.Group
-                    heading="Players"
-                    className={groupHeadingClassName}
-                  >
-                    {matchingPlayers.map((player) => (
-                      <CommandPrimitive.Item
-                        key={player.id}
-                        value={player.name}
-                        onSelect={() => go("/players")}
-                        className={cn(itemClassName, "flex-col items-start gap-0.5")}
-                      >
-                        <span className="text-sm font-medium text-foreground">
-                          {player.name}
-                        </span>
-                        <span className="label-system text-[10px] text-foreground-tertiary">
-                          {player.club.shortName} · {player.position} ·{" "}
-                          {leagueLabels[player.club.league]}
-                        </span>
-                      </CommandPrimitive.Item>
-                    ))}
-                  </CommandPrimitive.Group>
-                )}
               </CommandPrimitive.List>
             </CommandPrimitive>
           </DialogPrimitive.Popup>
