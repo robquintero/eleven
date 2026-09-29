@@ -1,69 +1,75 @@
-import Image from "next/image";
+import { ActivityFeed } from "@/components/dashboard/activity-feed";
+import { Greeting } from "@/components/dashboard/greeting";
+import { MatchupHero } from "@/components/dashboard/matchup-hero";
+import { RoundStatus } from "@/components/dashboard/round-status";
+import { StandingsPreview } from "@/components/dashboard/standings-preview";
+import { StartingXI } from "@/components/dashboard/starting-xi";
+import { FixturesList } from "@/components/football/fixtures-list";
+import {
+  activity,
+  currentLeague,
+  currentMatchup,
+  currentRound,
+  currentUserTeam,
+  standings,
+  startingXI,
+} from "@/lib/mock/dashboard";
+import { roundFixtures } from "@/lib/mock/fixtures";
+import { squad } from "@/lib/mock/team";
 
 export default function Home() {
+  const liveFixtures = roundFixtures.filter(
+    (f) => f.state === "live" || f.state === "ht"
+  );
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="flex flex-col gap-10 sm:gap-12">
+      <Greeting
+        managerName={currentUserTeam.manager.displayName}
+        teamName={currentUserTeam.name}
+        league={currentLeague}
+        round={currentRound}
+      />
+
+      <MatchupHero matchup={currentMatchup} />
+
+      <section className="order-3 lg:order-2">
+        <div className="grid grid-cols-1 gap-8 border-t border-border pt-8 lg:grid-cols-2 lg:gap-12">
+          <RoundStatus
+            starters={squad.starters}
+            matchup={currentMatchup}
+            fixtures={roundFixtures}
+          />
+          <div>
+            <h2 className="text-sm font-semibold tracking-tight text-foreground">
+              Live fixtures
+            </h2>
+            <div className="mt-2">
+              {liveFixtures.length > 0 ? (
+                <FixturesList fixtures={liveFixtures} />
+              ) : (
+                <p className="mt-1 text-sm text-foreground-tertiary">
+                  No fixtures in play right now.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
+      </section>
+
+      <div className="order-2 lg:order-3">
+        <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.3fr_1fr] lg:gap-12">
+          <StartingXI players={startingXI} />
+
+          <div className="space-y-10">
+            <StandingsPreview
+              entries={standings.slice(0, 6)}
+              highlightTeamId={currentUserTeam.id}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            <ActivityFeed items={activity} />
+          </div>
         </div>
-      </main>
+      </div>
     </div>
   );
 }
