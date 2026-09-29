@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { JetBrains_Mono } from "next/font/google";
-import { AppShell } from "@/components/shell/app-shell";
 import "./globals.css";
 
 const jetbrainsMono = JetBrains_Mono({
@@ -29,7 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`dark h-full antialiased ${jetbrainsMono.variable}`}
     >
       <body className="min-h-full bg-background text-foreground">
-        <AppShell>{children}</AppShell>
+        {children}
       </body>
     </html>
   );

@@ -6,9 +6,26 @@ import { LeagueSwitcher } from "@/components/shell/league-switcher";
 import { ProfileControl } from "@/components/shell/profile-control";
 import { StatusBar } from "@/components/shell/status-bar";
 import { Wordmark } from "@/components/shell/wordmark";
-import { currentUserTeam, leagues } from "@/lib/mock/dashboard";
+import { getUserLeagues } from "@/data-access/leagues";
+import { getCurrentProfile } from "@/data-access/profiles";
+import { currentUserTeam, leagues as mockLeagues } from "@/lib/mock/dashboard";
 
-export function AppShell({ children }: { children: ReactNode }) {
+export async function AppShell({ children }: { children: ReactNode }) {
+  const [profile, realLeagues] = await Promise.all([
+    getCurrentProfile(),
+    getUserLeagues(),
+  ]);
+
+  // Real leagues take over the switcher the moment the signed-in user has
+  // at least one; otherwise it keeps showing the mock leagues exactly as
+  // before — see docs/architecture.md-style "two data sources" note in
+  // the Pass 6 report for why this fallback exists rather than an empty
+  // switcher.
+  const switcherLeagues =
+    realLeagues.length > 0
+      ? realLeagues.map((l) => ({ id: l.id, name: l.name, memberCount: l.memberCount }))
+      : mockLeagues;
+
   return (
     <div className="mx-auto min-h-dvh max-w-[1920px] lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:gap-8 lg:border-r lg:border-border lg:px-5 lg:py-7">
@@ -25,13 +42,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Wordmark />
               </div>
               <LeagueSwitcher
-                leagues={leagues}
-                initialLeagueId={leagues[0].id}
+                leagues={switcherLeagues}
+                initialLeagueId={switcherLeagues[0].id}
               />
             </div>
             <div className="flex items-center gap-3">
               <CommandPalette />
-              <ProfileControl manager={currentUserTeam.manager} />
+              <ProfileControl manager={currentUserTeam.manager} profile={profile} />
             </div>
           </div>
           <StatusBar />
