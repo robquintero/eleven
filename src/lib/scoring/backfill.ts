@@ -43,10 +43,18 @@ export interface BackfillResult {
  * raw stats — never increments. Running this twice on unchanged data
  * produces byte-identical rows both times (see scoring.test.ts's
  * determinism test for the pure-function half of that guarantee).
+ *
+ * `options.fixtureIds`, when given, bypasses the season/status filter and
+ * recomputes exactly those fixtures regardless of status — this is what
+ * live sync (Phase 6) uses to refresh a handful of currently-live or
+ * just-finished fixtures' scores after a stats sync, without re-scanning
+ * the entire season. Deliberately still the SAME function: "recompute
+ * from current canonical raw stats" is one behavior whether it's applied
+ * to 11,000 historical rows or 22 rows from one live match.
  */
 export async function backfillScores(
   admin: SupabaseClient<Database>,
-  options: { season?: number } = {}
+  options: { season?: number; fixtureIds?: string[] } = {}
 ): Promise<BackfillResult> {
   const season = options.season ?? 2026;
   const errors: string[] = [];
@@ -56,11 +64,12 @@ export async function backfillScores(
   let skipped = 0;
   let failed = 0;
 
-  const { data: fixtures, error: fixturesError } = await admin
+  const fixturesQuery = admin
     .from("fixtures")
-    .select("id, home_club_id, away_club_id, home_score, away_score, competition_id")
-    .eq("season", season)
-    .eq("status", "final");
+    .select("id, home_club_id, away_club_id, home_score, away_score, competition_id");
+  const { data: fixtures, error: fixturesError } = await (options.fixtureIds
+    ? fixturesQuery.in("id", options.fixtureIds)
+    : fixturesQuery.eq("season", season).eq("status", "final"));
 
   if (fixturesError) {
     return {

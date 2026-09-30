@@ -521,3 +521,89 @@ tested, consistent with this codebase's existing convention that
 Supabase-touching `data-access`/write code is exercised manually rather
 than mocked — see the Pass 8 final report's "Controlled live validation"
 section for what was actually run against the real project.
+
+## Fantasy scoring (Pass 9)
+
+`player_match_stats` now feeds a real, versioned scoring engine —
+`src/domain/fantasy/scoring.ts` (`ELEVEN_STANDARD_V1`) — with results
+persisted to `fantasy_player_scores` via `src/lib/scoring/backfill.ts`
+(`npm run scoring:backfill`). See `docs/scoring-model.md` for the full
+field-coverage audit, empirical calibration, and backfill results.
+
+## Live sync foundation (Pass 9, Phase 6)
+
+Scoring a completed season is a one-time backfill; keeping scores current
+during a LIVE matchday needs a different shape — centralized, fixture-aware,
+quota-conscious, and safe to invoke as often as needed. Three new pieces:
+
+1. **`src/domain/football/sync-cadence.ts`** — a pure function,
+   `determineFixtureSyncCadence(fixture, now)`, deciding whether ONE stored
+   fixture needs a fresh sync right now. `now` is always an explicit
+   argument (never `Date.now()`/`new Date()` read internally), per the
+   brief's clock-abstraction rule — production passes the real clock,
+   tests pass a fixed instant (see `sync-cadence.test.ts`). It has no
+   internal loop or timer; "every 10 minutes while live" is a property of
+   how often something calls it, not of anything in the function itself —
+   that's what makes the interval configurable (10min → 5min → 2min → 1min)
+   without a redesign: change the one `LIVE_INTERVAL_MINUTES` constant, or
+   the caller's invocation frequency, never the decision logic.
+
+2. **`src/lib/football-ingestion/live-sync.ts`** — `runLiveSyncTick(admin,
+   now?)`, ONE bounded pass: reads every stored fixture that isn't
+   provably settled forever, runs each through the cadence function,
+   syncs only the competitions/fixtures that actually need it (via the
+   existing `syncFixtures`/`syncFixtureStats`), and recomputes
+   `fantasy_player_scores` for exactly the fixtures touched (via
+   `backfillScores({ fixtureIds })` — the same engine as the historical
+   backfill, never a separate "live" scoring path). On a day with nothing
+   live or near kickoff, this costs **zero** provider requests — confirmed
+   live: `npm run football:sync -- live-tick` against the real database on
+   2026-09-29 considered 2,058 stored fixtures, found 0 needing sync (the
+   soonest scheduled fixture was 10 days out), and made 0 provider
+   requests. This is the "do NOT blindly poll every competition every 10
+   min 24/7" requirement holding in practice, not just in design.
+
+3. **`src/app/api/cron/football-live-tick/route.ts`** — the production-safe
+   HTTP job entry point a deployed cron would call, wrapping the identical
+   `runLiveSyncTick`. Fails closed: refuses to run unless `CRON_SECRET` is
+   set AND the request's `Authorization: Bearer <secret>` header matches —
+   an unauthenticated version would let anyone trigger provider requests
+   against Eleven's quota on demand. This route is explicitly exempted
+   (and ONLY this route — see `no-provider-imports-in-app.test.ts`'s
+   narrow-exemption test) from the "no application code imports the
+   ingestion layer" architecture guard, because it isn't reachable by any
+   page load — it's the job entry point itself.
+
+### Live sync — activating the cron (the exact remaining step)
+
+Nothing calls `/api/cron/football-live-tick` automatically yet. No
+`vercel.json` exists in this repo, and none was added this pass —
+per the brief ("do not silently create expensive polling... document the
+exact remaining step rather than inventing configuration"), activating it
+is a deliberate, separate decision:
+
+1. In the Vercel project's environment variables, set `CRON_SECRET` to a
+   generated random value (e.g. `openssl rand -hex 32`) for the Production
+   environment.
+2. Add a `vercel.json` at the repo root with a `crons` entry, e.g.:
+   ```json
+   { "crons": [{ "path": "/api/cron/football-live-tick", "schedule": "*/10 * * * *" }] }
+   ```
+   (Vercel Cron's minimum granularity is 1 minute on paid plans; start at
+   the brief's conservative 10-minute cadence and tighten later by editing
+   only this schedule string.)
+3. Redeploy. Vercel will then call the route on schedule with its own
+   cron-invocation auth; add that as a second accepted credential in the
+   route only if Vercel's own cron signing is preferred over the
+   hand-rolled `CRON_SECRET` bearer check — either is fine, not decided
+   here since no cron is active yet.
+
+### Sync observability
+
+`src/lib/football-ingestion/sync-health.ts` (`npm run football:sync --
+sync-health`, zero provider requests) answers the brief's observability
+questions from stored state alone: recent sync events (reusing
+`domain_events`, the same table `recordSyncEvent` already wrote every
+sync to — no new table), currently-live fixture count, the last scoring
+recomputation timestamp, and the total scored-row count. No dashboard —
+a structured JSON snapshot, per brief §Phase 6.

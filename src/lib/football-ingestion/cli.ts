@@ -18,17 +18,17 @@
  *   fixture-stats --fixture <providerFixtureId>   sync one fixture's player stats
  *   audit                                 zero-request DB-integrity report (see audit.ts) — safe to run anytime
  *   audit-squad --code ENG --club ARS     ONE live request: compares a club's real provider squad against Eleven, reporting any missing players by name/id
+ *   live-tick                             ONE bounded live-sync pass (see live-sync.ts) — fixture-aware, quota-conscious; request count varies with how many fixtures are actually near kickoff/live/recently final (zero on a quiet day)
+ *   sync-health                           zero-request observability snapshot (see sync-health.ts) — safe to run anytime
  *
  * Every operation makes exactly ONE provider request (or, for
  * "competitions" with no --code, one request PER enabled competition,
- * stopping early if quota runs low; "audit" makes none) — see brief §8/§31.
+ * stopping early if quota runs low; "audit"/"sync-health" make none;
+ * "live-tick" varies — see live-sync.ts) — see brief §8/§31.
  * Nothing here loops pages automatically; pass --page explicitly to
  * continue one.
  */
 import "server-only";
-import { BIG_FIVE_COMPETITIONS, getBigFiveCompetition } from "../football-providers/api-football/big-five-competitions.ts";
-import type { BigFiveCompetitionCode } from "../../domain/football/constants.ts";
-import { getUefaCompetition, isUefaCompetitionCode } from "../football-providers/api-football/uefa-competitions.ts";
 import { ApiFootballConfigError, ApiFootballRateLimitError } from "../football-providers/api-football/errors.ts";
 import { getApiKey } from "../football-providers/api-football/config.ts";
 import { createAdminClient, isSupabaseAdminConfigured } from "../supabase/admin.ts";
@@ -40,13 +40,10 @@ import { syncFixtureStats } from "./sync-fixture-stats.ts";
 import { recordSyncEvent } from "./record-sync-event.ts";
 import { shouldStopForQuota } from "./quota.ts";
 import { compareProviderSquadToEleven, getDatabaseIntegrityReport } from "./audit.ts";
-import type { CompetitionSyncTarget, SyncResult } from "./types.ts";
-
-/** Resolves a `--code` flag against either config list — Big Five or UEFA — never guessing/hardcoding a provider id inline at a call site. */
-function resolveCompetition(code: string): CompetitionSyncTarget {
-  if (isUefaCompetitionCode(code)) return getUefaCompetition(code);
-  return getBigFiveCompetition(code as BigFiveCompetitionCode);
-}
+import { BIG_FIVE_COMPETITIONS, resolveCompetition } from "./resolve-competition.ts";
+import { runLiveSyncTick } from "./live-sync.ts";
+import { getSyncHealth } from "./sync-health.ts";
+import type { SyncResult } from "./types.ts";
 
 function parseFlags(argv: string[]): Record<string, string> {
   const flags: Record<string, string> = {};
@@ -86,7 +83,7 @@ async function main() {
   const flags = parseFlags(rest);
 
   if (!operation) {
-    console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|audit|audit-squad> [flags]");
+    console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|audit|audit-squad|live-tick|sync-health> [flags]");
     process.exitCode = 1;
     return;
   }
@@ -188,9 +185,23 @@ async function main() {
         break;
       }
 
+      case "live-tick": {
+        const result = await runLiveSyncTick(admin);
+        requestsUsedThisRun += result.requestsUsed;
+        console.log(JSON.stringify(result, null, 2));
+        break;
+      }
+
+      case "sync-health": {
+        // No provider request — safe to run anytime.
+        const report = await getSyncHealth(admin);
+        console.log(JSON.stringify(report, null, 2));
+        break;
+      }
+
       default:
         console.log(`Unknown operation "${operation}".`);
-        console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|audit|audit-squad> [flags]");
+        console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|audit|audit-squad|live-tick|sync-health> [flags]");
         process.exitCode = 1;
         return;
     }
