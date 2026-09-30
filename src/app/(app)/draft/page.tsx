@@ -6,6 +6,7 @@ import { DraftPageClient } from "@/components/draft/draft-page-client";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus, getDraftState } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
+import { getPlayerDatabase } from "@/data-access/players";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
 
@@ -59,5 +60,7 @@ export default async function DraftPage() {
     );
   }
 
-  return <DraftPageClient leagueId={league.id} draft={draft} hasTeam={Boolean(team)} />;
+  const initialPlayers = await getPlayerDatabase({ activeLeagueId: league.id, ownership: "free", pageSize: 30 });
+
+  return <DraftPageClient leagueId={league.id} draft={draft} hasTeam={Boolean(team)} initialPlayers={initialPlayers} />;
 }

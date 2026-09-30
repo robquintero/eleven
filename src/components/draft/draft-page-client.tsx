@@ -12,18 +12,23 @@ export function DraftPageClient({
   leagueId,
   draft,
   hasTeam,
+  initialPlayers,
 }: {
   leagueId: string;
   draft: DraftState;
   hasTeam: boolean;
+  initialPlayers: PlayerDatabasePage;
 }) {
   const router = useRouter();
-  const [availablePlayers, setAvailablePlayers] = useState<PlayerDatabasePage>({ players: [], total: 0, page: 1, pageSize: 30 });
+  // `null` means "no active search" -- render straight from the server's
+  // own fresh `initialPlayers` prop (which changes on every periodic
+  // router.refresh(), automatically staying current with no effect
+  // needed to resync it). A non-null value is this component's own
+  // client-fetched search result, which intentionally persists until the
+  // user clears the box.
+  const [searchResults, setSearchResults] = useState<PlayerDatabasePage | null>(null);
+  const availablePlayers = searchResults ?? initialPlayers;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    getAvailablePlayersAction(leagueId, "").then(setAvailablePlayers);
-  }, [leagueId]);
 
   useEffect(() => {
     if (draft.status !== "in_progress") return;
@@ -34,7 +39,11 @@ export function DraftPageClient({
   function handleSearch(query: string) {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      getAvailablePlayersAction(leagueId, query).then(setAvailablePlayers);
+      if (!query) {
+        setSearchResults(null);
+        return;
+      }
+      getAvailablePlayersAction(leagueId, query).then(setSearchResults);
     }, 250);
   }
 
