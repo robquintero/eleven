@@ -228,6 +228,84 @@ branch's commit history for the full detail:
   inventing a "real" abbreviation Eleven has no authority to assign.
   `clubs.short_name` (the UI-facing value) is untouched.
 
+## Player universe integrity (Pass 9 Phase 0)
+
+Pass 9 opened with a report that Raphinha (Barcelona) was missing from
+the populated Players database. Traced end-to-end rather than patched
+as a one-off:
+
+**Root cause.** API-Football's `/players` response gives a player ONE
+`statistics` entry PER COMPETITION they appeared in for a team, not one
+entry per team — Raphinha had three entries for Barcelona (Spanish Super
+Cup, Champions League, La Liga), all with the same `team.id` but
+different `league.id`/`games.position`. `normalizePlayer` picked
+whichever entry matched `team.id` first, with no regard for which
+competition the caller actually wanted or whether that entry's position
+was even recognized. His Super Cup entry sorted first and reported
+`position: "Forward"` — a real, valid label `POSITION_MAP` simply didn't
+have (only `"Attacker"` was mapped) — so he was silently folded into the
+generic "skipped" count with no distinct failure signal at all.
+
+**Fix** (`adapter.ts`'s `normalizePlayer`, `ApiFootballPlayerItem`'s
+`statistics[].league.id` field, `POSITION_MAP`): select a statistics
+entry by preference — exact competition being synced, then any entry for
+the club with a recognized position, then any entry for the club, never a
+different club's entry. `"Forward"` is now a recognized synonym for
+`"Attacker"`. `sync-players.ts` also now logs *which* player was skipped
+and why, instead of a silent count.
+
+**Blast radius, measured empirically** (not estimated): re-running
+`players` sync for all ~96 Big Five clubs with the fix recovered exactly
+**5 players** system-wide (Raphinha at Barcelona, plus one each at
+Arsenal, Man Utd, Atlético Madrid, and Lens). Re-running the fixture-stats
+backfill then recovered **25 previously-skipped `player_match_stats`
+rows** for those same players — which fully re-explains the "28 domestic
+stat participants skipped" figure from the original population report.
+That report's guess ("players no longer on any current squad") was
+**wrong**; the real cause was this defect. Only 3 stat-skip cases remain
+genuinely unresolvable (see below).
+
+**Remaining 3 unresolvable players are a real provider data gap, not a
+bug**: T. Tuterov (Sunderland), José Ángel (Espanyol), Rafa Fernández
+(Osasuna) — every statistics entry for their club reports `position:
+null` (the provider has no position on file for them at all, in any
+competition). Correctly skipped, not fabricated.
+
+**Sanity check**: the provider's own `/players/topscorers` endpoint (an
+independent, provider-sourced "who's prominent" signal — never a
+hardcoded name list) for all five Big Five leagues, 8 players each = 40
+total, all resolve correctly in Eleven with matching club and position,
+including confirming Bayern München (`BAY`) vs Bayer Leverkusen
+(`BAY168`) stay correctly distinct.
+
+**Reusable audit tooling** (`src/lib/football-ingestion/audit.ts`, `npm
+run football:sync -- audit` / `audit-squad`): `audit` is a zero-provider-
+request database-integrity report (player counts by competition,
+duplicate-identity check, provider-mapping-count consistency, recent skip
+reasons) — safe to run anytime, as often as useful, to answer "is
+Eleven's current draftable Big Five player universe internally
+consistent?" without hunting for famous players by hand. `audit-squad
+--code X --club Y` costs one real request and does the deeper "does
+Eleven's squad for this club match the provider's right now" comparison,
+for spot-checking a specific club on demand — deliberately not run
+automatically for all ~96 clubs every time (that's a bulk operation, not
+a routine health check).
+
+**Historical identity vs. current eligibility.** The schema already
+represents this distinction — `players.active` (default `true`) exists
+for exactly this — and `getPlayerDatabase()` already filters
+`active = true` for the draftable view. What doesn't exist yet is the
+*other side*: nothing currently flips a departed player to `active =
+false` when they drop off every Big Five club's current squad (Big Five
+membership is compared, and a squad refresh only ever creates/updates
+players present in the current response — it never notices a player's
+absence). No schema change is needed to represent this; a future
+reconciliation pass would compare "who was on this club's roster" against
+"who the provider returns now" and deactivate the difference. Deliberately
+not built in Pass 9 (out of scope — squad-departure detection is adjacent
+to roster-management concerns, not scoring/live-sync foundation) but the
+column is already there and already respected by every read.
+
 ## Idempotency
 
 Running any `sync-*` command twice must never duplicate a row. Mechanisms,

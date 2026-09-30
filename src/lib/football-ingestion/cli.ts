@@ -16,11 +16,14 @@
  * player pool; UEFA competitions are ingested for fixture/stat history
  * only (see docs/football-data-system.md).
  *   fixture-stats --fixture <providerFixtureId>   sync one fixture's player stats
+ *   audit                                 zero-request DB-integrity report (see audit.ts) — safe to run anytime
+ *   audit-squad --code ENG --club ARS     ONE live request: compares a club's real provider squad against Eleven, reporting any missing players by name/id
  *
  * Every operation makes exactly ONE provider request (or, for
  * "competitions" with no --code, one request PER enabled competition,
- * stopping early if quota runs low) — see brief §8/§31. Nothing here loops
- * pages automatically; pass --page explicitly to continue one.
+ * stopping early if quota runs low; "audit" makes none) — see brief §8/§31.
+ * Nothing here loops pages automatically; pass --page explicitly to
+ * continue one.
  */
 import "server-only";
 import { BIG_FIVE_COMPETITIONS, getBigFiveCompetition } from "../football-providers/api-football/big-five-competitions.ts";
@@ -36,6 +39,7 @@ import { syncFixtures } from "./sync-fixtures.ts";
 import { syncFixtureStats } from "./sync-fixture-stats.ts";
 import { recordSyncEvent } from "./record-sync-event.ts";
 import { shouldStopForQuota } from "./quota.ts";
+import { compareProviderSquadToEleven, getDatabaseIntegrityReport } from "./audit.ts";
 import type { CompetitionSyncTarget, SyncResult } from "./types.ts";
 
 /** Resolves a `--code` flag against either config list — Big Five or UEFA — never guessing/hardcoding a provider id inline at a call site. */
@@ -82,7 +86,7 @@ async function main() {
   const flags = parseFlags(rest);
 
   if (!operation) {
-    console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats> [flags]");
+    console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|audit|audit-squad> [flags]");
     process.exitCode = 1;
     return;
   }
@@ -167,9 +171,26 @@ async function main() {
         break;
       }
 
+      case "audit": {
+        // No provider request — safe to run anytime, as often as useful.
+        const report = await getDatabaseIntegrityReport(admin);
+        console.log(JSON.stringify(report, null, 2));
+        break;
+      }
+
+      case "audit-squad": {
+        if (!flags.code || !flags.club) {
+          throw new Error('audit-squad requires --code and --club, e.g. "audit-squad --code ENG --club ARS"');
+        }
+        const result = await compareProviderSquadToEleven(admin, resolveCompetition(flags.code), flags.club);
+        requestsUsedThisRun += result.requestsUsed;
+        console.log(JSON.stringify(result, null, 2));
+        break;
+      }
+
       default:
         console.log(`Unknown operation "${operation}".`);
-        console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats> [flags]");
+        console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|audit|audit-squad> [flags]");
         process.exitCode = 1;
         return;
     }

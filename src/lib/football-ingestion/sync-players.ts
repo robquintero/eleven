@@ -79,6 +79,13 @@ export async function syncPlayersForClub(
       if (player) {
         normalized.push(player);
       } else {
+        const positionsSeen = item.statistics
+          .filter((s) => String(s.team.id) === mappingRow.external_id)
+          .map((s) => s.games.position ?? "null")
+          .join(", ");
+        errors.push(
+          `Skipping player ${item.player.id} (${item.player.name}): no recognized position across this club's statistics entries [${positionsSeen || "no entries for this club"}].`
+        );
         counts.skipped += 1;
       }
     }
