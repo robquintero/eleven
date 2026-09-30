@@ -22,6 +22,19 @@ export const FORMATION_RULES: {
   },
 };
 
+/**
+ * The minimum number of managers required before a commissioner may
+ * start the draft — deliberately NOT the same as `settings.maxTeams`
+ * (the league's configured target size). A league configured for 10
+ * managers can still start its draft with as few as 2; the commissioner
+ * chooses when to start, Eleven never requires hitting the configured
+ * target first and never auto-starts on reaching this minimum either.
+ * Mirrored as a literal in `start_draft()`
+ * (supabase/migrations/20260930024807_draft_engine.sql) since SQL can't
+ * import this constant — keep both in sync if this ever changes.
+ */
+export const MIN_MANAGERS_TO_START_DRAFT = 2;
+
 export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
   maxTeams: 10,
   squadSize: FORMATION_RULES.squadSizeApprox,

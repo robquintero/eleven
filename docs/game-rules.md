@@ -182,29 +182,40 @@ without waiting for a real clock to cross a real boundary.
 Unchanged shape from Pass 7.5's `deriveLeagueLifecycle` — Pass 10 makes
 `DRAFTING`/`ACTIVE` reachable for real by actually writing `drafts` rows.
 No new lifecycle column: the state is still fully derived from
-`fantasy_leagues.status` + live membership count vs. `settings.maxTeams`
-+ `drafts.status`.
+`fantasy_leagues.status` + live membership count vs.
+`MIN_MANAGERS_TO_START_DRAFT` + `drafts.status`.
 
 | State | Reached when |
 |---|---|
 | `NO_LEAGUE` | Caller has no league memberships (resolved by the caller, before this function runs) |
-| `WAITING_FOR_MANAGERS` | `memberCount < maxTeams` |
-| `READY_FOR_DRAFT` | `memberCount >= maxTeams`, no `drafts` row yet |
+| `WAITING_FOR_MANAGERS` | `memberCount < MIN_MANAGERS_TO_START_DRAFT` (2) |
+| `READY_FOR_DRAFT` | `memberCount >= MIN_MANAGERS_TO_START_DRAFT`, no `drafts` row yet |
 | `DRAFTING` | A `drafts` row exists with `status = 'in_progress'` |
 | `ACTIVE` | A `drafts` row exists with `status = 'completed'` |
 | `COMPLETED` | `fantasy_leagues.status` is `completed`/`archived` (not driven by this pass) |
 
-Illegal transitions (e.g. starting a draft before `memberCount >=
-maxTeams`, drafting an already-owned player, editing a lineup for a
-league that isn't `ACTIVE`) are rejected server-side — see each engine
-function's own validation.
+`READY_FOR_DRAFT` — and therefore the commissioner's ability to start the
+draft — requires only `MIN_MANAGERS_TO_START_DRAFT` (2) managers, **not**
+`settings.maxTeams` (the league's configured target size). A league
+configured for 10 managers may start its draft the moment a 2nd manager
+joins; Eleven never requires filling the configured target first, and
+never auto-starts on reaching the minimum either — starting remains an
+explicit commissioner action (`start_draft`). `maxTeams` still gates
+*joining* (`join_league_by_invite_code`'s `LEAGUE_FULL` check).
+
+Illegal transitions (e.g. starting a draft with fewer than
+`MIN_MANAGERS_TO_START_DRAFT` managers, drafting an already-owned player,
+editing a lineup for a league that isn't `ACTIVE`) are rejected
+server-side — see each engine function's own validation.
 
 ## League size
 
-Eleven supports 6–12 manager leagues; nothing hardcodes 8.
-`fantasy_leagues.settings.maxTeams` (already a real, arbitrary integer in
-the existing schema) gates `READY_FOR_DRAFT`. Odd manager counts are
-**allowed**: the round-robin schedule generator
+Eleven supports 6–12 manager leagues as the designed/tested range for a
+full season; nothing hardcodes 8. `fantasy_leagues.settings.maxTeams`
+(already a real, arbitrary integer in the existing schema) gates
+*joining* a league, not starting its draft — see "League lifecycle"
+above for the actual `MIN_MANAGERS_TO_START_DRAFT` (2) rule. Odd manager
+counts are **allowed**: the round-robin schedule generator
 (`src/domain/fantasy/schedule.ts`) uses the standard circle method, which
 naturally produces a deterministic bye for whichever team draws the
 "ghost" slot in an odd-sized league each round — that team simply has no

@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { OperationalRow } from "@/components/football/operational-row";
 import { Button } from "@/components/ui/button";
+import { MIN_MANAGERS_TO_START_DRAFT } from "@/domain/fantasy/constants";
 import type { LeagueLifecycleState } from "@/domain/fantasy/league-lifecycle";
 
 const nextActionCopy: Partial<Record<LeagueLifecycleState, string>> = {
-  WAITING_FOR_MANAGERS: "Invite more managers to reach the league's capacity.",
+  WAITING_FOR_MANAGERS: `Invite more managers — the commissioner can start the draft once at least ${MIN_MANAGERS_TO_START_DRAFT} have joined, without waiting for the full league.`,
   READY_FOR_DRAFT: "Your league has enough managers — the draft isn't built yet.",
 };
 

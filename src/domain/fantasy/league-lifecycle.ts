@@ -1,16 +1,22 @@
+import { MIN_MANAGERS_TO_START_DRAFT } from "./constants.ts";
+
 /**
  * Derives the league's PRODUCT lifecycle state from persisted data, rather
  * than storing it as its own column — see docs/product-state.md "League
  * lifecycle." Every state here must be justified by data that already
  * exists in Postgres (`fantasy_leagues.status`, a membership count against
- * `settings.maxTeams`, and whether a `drafts` row exists for the league);
- * nothing here is invented product state.
+ * `MIN_MANAGERS_TO_START_DRAFT`, and whether a `drafts` row exists for the
+ * league); nothing here is invented product state.
+ *
+ * `READY_FOR_DRAFT` requires only `MIN_MANAGERS_TO_START_DRAFT` (2)
+ * managers, NOT `maxTeams` (the league's configured target size) — a
+ * league configured for 10 can start its draft the moment a 2nd manager
+ * joins; `maxTeams` only ever gated *joining* (see
+ * `join_league_by_invite_code`'s `LEAGUE_FULL` check), never starting.
  *
  * DRAFTING/ACTIVE are reachable in this type because the schema (and RLS)
- * already supports a `drafts` row existing, but Pass 7.5 never creates one
- * — the draft engine is Pass 8+. Until then every real league in this
- * product resolves to NO_LEAGUE, WAITING_FOR_MANAGERS, or
- * READY_FOR_DRAFT.
+ * already supports a `drafts` row existing — the draft engine landed in
+ * Pass 10.
  */
 
 export type LeagueLifecycleState =
@@ -36,7 +42,7 @@ export interface LeagueLifecycleInput {
  * league data to a `NO_LEAGUE` state before ever calling this.
  */
 export function deriveLeagueLifecycle(input: LeagueLifecycleInput): LeagueLifecycleState {
-  const { leagueStatus, memberCount, maxTeams, draftStatus } = input;
+  const { leagueStatus, memberCount, draftStatus } = input;
 
   if (leagueStatus === "completed") return "COMPLETED";
   if (leagueStatus === "archived") return "COMPLETED";
@@ -44,7 +50,7 @@ export function deriveLeagueLifecycle(input: LeagueLifecycleInput): LeagueLifecy
   if (draftStatus === "in_progress") return "DRAFTING";
   if (draftStatus === "completed") return "ACTIVE";
 
-  if (memberCount < maxTeams) return "WAITING_FOR_MANAGERS";
+  if (memberCount < MIN_MANAGERS_TO_START_DRAFT) return "WAITING_FOR_MANAGERS";
 
   return "READY_FOR_DRAFT";
 }

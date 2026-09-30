@@ -2,14 +2,34 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { deriveLeagueLifecycle } from "./league-lifecycle.ts";
 
-test("WAITING_FOR_MANAGERS when membership is below capacity", () => {
+test("WAITING_FOR_MANAGERS with only 1 manager, even in a league configured for far fewer than its target", () => {
   const state = deriveLeagueLifecycle({
     leagueStatus: "active",
-    memberCount: 3,
+    memberCount: 1,
     maxTeams: 8,
     draftStatus: null,
   });
   assert.equal(state, "WAITING_FOR_MANAGERS");
+});
+
+test("READY_FOR_DRAFT the moment a 2nd manager joins -- does NOT wait for the configured maxTeams target", () => {
+  const state = deriveLeagueLifecycle({
+    leagueStatus: "active",
+    memberCount: 2,
+    maxTeams: 8,
+    draftStatus: null,
+  });
+  assert.equal(state, "READY_FOR_DRAFT");
+});
+
+test("a league configured for 10 managers is READY_FOR_DRAFT with only 2 -- the target size never gates starting", () => {
+  const state = deriveLeagueLifecycle({
+    leagueStatus: "active",
+    memberCount: 2,
+    maxTeams: 10,
+    draftStatus: null,
+  });
+  assert.equal(state, "READY_FOR_DRAFT");
 });
 
 test("READY_FOR_DRAFT once membership meets capacity with no draft started", () => {

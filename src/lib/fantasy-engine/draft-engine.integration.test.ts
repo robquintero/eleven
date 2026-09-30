@@ -104,6 +104,49 @@ async function draftToCompletion(admin: ReturnType<typeof createAdminClient>, dr
   throw new Error("draft did not complete within the expected number of picks");
 }
 
+test("a commissioner cannot start the draft with only 1 manager", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 1, 4);
+  try {
+    const { error } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    assert.equal(error?.message, "LEAGUE_NOT_FULL");
+
+    const { data: draftRow } = await admin.from("drafts").select("id").eq("league_id", league.leagueId).maybeSingle();
+    assert.equal(draftRow, null, "no draft should have been created");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("a commissioner can start the draft with only 2 managers, even when the league is configured for far more", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 4);
+  try {
+    const { data, error } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    assert.equal(error, null, "starting with exactly 2 managers must succeed");
+    assert.ok(data?.[0]?.draft_id);
+
+    const { data: draftRow } = await admin.from("drafts").select("status").eq("id", data![0].draft_id).single();
+    assert.equal(draftRow!.status, "in_progress");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("a non-commissioner cannot start the draft, even with enough managers", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 4);
+  try {
+    const { error } = await league.clients[1].rpc("start_draft", { p_league_id: league.leagueId });
+    assert.equal(error?.message, "NOT_COMMISSIONER");
+
+    const { data: draftRow } = await admin.from("drafts").select("id").eq("league_id", league.leagueId).maybeSingle();
+    assert.equal(draftRow, null, "no draft should have been created");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
 test("concurrent draft picks for the same player: exactly one succeeds, the other gets a clean rejection, never a raw constraint error", { skip }, async () => {
   const admin = createAdminClient();
   const league = await createTestLeague(admin, 4);

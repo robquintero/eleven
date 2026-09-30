@@ -9,6 +9,7 @@ import { getUserLeagues } from "@/data-access/leagues";
 import { getPlayerDatabase } from "@/data-access/players";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
+import { MIN_MANAGERS_TO_START_DRAFT } from "@/domain/fantasy/constants";
 
 export default async function DraftPage() {
   const leagues = await getUserLeagues();
@@ -32,7 +33,7 @@ export default async function DraftPage() {
       <ComingSoon
         icon={Swords}
         title="Waiting for managers"
-        description={`This league needs ${league.maxTeams} managers before the draft can begin. Invite more managers from the League screen.`}
+        description={`This league needs at least ${MIN_MANAGERS_TO_START_DRAFT} managers before the draft can begin (${league.memberCount} so far — the commissioner doesn't have to wait for all ${league.maxTeams}). Invite more managers from the League screen.`}
       />
     );
   }
@@ -44,8 +45,8 @@ export default async function DraftPage() {
         title="Ready for draft"
         description={
           league.role === "commissioner"
-            ? "Your league is full. Start the draft to begin building rosters."
-            : "Your league is full. Waiting for the commissioner to start the draft."
+            ? `${league.memberCount} of ${league.maxTeams} managers have joined. You can start the draft now, or wait for more to join first.`
+            : `${league.memberCount} of ${league.maxTeams} managers have joined. Waiting for the commissioner to start the draft.`
         }
       >
         {league.role === "commissioner" && <StartDraftButton leagueId={league.id} />}

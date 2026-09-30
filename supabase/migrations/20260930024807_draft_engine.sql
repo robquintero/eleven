@@ -26,11 +26,15 @@ comment on column public.drafts.current_pick is
   'Round-LOCAL pick number (1..team count), NOT the same as draft_picks.pick_number (which is the overall 1..totalPicks count) — see make_draft_pick() for the exact conversion.';
 
 -- ---------------------------------------------------------------------
--- start_draft: commissioner-only. Randomizes the team order (via SQL's
--- own `order by random()` rather than trusting a client-supplied order —
--- the whole point of generating it server-side), persists it as
--- draft_orders, and creates the drafts row with the timer already
--- running for pick 1.
+-- start_draft: commissioner-only, requires at least 2 managers (NOT the
+-- league's configured settings.maxTeams target -- a league configured
+-- for 10 managers may still start with as few as 2; Eleven never
+-- requires filling the configured target before starting, and never
+-- auto-starts on reaching the minimum either). Randomizes the team order
+-- (via SQL's own `order by random()` rather than trusting a client-
+-- supplied order -- the whole point of generating it server-side),
+-- persists it as draft_orders, and creates the drafts row with the
+-- timer already running for pick 1.
 -- ---------------------------------------------------------------------
 
 create or replace function public.start_draft(p_league_id uuid)
@@ -43,7 +47,12 @@ declare
   v_user_id uuid := auth.uid();
   v_league public.fantasy_leagues%rowtype;
   v_member_count int;
-  v_max_teams int;
+  -- 2, not settings.maxTeams (the league's configured TARGET size) --
+  -- a commissioner may start the draft as soon as 2 managers have
+  -- joined, without waiting to hit the configured target. Mirrors
+  -- src/domain/fantasy/constants.ts's MIN_MANAGERS_TO_START_DRAFT;
+  -- keep both in sync if this ever changes.
+  v_min_managers constant int := 2;
   v_draft_id uuid;
   v_position int := 0;
   v_team record;
@@ -70,9 +79,8 @@ begin
   end if;
 
   select count(*) into v_member_count from public.league_memberships m where m.league_id = p_league_id;
-  v_max_teams := coalesce((v_league.settings ->> 'maxTeams')::int, 10);
 
-  if v_member_count < v_max_teams then
+  if v_member_count < v_min_managers then
     raise exception 'LEAGUE_NOT_FULL';
   end if;
 
@@ -95,7 +103,7 @@ end;
 $$;
 
 comment on function public.start_draft(uuid) is
-  'Commissioner-only. Atomically randomizes and persists the snake draft order, then creates the in_progress drafts row with pick 1''s timer running. Raises NOT_AUTHENTICATED / LEAGUE_NOT_FOUND / NOT_COMMISSIONER / LEAGUE_CLOSED / DRAFT_ALREADY_EXISTS / LEAGUE_NOT_FULL.';
+  'Commissioner-only, requires at least 2 managers (not settings.maxTeams). Atomically randomizes and persists the snake draft order, then creates the in_progress drafts row with pick 1''s timer running. Raises NOT_AUTHENTICATED / LEAGUE_NOT_FOUND / NOT_COMMISSIONER / LEAGUE_CLOSED / DRAFT_ALREADY_EXISTS / LEAGUE_NOT_FULL.';
 
 revoke all on function public.start_draft(uuid) from public;
 grant execute on function public.start_draft(uuid) to authenticated;
