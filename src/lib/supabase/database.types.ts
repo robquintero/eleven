@@ -327,29 +327,32 @@ export type Database = {
         Row: {
           breakdown: Json
           calculated_at: string
-          fantasy_round_id: string
+          fantasy_round_id: string | null
           fixture_id: string
           id: string
           player_id: string
           points: number
+          scoring_rule_version: string
         }
         Insert: {
           breakdown?: Json
           calculated_at?: string
-          fantasy_round_id: string
+          fantasy_round_id?: string | null
           fixture_id: string
           id?: string
           player_id: string
           points?: number
+          scoring_rule_version?: string
         }
         Update: {
           breakdown?: Json
           calculated_at?: string
-          fantasy_round_id?: string
+          fantasy_round_id?: string | null
           fixture_id?: string
           id?: string
           player_id?: string
           points?: number
+          scoring_rule_version?: string
         }
         Relationships: [
           {
