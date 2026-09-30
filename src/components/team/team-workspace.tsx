@@ -81,23 +81,21 @@ type Selection =
  *   `swapLineupAction`, re-validated server-side exactly as before.
  *
  * Read-only (no edit affordance at all) when there's no team, matching
- * "Interaction truthfulness" — see docs/product-state.md. Also read-only,
- * with a truthful explanation, when the server-side admin client isn't
- * configured at all (`lineupEditingAvailable`) — the Team UI must never
- * expose a lineup editor it can't actually persist through.
+ * "Interaction truthfulness" — see docs/product-state.md. Lineup writes go
+ * through the ordinary authenticated request-scoped client now (Pass
+ * 10.5C.2A — see `team/actions.ts`), not a service-role admin client, so
+ * there's no separate "is the server configured for this" gate anymore.
  */
 export function TeamWorkspace({
   squad,
   matchdayNumber,
   leagueId,
   fantasyTeamId,
-  lineupEditingAvailable,
 }: {
   squad: Squad;
   matchdayNumber: number | null;
   leagueId: string;
   fantasyTeamId: string | null;
-  lineupEditingAvailable: boolean;
 }) {
   const router = useRouter();
   const [detail, setDetail] = useState<Player | null>(null);
@@ -108,7 +106,7 @@ export function TeamWorkspace({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canEdit = Boolean(fantasyTeamId) && lineupEditingAvailable;
+  const canEdit = Boolean(fantasyTeamId);
 
   function openPlayer(player: Player) {
     setDetail(player);
@@ -278,10 +276,14 @@ export function TeamWorkspace({
    *     they were, with the existing error treatment shown — never a
    *     silent discard.
    *
-   * Fills are sent in SLOT-SEQUENCE order (Pass 10.5C.2) specifically so
-   * `updateLineup`'s own sequential per-row writes leave `updated_at`
-   * ascending in the manager's intended left-to-right order — see
-   * `roster.ts`'s read-side sort for why.
+   * Fills are sent in slot-sequence order for readability only — the
+   * database has no durable column to persist exactly which slot each
+   * starter occupies (see `roster.ts`'s own comment and this pass's
+   * report), so a refresh currently re-derives a stable but not
+   * necessarily identical layout. This session's own placements (via
+   * `pendingAssignments`/`formationSlots()`) stay exact for as long as the
+   * editor is open, which is what this comment previously conflated with
+   * post-refresh persistence.
    */
   async function handleDoneOrEdit() {
     if (!editing) {
@@ -323,13 +325,11 @@ export function TeamWorkspace({
       {fantasyTeamId && (
         <div className="mt-4 flex items-center justify-between">
           <p className="text-xs text-foreground-tertiary">
-            {!lineupEditingAvailable
-              ? "Lineup editing is temporarily unavailable — the server isn't configured for it right now."
-              : editing
-                ? pendingAssignments.size > 0
-                  ? `Building lineup — ${totalAssigned} / ${FORMATION_RULES.startersTotal} selected. Click Done to save.`
-                  : "Select a starter, then a bench player (or vice versa) to swap them — or select an empty slot to fill it from the bench."
-                : "Selecting a footballer opens their record. Select an empty pitch slot to start building your XI."}
+            {editing
+              ? pendingAssignments.size > 0
+                ? `Building lineup — ${totalAssigned} / ${FORMATION_RULES.startersTotal} selected. Click Done to save.`
+                : "Select a starter, then a bench player (or vice versa) to swap them — or select an empty slot to fill it from the bench."
+              : "Selecting a footballer opens their record. Select an empty pitch slot to start building your XI."}
           </p>
           <Button
             variant={editing ? "outline" : "default"}

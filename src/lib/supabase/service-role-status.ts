@@ -11,13 +11,17 @@
  * directory would falsely trip it even though it never actually imports
  * the admin client.)
  *
- * A wide swath of Eleven's core gameplay now depends on this being
- * configured — Team lineup editing (swap/fill/formation-change) and the
- * draft's own round-1 auto-open self-heal both silently fail/no-op
- * without it. A Team/Draft page checks this so it can show a truthful
- * "lineup editing unavailable" state instead of exposing a lineup editor
- * that will fail at the very last step (see `.env.example`'s own note on
- * this being the most common cause of "Lineup editing isn't configured").
+ * As of Pass 10.5C.2A, ordinary lineup editing (swap/fill/
+ * formation-change) no longer depends on this at all — those writes go
+ * through the authenticated request-scoped client under a real,
+ * ownership-scoped RLS policy (see
+ * supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql).
+ * The one remaining consumer is the draft's round-1 auto-open self-heal
+ * (`ensureFirstRoundOpenedAction`), a genuine multi-team lifecycle
+ * operation that legitimately needs service-role. Without it, a
+ * completed draft simply won't self-heal into an open round — which
+ * surfaces as the existing, truthful "No fantasy round is open yet."
+ * lineup error, not a separate configuration message.
  */
 export function isSupabaseAdminConfigured(): boolean {
   return Boolean(

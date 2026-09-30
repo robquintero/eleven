@@ -61,8 +61,11 @@ Manager selects a starter then a bench player (or vice versa) on the
 Team screen → swapLineupAction (src/app/(app)/team/actions.ts)
   → Verifies the caller actually owns this fantasy team (their own
     RLS-respecting session), then calls updateLineup()
-    (src/lib/fantasy-engine/lineup.ts) via the service-role client — no
-    authenticated INSERT/UPDATE policy exists on lineup_slots by design
+    (src/lib/fantasy-engine/lineup.ts) via that SAME authenticated
+    session (Pass 10.5C.2A) — no service-role client involved; a real
+    ownership-scoped RLS UPDATE policy on lineup_slots enforces this
+    again at the database layer (supabase/migrations/
+    20260930050000_lineup_slots_owner_write_policy.sql)
   → All-or-nothing: rejects the whole batch if any touched slot is
     already locked, or if the resulting starter composition wouldn't be
     a valid formation (src/domain/fantasy/constants.ts)

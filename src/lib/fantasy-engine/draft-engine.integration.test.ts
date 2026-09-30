@@ -777,3 +777,96 @@ test("updateLineup: an incomplete fill (fewer than 11) is rejected -- an in-prog
     await cleanupTestLeague(admin, league);
   }
 });
+
+// ---------------------------------------------------------------------
+// Pass 10.5C.2A: ordinary lineup writes (swap/fill/formation-change) move
+// off the service-role admin client onto the authenticated request-scoped
+// client (`team/actions.ts`), under a new ownership-scoped RLS UPDATE
+// policy (supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql).
+// These two tests exercise the REAL authenticated client
+// (`league.clients[i]`, a real signed-in Supabase Auth session — not
+// admin) to prove: (1) a manager's own write actually persists through
+// this policy, not just "doesn't error", and (2) the database itself
+// blocks a write to another manager's team, independent of and in
+// addition to the application-level ownership check every Server Action
+// already performs.
+// ---------------------------------------------------------------------
+
+test("updateLineup persists through the authenticated client for a manager's own team -- no service-role client involved", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    await draftToCompletion(admin, draftId, 2, 16);
+
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    assert.ok(openResult.ok);
+    if (!openResult.ok) return;
+
+    const teamId = league.teamIds[0];
+    const { data: roster } = await admin.from("roster_entries").select("id, players(position)").eq("fantasy_team_id", teamId).eq("status", "active");
+    const byPosition: Record<string, string[]> = { GK: [], DEF: [], MID: [], FWD: [] };
+    for (const r of roster!) byPosition[(r.players as { position: string }).position].push(r.id);
+    const validXi = [
+      ...byPosition.GK.slice(0, 1).map((id) => ({ rosterEntryId: id, starter: true as const, position: "GK" as const })),
+      ...byPosition.DEF.slice(0, 4).map((id) => ({ rosterEntryId: id, starter: true as const, position: "DEF" as const })),
+      ...byPosition.MID.slice(0, 4).map((id) => ({ rosterEntryId: id, starter: true as const, position: "MID" as const })),
+      ...byPosition.FWD.slice(0, 2).map((id) => ({ rosterEntryId: id, starter: true as const, position: "FWD" as const })),
+    ];
+
+    // league.clients[0] is a real, signed-in session for team 0's own
+    // owner -- the SAME kind of client swapLineupAction/fillEmptySlotsAction/
+    // changeFormationAction now use, deliberately NOT the admin client.
+    const result = await updateLineup(league.clients[0], teamId, openResult.roundId, validXi, new Date("2026-09-08T00:00:00Z"));
+    assert.deepEqual(result, { ok: true }, "the RLS UPDATE policy must permit an owner to write their own team's lineup_slots");
+
+    // Re-read with admin (bypasses RLS) to confirm the write actually
+    // landed, not just that no error was thrown.
+    const rosterIds = roster!.map((r) => r.id);
+    const { data: finalSlots } = await admin.from("lineup_slots").select("starter").eq("fantasy_round_id", openResult.roundId).in("roster_entry_id", rosterIds);
+    assert.equal((finalSlots ?? []).filter((s) => s.starter).length, 11, "the authenticated-client write must genuinely persist 11 starters");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("the database itself rejects a manager writing another team's lineup_slots, independent of any application-level check", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    await draftToCompletion(admin, draftId, 2, 16);
+
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    assert.ok(openResult.ok);
+    if (!openResult.ok) return;
+
+    const victimTeamId = league.teamIds[0];
+    const { data: victimSlot } = await admin
+      .from("lineup_slots")
+      .select("id, roster_entry_id, starter")
+      .eq("fantasy_round_id", openResult.roundId)
+      .in(
+        "roster_entry_id",
+        (await admin.from("roster_entries").select("id").eq("fantasy_team_id", victimTeamId).eq("status", "active")).data!.map((r) => r.id)
+      )
+      .limit(1)
+      .single();
+    assert.ok(victimSlot);
+    const before = victimSlot.starter;
+
+    // Team 1's own authenticated session attempts to flip a row it does
+    // NOT own, bypassing updateLineup()/the Server Action's ownership
+    // check entirely -- this is exactly what the RLS policy alone must
+    // stop, as the last line of defense (docs/game-rules.md-style
+    // "manager must only ever modify their own fantasy team's lineup").
+    await league.clients[1].from("lineup_slots").update({ starter: !before }).eq("id", victimSlot.id);
+
+    const { data: after } = await admin.from("lineup_slots").select("starter").eq("id", victimSlot.id).single();
+    assert.equal(after!.starter, before, "team 1 must not be able to change team 0's lineup_slots row at all");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});

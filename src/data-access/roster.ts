@@ -105,14 +105,14 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
 
   const { data: slots } = await supabase
     .from("lineup_slots")
-    .select("roster_entry_id, starter, locked_at, updated_at")
+    .select("roster_entry_id, starter, locked_at")
     .eq("fantasy_round_id", currentRound.id)
     .in("roster_entry_id", Array.from(playerByRosterEntryId.keys()));
 
   const slotByRosterEntryId = new Map((slots ?? []).map((s) => [s.roster_entry_id, s]));
   const now = new Date();
 
-  const starterEntries: Array<{ rosterEntryId: string; player: Player; locked: boolean; updatedAt: string }> = [];
+  const starterEntries: Array<{ rosterEntryId: string; player: Player; locked: boolean }> = [];
   const bench: Player[] = [];
 
   for (const [rosterEntryId, player] of playerByRosterEntryId) {
@@ -122,27 +122,26 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
         rosterEntryId,
         player,
         locked: isLocked(slot.locked_at ? new Date(slot.locked_at) : null, now),
-        updatedAt: slot.updated_at,
       });
     } else {
       bench.push(player);
     }
   }
 
-  // Pass 10.5C.2: sorted so a manager's specific slot choices (e.g. "right
-  // CB" vs "left CB") survive a refresh as faithfully as the EXISTING
-  // schema allows. `lineup_slots` has no dedicated slot-index column, and
-  // this pass deliberately doesn't add one (see the pass's own report for
-  // why) -- but `updateLineup()` already writes a batch of changes
-  // sequentially, in the order given, so `updated_at` ascending recovers
-  // the manager's intended left-to-right order for whichever slots they
-  // actually just set (see `team-workspace.tsx`, which now constructs
-  // fills in slot-sequence order specifically so this works). A starter
-  // never individually touched since the original auto-generated XI (or
-  // by an older swap) simply keeps whatever relative order its own write
-  // produced -- still stable and deterministic on every read, just not
-  // meaningfully "chosen" for that specific slot.
-  starterEntries.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
+  // `lineup_slots` has no durable column recording WHICH specific pitch
+  // slot a starter occupies (only the coarse GK/DEF/MID/FWD/BENCH
+  // `slot` bucket) -- so which starter lands on, say, "left CB" vs
+  // "right CB" is NOT preserved across a refresh/navigation today (Pass
+  // 10.5C.2A: a prior pass sorted by `updated_at` to approximate this,
+  // but that's an audit timestamp that can change for unrelated reasons
+  // and was rejected as a canonical placement mechanism -- see this
+  // pass's own report for the minimal schema change that would actually
+  // fix this: a durable `slot_id` column). Sorting by roster_entry_id
+  // gives a stable, deterministic (if not manager-chosen) placement on
+  // every read instead, so a refresh never re-shuffles randomly, and each
+  // *editing session* still places players exactly where the manager put
+  // them (`team-workspace.tsx`'s own stable client-side slot ids).
+  starterEntries.sort((a, b) => a.rosterEntryId.localeCompare(b.rosterEntryId));
 
   const counts: Partial<Record<PlayerPosition, number>> = {};
   for (const s of starterEntries) counts[s.player.position] = (counts[s.player.position] ?? 0) + 1;

@@ -1,5 +1,15 @@
 "use server";
 
+// Pass 10.5C.2A: swapLineupAction/fillEmptySlotsAction/changeFormationAction
+// below write through the request-scoped, RLS-respecting `createClient()`
+// -- see each function's own doc comment and
+// supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql.
+// Only `ensureFirstRoundOpenedAction` below still needs the privileged
+// admin client: opening a round writes EVERY team's `lineup_slots` in the
+// league at once (see `createRoundLineupSlots`), not just the caller's
+// own team, so no single manager's row-ownership -- and no per-row RLS
+// update policy -- could ever cover it.
+
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
@@ -40,14 +50,16 @@ export async function ensureFirstRoundOpenedAction(leagueId: string): Promise<vo
 /**
  * Swaps one starter for one bench player, matching the existing
  * `swapPlayers` view-model semantics (src/lib/selectors/lineup.ts) but
- * actually persisted. Uses the service-role client for the write itself
- * (no `authenticated` INSERT/UPDATE policy exists on `lineup_slots` — see
- * supabase/migrations/20260929141143_rls.sql's own stated convention:
- * privileged writes go through trusted server code, not client RLS), but
- * FIRST independently verifies via the caller's own real session that
- * they actually own `fantasyTeamId` in `leagueId` — never trusts the
- * client's claim. `updateLineup()` itself re-validates lock state and
- * formation validity all-or-nothing.
+ * actually persisted. This is an ordinary authenticated manager operation
+ * on their OWN team, so it writes through the request-scoped,
+ * RLS-respecting client throughout — no service-role client involved.
+ * `lineup_slots` has a real ownership-scoped UPDATE policy for this (see
+ * supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql,
+ * mirroring `fantasy_teams`'s own "owners can update their own team"
+ * policy), so the database itself enforces "a manager can only touch
+ * their own team's lineup" as a second line of defense behind the
+ * explicit ownership check below. `updateLineup()` itself re-validates
+ * lock state and formation validity all-or-nothing.
  */
 export async function swapLineupAction(
   leagueId: string,
@@ -70,10 +82,7 @@ export async function swapLineupAction(
     .maybeSingle();
   if (!team) return { error: "You don't own this team." };
 
-  if (!isSupabaseAdminConfigured()) return { error: "Lineup editing isn't configured." };
-  const admin = createAdminClient();
-
-  const { data: round } = await admin
+  const { data: round } = await supabase
     .from("fantasy_rounds")
     .select("id")
     .eq("league_id", leagueId)
@@ -82,7 +91,7 @@ export async function swapLineupAction(
     .maybeSingle();
   if (!round) return { error: "No fantasy round is open yet." };
 
-  const { data: rosterEntries } = await admin
+  const { data: rosterEntries } = await supabase
     .from("roster_entries")
     .select("id, player_id, players(position)")
     .eq("fantasy_team_id", fantasyTeamId)
@@ -97,7 +106,7 @@ export async function swapLineupAction(
   if (!inPosition) return { error: "Player not found on this roster." };
 
   const result = await updateLineup(
-    admin,
+    supabase,
     fantasyTeamId,
     round.id,
     [
@@ -135,7 +144,9 @@ export async function swapLineupAction(
  * team to a complete, legal starting XI. The client is expected to queue
  * fills locally and only call this once that's true (see
  * `team-workspace.tsx`) -- calling it earlier just returns
- * INVALID_FORMATION, never partially applies anything.
+ * INVALID_FORMATION, never partially applies anything. Same authenticated,
+ * RLS-respecting write path as `swapLineupAction` above (Pass 10.5C.2A) —
+ * no service-role client involved.
  */
 export async function fillEmptySlotsAction(
   leagueId: string,
@@ -159,10 +170,7 @@ export async function fillEmptySlotsAction(
     .maybeSingle();
   if (!team) return { error: "You don't own this team." };
 
-  if (!isSupabaseAdminConfigured()) return { error: "Lineup editing isn't configured." };
-  const admin = createAdminClient();
-
-  const { data: round } = await admin
+  const { data: round } = await supabase
     .from("fantasy_rounds")
     .select("id")
     .eq("league_id", leagueId)
@@ -171,7 +179,7 @@ export async function fillEmptySlotsAction(
     .maybeSingle();
   if (!round) return { error: "No fantasy round is open yet." };
 
-  const { data: rosterEntries } = await admin
+  const { data: rosterEntries } = await supabase
     .from("roster_entries")
     .select("id, player_id, players(position)")
     .eq("fantasy_team_id", fantasyTeamId)
@@ -191,7 +199,7 @@ export async function fillEmptySlotsAction(
     changes.push({ rosterEntryId: entry.id, starter: true, position: fill.position });
   }
 
-  const result = await updateLineup(admin, fantasyTeamId, round.id, changes, new Date());
+  const result = await updateLineup(supabase, fantasyTeamId, round.id, changes, new Date());
   if (!result.ok) {
     const copy: Record<string, string> = {
       ROUND_NOT_FOUND: "No fantasy round is open yet.",
@@ -215,7 +223,8 @@ export async function fillEmptySlotsAction(
  * starters where possible, promotes from bench, demotes surplus, never
  * touches a locked player), then persists it through the SAME
  * `updateLineup()` all-or-nothing primitive `swapLineupAction` above uses
- * — no new write path, no new lock-checking logic.
+ * — no new write path, no new lock-checking logic. Same authenticated,
+ * RLS-respecting client throughout (Pass 10.5C.2A).
  */
 export async function changeFormationAction(
   leagueId: string,
@@ -237,10 +246,7 @@ export async function changeFormationAction(
     .maybeSingle();
   if (!team) return { error: "You don't own this team." };
 
-  if (!isSupabaseAdminConfigured()) return { error: "Lineup editing isn't configured." };
-  const admin = createAdminClient();
-
-  const { data: round } = await admin
+  const { data: round } = await supabase
     .from("fantasy_rounds")
     .select("id")
     .eq("league_id", leagueId)
@@ -249,14 +255,14 @@ export async function changeFormationAction(
     .maybeSingle();
   if (!round) return { error: "No fantasy round is open yet." };
 
-  const { data: rosterEntries } = await admin
+  const { data: rosterEntries } = await supabase
     .from("roster_entries")
     .select("id, players(name, position)")
     .eq("fantasy_team_id", fantasyTeamId)
     .eq("status", "active");
   if (!rosterEntries || rosterEntries.length === 0) return { error: "No roster found." };
 
-  const { data: slots } = await admin
+  const { data: slots } = await supabase
     .from("lineup_slots")
     .select("roster_entry_id, starter, locked_at")
     .eq("fantasy_round_id", round.id)
@@ -305,7 +311,7 @@ export async function changeFormationAction(
     return undefined;
   }
 
-  const result = await updateLineup(admin, fantasyTeamId, round.id, changeResult.changes, now);
+  const result = await updateLineup(supabase, fantasyTeamId, round.id, changeResult.changes, now);
   if (!result.ok) {
     const copy: Record<string, string> = {
       ROUND_NOT_FOUND: "No fantasy round is open yet.",

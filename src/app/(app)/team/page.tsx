@@ -5,7 +5,6 @@ import { getActiveLeagueId } from "@/data-access/active-league";
 import { getUserLeagues } from "@/data-access/leagues";
 import { getUserSquad } from "@/data-access/roster";
 import { getUserTeamInLeague } from "@/data-access/teams";
-import { isSupabaseAdminConfigured } from "@/lib/supabase/service-role-status";
 import { pad2 } from "@/lib/team-fixture";
 import type { Squad } from "@/lib/types/fantasy";
 
@@ -64,7 +63,6 @@ export default async function TeamPage() {
         matchdayNumber={null}
         leagueId={league.id}
         fantasyTeamId={team?.id ?? null}
-        lineupEditingAvailable={isSupabaseAdminConfigured()}
       />
     </div>
   );

@@ -12,7 +12,9 @@ import type { Database } from "@/lib/supabase/database.types";
  *
  * Also used by a narrow, explicitly-justified allowlist of Server Action
  * files that need a privileged write no RLS policy allows `authenticated`
- * to do directly (Team lineup editing, draft round-1 auto-open) — see
+ * to do directly (as of Pass 10.5C.2A: only the draft's round-1 auto-open
+ * self-heal — ordinary lineup editing was moved OFF this client onto the
+ * authenticated one, see `team/actions.ts`) — see
  * `no-provider-imports-in-app.test.ts`'s own `EXEMPT_EXACT_PATHS`. Not
  * used by `src/data-access/*`, which always goes through the
  * RLS-respecting `src/lib/supabase/server.ts` client instead.
