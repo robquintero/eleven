@@ -240,6 +240,20 @@ export function PlayerInspectorContent({
           >
             {lineupContext.isStarter ? "Move to bench" : "Move to starting XI"}
           </Button>
+        ) : ownership === "mine" ? (
+          // Truthful owned/status state for a player already on the
+          // caller's OWN team (Pass 10.5B) -- never the "join a league"
+          // CTA (which previously showed here too, since this component
+          // couldn't tell "mine" apart from "no league context at all"),
+          // and never a fake trade/claim action either, since neither
+          // exists yet. Real lineup moves belong to the Team page's own
+          // edit-lineup flow (lineupContext above), not this slot.
+          <div className="rounded-control border border-border px-3 py-2.5 text-center">
+            <p className="label-system text-xs font-semibold text-accent">ON YOUR ROSTER</p>
+            <p className="mt-1 text-xs text-foreground-tertiary">
+              Manage starters and formation from the Team page.
+            </p>
+          </div>
         ) : ownership === "owned" ? (
           <>
             <Button className="w-full rounded-control" onClick={() => setShowNote(true)}>
@@ -264,7 +278,22 @@ export function PlayerInspectorContent({
               </p>
             )}
           </>
+        ) : ownership === "waivers" ? (
+          <>
+            <Button className="w-full rounded-control" onClick={() => setShowNote(true)}>
+              {actionCopy.waivers?.label}
+            </Button>
+            {showNote && (
+              <p className="mt-2 flex items-start gap-1.5 text-xs text-foreground-tertiary">
+                <Info className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
+                {actionCopy.waivers?.note}
+              </p>
+            )}
+          </>
         ) : (
+          // `ownership` is `undefined` here (never "mine"/"owned"/"free"/
+          // "waivers", all handled above) -- the caller genuinely has no
+          // active league context, e.g. no league joined at all.
           <Button
             className="w-full rounded-control"
             variant="outline"

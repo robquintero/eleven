@@ -87,7 +87,7 @@ export interface Player {
  * this is a template literal rather than a closed enum. "—" means no
  * formation has been set yet — no draft/lineup exists for this squad.
  */
-export type Formation = `${number}-${number}-${number}` | "—";
+export type Formation = `${number}-${number}-${number}` | "4-2-3-1" | "—";
 
 /** A single position on the pitch, expressed as a percentage of pitch width/height. */
 export interface LineupSlot {
@@ -165,7 +165,8 @@ export type FantasyRoundStatus = "upcoming" | "in-progress" | "completed";
 export interface FantasyRound {
   number: number;
   label: string;
-  deadline: string;
+  /** `null` when there's no single meaningful deadline to show (Eleven's real model locks each player individually at their own fixture's kickoff, not on one global deadline — docs/game-rules.md "Player locking") — e.g. the next applicable lock instant when one exists, or `null` when none is currently known. */
+  deadline: string | null;
   status: FantasyRoundStatus;
 }
 

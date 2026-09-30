@@ -33,10 +33,14 @@ export function Greeting({
             <span className="label-system text-xs text-foreground-tertiary">
               MATCHDAY {pad2(round.number)}
             </span>
-            <span className="text-foreground-tertiary">·</span>
-            <span className="label-system text-xs text-foreground-tertiary">
-              LOCKS {formatDeadline(round.deadline)}
-            </span>
+            {round.deadline && (
+              <>
+                <span className="text-foreground-tertiary">·</span>
+                <span className="label-system text-xs text-foreground-tertiary">
+                  LOCKS {formatDeadline(round.deadline)}
+                </span>
+              </>
+            )}
           </>
         ) : (
           <span className="label-system text-xs text-foreground-tertiary">

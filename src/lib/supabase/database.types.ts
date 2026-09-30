@@ -46,7 +46,9 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          name_unaccented: string | null
           short_name: string
+          short_name_unaccented: string | null
           updated_at: string
         }
         Insert: {
@@ -55,7 +57,9 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          name_unaccented?: string | null
           short_name: string
+          short_name_unaccented?: string | null
           updated_at?: string
         }
         Update: {
@@ -64,7 +68,9 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          name_unaccented?: string | null
           short_name?: string
+          short_name_unaccented?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -844,6 +850,7 @@ export type Database = {
           created_at: string
           id: string
           name: string
+          name_unaccented: string | null
           nationality: string | null
           position: string
           shirt_number: number | null
@@ -858,6 +865,7 @@ export type Database = {
           created_at?: string
           id?: string
           name: string
+          name_unaccented?: string | null
           nationality?: string | null
           position: string
           shirt_number?: number | null
@@ -872,6 +880,7 @@ export type Database = {
           created_at?: string
           id?: string
           name?: string
+          name_unaccented?: string | null
           nationality?: string | null
           position?: string
           shirt_number?: number | null
@@ -1298,6 +1307,7 @@ export type Database = {
         }[]
       }
       generate_invite_code: { Args: { p_length?: number }; Returns: string }
+      immutable_unaccent: { Args: { "": string }; Returns: string }
       is_league_commissioner: {
         Args: { p_league_id: string }
         Returns: boolean

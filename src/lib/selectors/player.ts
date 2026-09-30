@@ -48,18 +48,22 @@ export function getRecentFormAverage(player: Player): number | null {
 
 export interface PlayerDatabaseSummary {
   free: number;
+  /** Owned by another team in the league -- excludes "mine" (see below). */
   owned: number;
+  /** Owned by the CALLER's own team -- a subset of "owned by someone," tallied separately since it's a truthfully distinct state (Pass 10.5B). */
+  mine: number;
   waivers: number;
   flagged: number;
 }
 
 /** Whole-database ownership/availability tallies — powers the Players page's summary strip. */
 export function getDatabaseSummary(players: Player[]): PlayerDatabaseSummary {
-  const summary: PlayerDatabaseSummary = { free: 0, owned: 0, waivers: 0, flagged: 0 };
+  const summary: PlayerDatabaseSummary = { free: 0, owned: 0, mine: 0, waivers: 0, flagged: 0 };
   for (const player of players) {
     const ownership = player.ownership ?? "free";
     if (ownership === "free") summary.free += 1;
     else if (ownership === "owned") summary.owned += 1;
+    else if (ownership === "mine") summary.mine += 1;
     else if (ownership === "waivers") summary.waivers += 1;
     if (player.availability === "injured" || player.availability === "suspended") {
       summary.flagged += 1;

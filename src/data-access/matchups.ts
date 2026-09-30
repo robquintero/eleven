@@ -2,12 +2,21 @@ import "server-only";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { buildStandingsTable, rankStandings } from "@/domain/fantasy/standings";
+import { computeFixtureIntelligence } from "@/domain/fantasy/fixture-intelligence";
 import type { MatchupOutcome } from "@/domain/fantasy/standings";
+import type { FixtureRow } from "@/domain/fantasy/fixture-intelligence";
+import type { RoundWindow } from "@/domain/fantasy/round-calendar";
 
 export interface CurrentMatchup {
   id: string;
+  roundId: string;
   roundNumber: number;
+  /** The fantasy round's own Tue→Mon window (docs/game-rules.md "Fantasy round boundary") — what "round-aware" fixture lookups (Pass 10.5B) must stay inside, never crossing into a future round just to find something to show. */
+  roundStartsAt: string;
+  roundEndsAt: string;
   status: "scheduled" | "live" | "final";
+  homeFantasyTeamId: string;
+  awayFantasyTeamId: string;
   homeTeamName: string;
   awayTeamName: string;
   homeLivePoints: number;
@@ -33,7 +42,7 @@ export async function getCurrentMatchup(
 
   const { data: round } = await supabase
     .from("fantasy_rounds")
-    .select("id, number, status")
+    .select("id, number, status, starts_at, ends_at")
     .eq("league_id", leagueId)
     .in("status", ["in_progress", "upcoming"])
     .order("starts_at", { ascending: true })
@@ -67,8 +76,13 @@ export async function getCurrentMatchup(
 
   return {
     id: matchup.id,
+    roundId: round.id,
     roundNumber: round.number,
+    roundStartsAt: round.starts_at,
+    roundEndsAt: round.ends_at,
     status: matchup.status as CurrentMatchup["status"],
+    homeFantasyTeamId: matchup.home_fantasy_team_id,
+    awayFantasyTeamId: matchup.away_fantasy_team_id,
     homeTeamName: nameById.get(matchup.home_fantasy_team_id) ?? "—",
     awayTeamName: nameById.get(matchup.away_fantasy_team_id) ?? "—",
     homeLivePoints: homeScore?.live_points ?? 0,
@@ -77,6 +91,88 @@ export async function getCurrentMatchup(
     awayFinalPoints: awayScore?.final_points ?? null,
     isUserHome,
   };
+}
+
+export interface MatchupFixtureIntelligence {
+  liveFixtureCount: number;
+  /** `false` only when there is genuinely no stored fixture data at all for the clubs involved in this matchup — never merely because nothing is live/upcoming right now (Pass 10.5B: "NO FIXTURE DATA" must not be used just because nothing is live). */
+  hasAnyFixtureData: boolean;
+  nextFixture: {
+    kickoffAt: string;
+    homeClubShortName: string;
+    awayClubShortName: string;
+  } | null;
+}
+
+/**
+ * Real fixture context for the CURRENT H2H matchup (Pass 10.5B) — scoped to
+ * every ACTIVE roster entry (starter AND bench) on BOTH fantasy teams, since
+ * an upcoming fixture can affect lineup/lock decisions even for a player not
+ * currently starting. Strictly round-aware: `nextFixture` only ever looks
+ * inside `matchup`'s own [roundStartsAt, roundEndsAt) window — it never
+ * reaches into a future fantasy round merely to have something to show (see
+ * docs/game-rules.md "Fantasy round boundary"). Uses only stored Eleven
+ * fixture data — no live provider calls here.
+ */
+export async function getMatchupFixtureIntelligence(
+  matchup: CurrentMatchup,
+  now: Date
+): Promise<MatchupFixtureIntelligence> {
+  const empty: MatchupFixtureIntelligence = { liveFixtureCount: 0, hasAnyFixtureData: false, nextFixture: null };
+  if (!isSupabaseConfigured()) return empty;
+
+  const supabase = await createClient();
+
+  const { data: rosterEntries } = await supabase
+    .from("roster_entries")
+    .select("players(club_id)")
+    .in("fantasy_team_id", [matchup.homeFantasyTeamId, matchup.awayFantasyTeamId])
+    .eq("status", "active");
+
+  const clubIds = Array.from(
+    new Set(
+      (rosterEntries ?? [])
+        .map((r) => (r.players as { club_id: string } | null)?.club_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  if (clubIds.length === 0) return empty;
+
+  const { data: fixtures } = await supabase
+    .from("fixtures")
+    .select("kickoff_at, status, home_club_id, away_club_id")
+    .or(`home_club_id.in.(${clubIds.join(",")}),away_club_id.in.(${clubIds.join(",")})`)
+    .order("kickoff_at", { ascending: true });
+
+  const window: RoundWindow = { startsAt: new Date(matchup.roundStartsAt), endsAt: new Date(matchup.roundEndsAt) };
+  const fixtureRows: FixtureRow[] = (fixtures ?? []).map((f) => ({
+    kickoffAt: f.kickoff_at,
+    status: f.status as FixtureRow["status"],
+    homeClubId: f.home_club_id,
+    awayClubId: f.away_club_id,
+  }));
+
+  const { liveFixtureCount, hasAnyFixtureData, nextFixture: nextWithinRound } = computeFixtureIntelligence(
+    fixtureRows,
+    window,
+    now
+  );
+
+  let nextFixture: MatchupFixtureIntelligence["nextFixture"] = null;
+  if (nextWithinRound) {
+    const { data: clubs } = await supabase
+      .from("clubs")
+      .select("id, short_name")
+      .in("id", [nextWithinRound.homeClubId, nextWithinRound.awayClubId]);
+    const shortNameById = new Map((clubs ?? []).map((c) => [c.id, c.short_name]));
+    nextFixture = {
+      kickoffAt: nextWithinRound.kickoffAt,
+      homeClubShortName: shortNameById.get(nextWithinRound.homeClubId) ?? "—",
+      awayClubShortName: shortNameById.get(nextWithinRound.awayClubId) ?? "—",
+    };
+  }
+
+  return { liveFixtureCount, hasAnyFixtureData, nextFixture };
 }
 
 export interface StandingsRow {

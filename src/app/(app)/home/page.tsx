@@ -9,12 +9,13 @@ import { ModuleHeader } from "@/components/ui/module-header";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
-import { getCurrentMatchup, getStandings } from "@/data-access/matchups";
+import { getCurrentMatchup, getMatchupFixtureIntelligence, getStandings } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
 import { getUserSquad } from "@/data-access/roster";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { getRecentActivity } from "@/data-access/transactions";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
+import type { FantasyRound } from "@/lib/types/fantasy";
 
 export default async function HomePage() {
   const [profile, leagues] = await Promise.all([getCurrentProfile(), getUserLeagues()]);
@@ -47,21 +48,31 @@ export default async function HomePage() {
 
   const startingXI = squad.starters.map((slot) => slot.player);
 
+  // Pass 10.5B: Home must not contradict what Pass 10.5A already proved
+  // live (round 1 opens automatically on draft completion, a real H2H
+  // matchup exists, both XIs exist) — `round` here reflects the SAME real
+  // matchup, not a hardcoded "no round" state. `deadline` is the next
+  // applicable lock instant (see getMatchupFixtureIntelligence), never a
+  // single global deadline Eleven's real per-player-lock model doesn't
+  // have — `Greeting` itself only renders the "LOCKS ..." segment when
+  // this is non-null.
+  const fixtureIntel = matchup ? await getMatchupFixtureIntelligence(matchup, new Date()) : null;
+  const round: FantasyRound | null = matchup
+    ? {
+        number: matchup.roundNumber,
+        label: `Matchday ${matchup.roundNumber}`,
+        deadline: fixtureIntel?.nextFixture?.kickoffAt ?? null,
+        status: matchup.status === "final" ? "completed" : matchup.status === "live" ? "in-progress" : "upcoming",
+      }
+    : null;
+
   return (
     <div className="flex flex-col gap-8">
       <Greeting
         managerName={profile?.displayName ?? "Manager"}
         teamName={team?.name ?? league.name}
         leagueName={league.name}
-        // `Greeting`'s `round` prop expects a single "LOCKS <deadline>" —
-        // that shape assumes one global weekly lineup deadline, which
-        // Pass 10's real model doesn't have (locking is per-player, at
-        // each player's own first eligible kickoff — docs/game-rules.md
-        // "Player locking"). Passing a misleading single deadline here
-        // would be worse than the truthful "no round" state; left as a
-        // follow-up once Greeting's shape is revisited for the real
-        // per-player lock model.
-        round={null}
+        round={round}
       />
 
       {lifecycle !== "ACTIVE" && lifecycle !== "COMPLETED" && (
@@ -81,7 +92,12 @@ export default async function HomePage() {
           <StartingXI players={startingXI} />
         </div>
 
-        <OperationsRail starters={squad.starters} standings={standings} hasActiveRound={matchup !== null} />
+        <OperationsRail
+          starters={squad.starters}
+          standings={standings}
+          hasActiveRound={matchup !== null}
+          fixtureIntel={fixtureIntel}
+        />
       </div>
 
       <section>

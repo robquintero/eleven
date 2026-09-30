@@ -86,6 +86,7 @@ test("getDatabaseSummary tallies ownership and flagged availability", () => {
   assert.deepEqual(getDatabaseSummary(players), {
     free: 2,
     owned: 2,
+    mine: 1,
     waivers: 1,
     flagged: 2,
   });

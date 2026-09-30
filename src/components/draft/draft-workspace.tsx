@@ -59,7 +59,7 @@ export function DraftWorkspace({
   const router = useRouter();
   const [selected, setSelected] = useState<Player | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [pending, setPending] = useState<string | null>(null);
+  const [submittedPlayerId, setSubmittedPlayerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -92,19 +92,53 @@ export function DraftWorkspace({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
 
-  async function handleDraft(playerId: string, playerName: string) {
+  const reconciliationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function clearReconciliationTimeout() {
+    if (reconciliationTimeoutRef.current) {
+      clearTimeout(reconciliationTimeoutRef.current);
+      reconciliationTimeoutRef.current = null;
+    }
+  }
+
+  /**
+   * `pending` is DERIVED, not synced via an effect: `submittedPlayerId` is
+   * "the player we most recently tried to draft," and it counts as still
+   * pending only while the authoritative `draft.picks` doesn't contain it
+   * yet. The moment `router.refresh()`'s new props land and this player
+   * appears in `draft.picks`, this recomputes to `null` on that same
+   * render — no separate effect watching for the transition, and no
+   * moment where "PROCESSING PICK" clears before the pick is genuinely
+   * confirmed (Pass 10.5B fix for the reverse bug: it used to clear the
+   * instant the mutation returned, well before confirmation).
+   */
+  const pending = submittedPlayerId !== null && !draft.picks.some((p) => p.playerId === submittedPlayerId) ? submittedPlayerId : null;
+
+  /**
+   * The 10s fallback timeout exists solely so a genuinely failed
+   * refresh/reconciliation never leaves the button stuck forever -- it
+   * does not fabricate success or failure, it just stops blocking further
+   * interaction by resetting `submittedPlayerId` (which, if reconciliation
+   * truly never arrives, is otherwise never cleared any other way).
+   */
+  async function handleDraft(playerId: string) {
     if (!draft.isMyTurn || pending) return;
-    setPending(playerId);
+    setSubmittedPlayerId(playerId);
     setError(null);
     const result = await submitDraftPickAction(draft.draftId, playerId);
-    setPending(null);
     if (result?.error) {
+      setSubmittedPlayerId(null);
       setError(result.error);
-    } else {
-      router.refresh();
+      return;
     }
-    void playerName;
+    router.refresh();
+    clearReconciliationTimeout();
+    reconciliationTimeoutRef.current = setTimeout(() => {
+      setSubmittedPlayerId((current) => (current === playerId ? null : current));
+    }, 10000);
   }
+
+  useEffect(() => clearReconciliationTimeout, []);
 
   const myPicks = useMemo(
     () => draft.picks.filter((p) => p.fantasyTeamId === draft.myFantasyTeamId),
@@ -198,7 +232,7 @@ export function DraftWorkspace({
                 <button
                   type="button"
                   disabled={!draft.isMyTurn || pending !== null || !legalPositions.has(player.position)}
-                  onClick={() => handleDraft(player.id, player.name)}
+                  onClick={() => handleDraft(player.id)}
                   className="label-system flex shrink-0 items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {pending === player.id && (

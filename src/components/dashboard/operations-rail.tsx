@@ -1,24 +1,30 @@
 import Link from "next/link";
 import { OperationalRow } from "@/components/football/operational-row";
 import { RailModule } from "@/components/ui/rail-module";
-import type { StandingsRow } from "@/data-access/matchups";
-import { starterBuckets } from "@/lib/team-fixture";
+import type { MatchupFixtureIntelligence, StandingsRow } from "@/data-access/matchups";
+import { formatKickoff, pad2, starterBuckets } from "@/lib/team-fixture";
 import type { LineupSlot } from "@/lib/types/fantasy";
 
 /**
- * Dashboard's secondary operations rail. Every module here renders a
- * truthful empty state until the systems behind it exist — round
- * scheduling, live fixture ingestion, and the scoring engine are all
- * Pass 8+, so `fixtures`/`standings` are `[]` for every league today.
+ * Dashboard's secondary operations rail. LEAGUE_TABLE renders a truthful
+ * empty state until real matchups have been played. ROUND_INTELLIGENCE/
+ * LIVE_FIXTURES/NEXT_LOCK are wired to `fixtureIntel` (Pass 10.5B,
+ * `getMatchupFixtureIntelligence`) whenever a real current matchup exists
+ * — `null` (no open round/matchup) is the only case that falls back to the
+ * honest "no active round" states below; "nothing is live right now" is a
+ * distinct, equally real state from "no fixture data exists at all," and
+ * is never collapsed into the other.
  */
 export function OperationsRail({
   starters,
   standings,
   hasActiveRound,
+  fixtureIntel,
 }: {
   starters: LineupSlot[];
   standings: StandingsRow[];
   hasActiveRound: boolean;
+  fixtureIntel: MatchupFixtureIntelligence | null;
 }) {
   const buckets = starterBuckets(starters);
 
@@ -37,12 +43,36 @@ export function OperationsRail({
         )}
       </RailModule>
 
-      <RailModule header="LIVE_FIXTURES" meta="00">
-        <p className="text-xs text-foreground-tertiary">NO FIXTURE DATA</p>
+      <RailModule header="LIVE_FIXTURES" meta={fixtureIntel ? pad2(fixtureIntel.liveFixtureCount) : "00"}>
+        {!hasActiveRound ? (
+          <p className="text-xs text-foreground-tertiary">NO ACTIVE ROUND</p>
+        ) : !fixtureIntel?.hasAnyFixtureData ? (
+          <p className="text-xs text-foreground-tertiary">NO FIXTURE DATA</p>
+        ) : fixtureIntel.liveFixtureCount > 0 ? (
+          <OperationalRow label="LIVE NOW" value={`${fixtureIntel.liveFixtureCount}`} />
+        ) : fixtureIntel.nextFixture ? (
+          <OperationalRow
+            label="NEXT"
+            value={`${fixtureIntel.nextFixture.homeClubShortName} v ${fixtureIntel.nextFixture.awayClubShortName} · ${formatKickoff(fixtureIntel.nextFixture.kickoffAt)}`}
+          />
+        ) : (
+          <p className="text-xs text-foreground-tertiary">NONE SCHEDULED THIS ROUND</p>
+        )}
       </RailModule>
 
       <RailModule header="NEXT_LOCK">
-        <p className="text-xs text-foreground-tertiary">NOT SCHEDULED</p>
+        {!hasActiveRound ? (
+          <p className="text-xs text-foreground-tertiary">NOT SCHEDULED</p>
+        ) : !fixtureIntel?.hasAnyFixtureData ? (
+          <p className="text-xs text-foreground-tertiary">NO FIXTURE DATA</p>
+        ) : fixtureIntel.nextFixture ? (
+          <OperationalRow
+            label={formatKickoff(fixtureIntel.nextFixture.kickoffAt)}
+            value={`${fixtureIntel.nextFixture.homeClubShortName} v ${fixtureIntel.nextFixture.awayClubShortName}`}
+          />
+        ) : (
+          <p className="text-xs text-foreground-tertiary">NONE SCHEDULED THIS ROUND</p>
+        )}
       </RailModule>
 
       <RailModule

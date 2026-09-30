@@ -2,6 +2,7 @@ import "server-only";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { bigFiveLeagueFromCompetitionCode } from "@/lib/leagues";
+import { normalizeForSearch } from "@/lib/search-normalize";
 import { SCORING_RULE_VERSION } from "@/domain/fantasy/scoring";
 import type { Player, PlayerFixture, PlayerMatchState, PlayerPosition } from "@/lib/types/fantasy";
 
@@ -73,13 +74,31 @@ export async function getPlayerDatabase(query: PlayerQuery = {}): Promise<Player
   // `ownership` to "free", which misrepresents "we don't know" as "known
   // free." No active league means ownership is left `undefined` and the
   // UI omits the column entirely.
-  let ownedPlayerIds: Set<string> | null = null;
+  //
+  // Distinguishes "mine" (owned by the CALLER's own team) from "owned" (by
+  // some other team) -- Pass 10.5B fix: this previously always returned
+  // "owned" even for the caller's own players, which is how the player
+  // drawer ended up showing a false "join a league" CTA for an
+  // already-owned player (see player-inspector-content.tsx's ownership
+  // branch, which only recognizes "mine"/"owned"/"free", never
+  // undefined-as-if-truly-owned).
+  let ownerTeamIdByPlayerId: Map<string, string> | null = null;
+  let myFantasyTeamId: string | null = null;
   if (query.activeLeagueId) {
-    const { data: ownership } = await supabase
-      .from("league_player_ownership")
-      .select("player_id")
-      .eq("league_id", query.activeLeagueId);
-    ownedPlayerIds = new Set((ownership ?? []).map((o) => o.player_id));
+    const [{ data: ownership }, { data: userData }] = await Promise.all([
+      supabase.from("league_player_ownership").select("player_id, fantasy_team_id").eq("league_id", query.activeLeagueId),
+      supabase.auth.getUser(),
+    ]);
+    ownerTeamIdByPlayerId = new Map((ownership ?? []).map((o) => [o.player_id, o.fantasy_team_id]));
+    if (userData.user) {
+      const { data: myTeam } = await supabase
+        .from("fantasy_teams")
+        .select("id")
+        .eq("league_id", query.activeLeagueId)
+        .eq("owner_user_id", userData.user.id)
+        .maybeSingle();
+      myFantasyTeamId = myTeam?.id ?? null;
+    }
   }
 
   let builder = supabase
@@ -92,29 +111,38 @@ export async function getPlayerDatabase(query: PlayerQuery = {}): Promise<Player
 
   const searchTerm = query.query?.trim();
   if (searchTerm) {
+    // Accent/diacritic-insensitive (Pass 10.5B): matched against the
+    // generated `*_unaccented` columns (see
+    // supabase/migrations/20260930040000_accent_insensitive_search.sql),
+    // never the raw `name`/`short_name` — "mbappe" must find "Mbappé" and
+    // vice versa. `normalizeForSearch` strips the SAME accents from the
+    // incoming term so both sides compare equivalently; `ilike` still
+    // handles case-insensitivity as before.
+    //
     // Matches the player's own name OR their club's full name/abbreviation
     // (see docs/football-data-system.md "Club naming / search UX") —
     // "Barcelona" and "BAR" both surface Barcelona's players, exactly
     // like searching a player's own name does. Resolved as a separate
     // club lookup rather than an embedded-relation `.or()` filter, which
     // PostgREST doesn't reliably support across a join.
+    const normalizedTerm = normalizeForSearch(searchTerm);
     const { data: matchingClubs } = await supabase
       .from("clubs")
       .select("id")
-      .or(`name.ilike.%${searchTerm}%,short_name.ilike.%${searchTerm}%`);
+      .or(`name_unaccented.ilike.%${normalizedTerm}%,short_name_unaccented.ilike.%${normalizedTerm}%`);
     const clubIds = (matchingClubs ?? []).map((c) => c.id);
 
     builder =
       clubIds.length > 0
-        ? builder.or(`name.ilike.%${searchTerm}%,club_id.in.(${clubIds.join(",")})`)
-        : builder.ilike("name", `%${searchTerm}%`);
+        ? builder.or(`name_unaccented.ilike.%${normalizedTerm}%,club_id.in.(${clubIds.join(",")})`)
+        : builder.ilike("name_unaccented", `%${normalizedTerm}%`);
   }
   if (query.position) builder = builder.eq("position", query.position);
   if (query.competitionId) builder = builder.eq("competition_id", query.competitionId);
   if (query.clubId) builder = builder.eq("club_id", query.clubId);
   if (query.availability) builder = builder.eq("availability_status", query.availability);
-  if (ownedPlayerIds) {
-    const ids = Array.from(ownedPlayerIds);
+  if (ownerTeamIdByPlayerId) {
+    const ids = Array.from(ownerTeamIdByPlayerId.keys());
     if (query.ownership === "owned") {
       if (ids.length === 0) return empty;
       builder = builder.in("id", ids);
@@ -170,7 +198,13 @@ export async function getPlayerDatabase(query: PlayerQuery = {}): Promise<Player
       availability: (row.availability_status as Player["availability"]) ?? "available",
       fixture: nextFixture,
       seasonStats: usage,
-      ownership: ownedPlayerIds ? (ownedPlayerIds.has(row.id) ? "owned" : "free") : undefined,
+      ownership: ownerTeamIdByPlayerId
+        ? ownerTeamIdByPlayerId.has(row.id)
+          ? ownerTeamIdByPlayerId.get(row.id) === myFantasyTeamId
+            ? "mine"
+            : "owned"
+          : "free"
+        : undefined,
     };
   });
 

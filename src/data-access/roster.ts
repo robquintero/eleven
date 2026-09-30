@@ -3,6 +3,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { bigFiveLeagueFromCompetitionCode } from "@/lib/leagues";
 import { deriveFormationLabel } from "@/domain/fantasy/constants";
+import { namedFormationForCounts } from "@/domain/fantasy/formations";
 import { isLocked } from "@/domain/fantasy/lineup-lock";
 import { layoutStartingXi } from "@/lib/selectors/pitch-layout";
 import type { Player, PlayerPosition, Squad } from "@/lib/types/fantasy";
@@ -49,6 +50,12 @@ function toPlayer(row: RosterRow): Player | null {
     number: player.shirt_number ?? undefined,
     fantasyPoints: 0,
     availability: (player.availability_status as Player["availability"]) ?? "available",
+    // Every player this function returns is, by construction, on the
+    // CALLER's own roster in this league -- "mine", never "owned" (which
+    // means someone else's) or undefined (Pass 10.5B fix: undefined here
+    // is what made the player drawer show a false "join a league" CTA for
+    // an already-owned player opened from Team/Home).
+    ownership: "mine",
   };
 }
 
@@ -136,7 +143,17 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
   }));
 
   return {
-    formation: starterEntries.length > 0 ? deriveFormationLabel(counts) : "—",
+    // Prefers the friendly named-formation label (e.g. "4-2-3-1" for a
+    // DEF4/MID5/FWD1 XI, which `deriveFormationLabel` alone would render
+    // as the less familiar "4-5-1") whenever the current starters happen
+    // to match one of the 5 formations the Team page's selector supports
+    // — true whether that XI was reached via the selector or a manual
+    // swap. Falls back to the plain derived label for any other, less
+    // common combination FORMATION_RULES still allows.
+    formation:
+      starterEntries.length > 0
+        ? (namedFormationForCounts({ DEF: counts.DEF ?? 0, MID: counts.MID ?? 0, FWD: counts.FWD ?? 0 }) ?? deriveFormationLabel(counts))
+        : "—",
     starters,
     bench,
   };

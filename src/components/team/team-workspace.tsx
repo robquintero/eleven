@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, X } from "lucide-react";
 import { BenchRow } from "@/components/team/bench-row";
+import { FormationSelector } from "@/components/team/formation-selector";
 import { NextLock } from "@/components/team/next-lock";
 import { Pitch } from "@/components/team/pitch";
 import { RoundIntelligence } from "@/components/team/round-intelligence";
@@ -12,7 +13,8 @@ import { PlayerInspector } from "@/components/players/player-inspector";
 import { Button } from "@/components/ui/button";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { RailModule } from "@/components/ui/rail-module";
-import { swapLineupAction } from "@/app/(app)/team/actions";
+import { swapLineupAction, changeFormationAction } from "@/app/(app)/team/actions";
+import { SUPPORTED_FORMATIONS, type FormationName } from "@/domain/fantasy/formations";
 import { pad2 } from "@/lib/team-fixture";
 import type { LineupSlot, Player, PlayerAvailability, Squad } from "@/lib/types/fantasy";
 
@@ -51,6 +53,30 @@ export function TeamWorkspace({
   }
 
   const allPlayers = [...squad.starters.map((s) => s.player), ...squad.bench];
+  const rosterCounts = allPlayers.reduce(
+    (acc, player) => {
+      acc[player.position] = (acc[player.position] ?? 0) + 1;
+      return acc;
+    },
+    {} as Partial<Record<Player["position"], number>>
+  );
+  const currentFormation: FormationName | null = (SUPPORTED_FORMATIONS as readonly string[]).includes(squad.formation)
+    ? (squad.formation as FormationName)
+    : null;
+
+  async function handleFormationChange(formation: FormationName) {
+    if (!fantasyTeamId || pending) return;
+    setPending(true);
+    setError(null);
+    const result = await changeFormationAction(leagueId, fantasyTeamId, formation);
+    setPending(false);
+    if (result?.error) {
+      setError(result.error);
+    } else {
+      router.refresh();
+    }
+  }
+
   const availabilityCounts = allPlayers.reduce(
     (acc, player) => {
       const status = player.availability ?? "available";
@@ -138,7 +164,21 @@ export function TeamWorkspace({
 
       <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_0.5fr] lg:items-start">
         <section>
-          <ModuleHeader title="STARTING_XI" meta={squad.formation} />
+          <ModuleHeader
+            title="STARTING_XI"
+            meta={
+              fantasyTeamId && squad.starters.length > 0 ? (
+                <FormationSelector
+                  currentFormation={currentFormation}
+                  rosterCounts={rosterCounts}
+                  disabled={pending}
+                  onChange={handleFormationChange}
+                />
+              ) : (
+                squad.formation
+              )
+            }
+          />
           <div className="mt-3">
             <Pitch
               slots={squad.starters}
@@ -156,8 +196,13 @@ export function TeamWorkspace({
           </div>
         </section>
 
+        {/* Pass 10.5B: slightly tighter vertical padding on desktop (lg:)
+            only, here in Team's own rail — RailModule's own default is
+            unchanged for every other screen that reuses it (e.g. Draft).
+            Bench rows (real content, not padding) still take the space
+            they need. */}
         <div className="flex flex-col divide-y divide-border border border-border">
-          <RailModule header="BENCH" meta={`/ ${pad2(squad.bench.length)}`}>
+          <RailModule header="BENCH" meta={`/ ${pad2(squad.bench.length)}`} className="lg:py-2.5">
             {squad.bench.length === 0 ? (
               <p className="text-xs text-foreground-tertiary">NO BENCH PLAYERS</p>
             ) : (
@@ -177,7 +222,7 @@ export function TeamWorkspace({
             )}
           </RailModule>
 
-          <RailModule header="SQUAD_STATUS">
+          <RailModule header="SQUAD_STATUS" className="lg:py-2.5">
             {allPlayers.length === 0 ? (
               <p className="text-xs text-foreground-tertiary">NO SQUAD</p>
             ) : (
@@ -185,17 +230,18 @@ export function TeamWorkspace({
             )}
           </RailModule>
 
-          <RailModule header="ROUND_INTELLIGENCE">
+          <RailModule header="ROUND_INTELLIGENCE" className="lg:py-2.5">
             <RoundIntelligence starters={squad.starters} hasActiveRound={squad.formation !== "—"} />
           </RailModule>
 
-          <RailModule header="NEXT_LOCK">
+          <RailModule header="NEXT_LOCK" className="lg:py-2.5">
             <NextLock slot={null} hasStarters={squad.starters.length > 0} />
           </RailModule>
 
           <RailModule
             header="FIXTURE_FEED"
             meta={matchdayNumber !== null ? `MATCHDAY ${pad2(matchdayNumber)}` : "—"}
+            className="lg:py-2.5"
           >
             <p className="text-xs text-foreground-tertiary">NO FIXTURE DATA</p>
           </RailModule>

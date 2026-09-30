@@ -41,7 +41,12 @@ export function Pitch({
         </div>
       </div>
 
-      <div className="relative aspect-[4/4.6] w-full">
+      {/* Pass 10.5B: flatter on desktop (lg:) specifically — the original
+          4/4.6 ratio made the full starting XI require substantial
+          scrolling on a typical laptop viewport; mobile keeps the taller
+          ratio, which reads fine there since the page is scrolled
+          top-to-bottom anyway. */}
+      <div className="relative aspect-[4/4.6] w-full lg:aspect-[4/3.1]">
         <div className="pointer-events-none absolute inset-0" aria-hidden>
           <div className="absolute inset-4 border border-foreground/6 sm:inset-6" />
           <div className="absolute inset-x-4 top-1/2 h-px -translate-y-1/2 bg-foreground/6 sm:inset-x-6" />
