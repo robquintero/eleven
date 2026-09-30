@@ -25,7 +25,9 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient, isSupabaseAdminConfigured } from "../supabase/admin.ts";
 import { openNextRound, refreshMatchupScores, finalizeRoundIfReady } from "./rounds.ts";
 import { updateLineup } from "./lineup.ts";
+import { isRosterCompositionValid, type RosterCounts } from "../../domain/fantasy/roster-rules.ts";
 import type { Database } from "../supabase/database.types.ts";
+import type { PlayerPosition } from "../../domain/football/types.ts";
 
 const skip = !isSupabaseAdminConfigured();
 
@@ -102,6 +104,40 @@ async function draftToCompletion(admin: ReturnType<typeof createAdminClient>, dr
     if (error) throw new Error(`auto-pick failed: ${error.message}`);
   }
   throw new Error("draft did not complete within the expected number of picks");
+}
+
+/**
+ * Drafts the first still-eligible player at `position` on behalf of
+ * `teamClient`'s team, auto-resolving any intervening OTHER team's turn
+ * (via resolve_expired_pick with a far-future `p_as_of`, same trick as
+ * draftToCompletion) until it's actually this team's turn. Returns the
+ * RPC error from the team's own attempt (e.g. ROSTER_LIMIT_EXCEEDED), or
+ * `null` on success — never throws for that outcome, only for
+ * infrastructure failures (no eligible player left, too many auto-skips).
+ */
+async function draftFirstAvailableAtPosition(
+  admin: ReturnType<typeof createAdminClient>,
+  teamClient: SupabaseClient<Database>,
+  draftId: string,
+  leagueId: string,
+  position: PlayerPosition
+): Promise<{ message: string } | null> {
+  const farFuture = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString();
+  for (let i = 0; i < 20; i++) {
+    const { data: owned } = await admin.from("league_player_ownership").select("player_id").eq("league_id", leagueId);
+    const ownedIds = new Set((owned ?? []).map((o) => o.player_id));
+    const { data: candidates } = await admin.from("players").select("id").eq("active", true).eq("position", position).order("name").limit(50);
+    const playerId = candidates?.find((c) => !ownedIds.has(c.id))?.id;
+    if (!playerId) throw new Error(`no eligible ${position} player left to test with`);
+
+    const { error } = await teamClient.rpc("make_draft_pick", { p_draft_id: draftId, p_player_id: playerId });
+    if (!error) return null;
+    if (error.message !== "NOT_YOUR_TURN") return error;
+
+    const { error: autoErr } = await admin.rpc("resolve_expired_pick", { p_draft_id: draftId, p_as_of: farFuture });
+    if (autoErr) throw new Error(`auto-advance failed: ${autoErr.message}`);
+  }
+  throw new Error("too many auto-advances waiting for this team's turn");
 }
 
 test("a commissioner cannot start the draft with only 1 manager", { skip }, async () => {
@@ -199,7 +235,10 @@ test("a team attempting to pick out of turn is rejected", { skip }, async () => 
 test("a completed draft leaves every team with exactly squadSize players and zero duplicate ownership", { skip }, async () => {
   const admin = createAdminClient();
   const managers = 4;
-  const squadSize = 4;
+  // Must be 16, not some arbitrary smaller squadSize as before Pass 10.5 --
+  // the canonical ROSTER_RULES (GK exactly 2, DEF/MID 4-6, FWD 2-4) require
+  // a total of exactly 16 and can never be satisfied by a smaller squad.
+  const squadSize = 16;
   const league = await createTestLeague(admin, managers, squadSize);
   try {
     const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
@@ -360,6 +399,170 @@ test("matchup scoring excludes bench points entirely -- a team with a real start
 
     const finalizeResult = await finalizeRoundIfReady(admin, openResult.roundId, new Date(openResult.window.endsAt.getTime() + 25 * 3600 * 1000));
     assert.equal(finalizeResult.finalized, true, "this historical window's fixtures should already be fully settled");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+// ---------------------------------------------------------------------
+// Pass 10.5: canonical 16-player roster composition rules (GK exactly 2,
+// DEF/MID 4-6, FWD 2-4), authoritatively enforced in _perform_draft_pick.
+// squadSize is set well above what these tests actually consume so a
+// team never hits the draft's own round-completion path mid-test.
+// ---------------------------------------------------------------------
+
+test("a team cannot draft a 3rd GK or a 7th DEF -- both are rejected with ROSTER_LIMIT_EXCEEDED, and legal picks keep working afterward", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 20);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    const teamClient = league.clients[0];
+
+    for (let i = 0; i < 2; i++) {
+      const err = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "GK");
+      assert.equal(err, null, `GK pick ${i + 1} of 2 should succeed`);
+    }
+    const thirdGk = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "GK");
+    assert.equal(thirdGk?.message, "ROSTER_LIMIT_EXCEEDED", "a 3rd GK must be rejected -- GK is fixed at exactly 2");
+
+    for (let i = 0; i < 6; i++) {
+      const err = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "DEF");
+      assert.equal(err, null, `DEF pick ${i + 1} of 6 should succeed`);
+    }
+    const seventhDef = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "DEF");
+    assert.equal(seventhDef?.message, "ROSTER_LIMIT_EXCEEDED", "a 7th DEF must exceed the DEF maximum of 6");
+
+    // A legal, different-position pick right after two rejections must
+    // still succeed -- rejecting an illegal pick never wedges the draft.
+    const legalFollowUp = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "MID");
+    assert.equal(legalFollowUp, null, "a legal MID pick immediately after two rejections should still succeed");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("a team cannot draft a 7th MID or a 5th FWD -- both are rejected with ROSTER_LIMIT_EXCEEDED", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 20);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    const teamClient = league.clients[0];
+
+    for (let i = 0; i < 6; i++) {
+      const err = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "MID");
+      assert.equal(err, null, `MID pick ${i + 1} of 6 should succeed`);
+    }
+    const seventhMid = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "MID");
+    assert.equal(seventhMid?.message, "ROSTER_LIMIT_EXCEEDED", "a 7th MID must exceed the MID maximum of 6");
+
+    for (let i = 0; i < 4; i++) {
+      const err = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "FWD");
+      assert.equal(err, null, `FWD pick ${i + 1} of 4 should succeed`);
+    }
+    const fifthFwd = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "FWD");
+    assert.equal(fifthFwd?.message, "ROSTER_LIMIT_EXCEEDED", "a 5th FWD must exceed the FWD maximum of 4");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("a pick that would make a position's minimum mathematically unreachable is rejected, even though that position itself isn't maxed", { skip }, async () => {
+  const admin = createAdminClient();
+  // A small squadSize (6, not 16) is deliberate here -- it lets this test
+  // reach "only 2 picks left" in a handful of RPC calls instead of playing
+  // out most of a real 16-round draft. This league's squad can never
+  // reach a fully valid 16-player composition (irrelevant to this test,
+  // which only checks ONE pick's legality, never calls draftToCompletion).
+  const league = await createTestLeague(admin, 2, 6);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    const teamClient = league.clients[0];
+
+    // Build: GK 1 (needs 1 more), DEF 3 (needs 1 more) -- 4 picks made, 2 remain.
+    assert.equal(await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "GK"), null);
+    assert.equal(await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "DEF"), null);
+    assert.equal(await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "DEF"), null);
+    assert.equal(await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "DEF"), null);
+
+    const illegalMid = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "MID");
+    assert.equal(
+      illegalMid?.message,
+      "ROSTER_LIMIT_EXCEEDED",
+      "with 2 picks left and GK+DEF each still needing 1 more, a MID pick would leave GK's minimum unreachable"
+    );
+
+    const legalGk = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "GK");
+    assert.equal(legalGk, null, "GK still has an unmet minimum with picks remaining -- legal");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("a full 2-manager auto-drafted simulation: both teams end with legal 16-player rosters, valid auto-generated starting XIs, and zero ownership violations", { skip }, async () => {
+  const admin = createAdminClient();
+  const managers = 2;
+  const squadSize = 16;
+  const league = await createTestLeague(admin, managers, squadSize);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    await draftToCompletion(admin, draftId, managers, squadSize);
+
+    const { data: ownershipRows } = await admin.from("league_player_ownership").select("fantasy_team_id, player_id").eq("league_id", league.leagueId);
+    assert.equal(ownershipRows!.length, managers * squadSize);
+    assert.equal(new Set(ownershipRows!.map((r) => r.player_id)).size, ownershipRows!.length, "zero ownership violations -- no player drafted twice");
+
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    assert.ok(openResult.ok, "round 1 must open, so the auto-generated starting XI is queryable");
+    if (!openResult.ok) return;
+
+    for (const teamId of league.teamIds) {
+      // Complete 16-player roster satisfies every canonical minimum --
+      // proven directly from auto-pick's own output (draftToCompletion
+      // uses resolve_expired_pick exclusively, so this also demonstrates
+      // auto-pick alone produces a fully legal roster).
+      const { data: roster } = await admin.from("roster_entries").select("id, players(position)").eq("fantasy_team_id", teamId).eq("status", "active");
+      const positionByRosterEntryId = new Map<string, PlayerPosition>();
+      const rosterCounts: RosterCounts = {};
+      for (const r of roster!) {
+        const position = (r.players as { position: PlayerPosition }).position;
+        positionByRosterEntryId.set(r.id, position);
+        rosterCounts[position] = (rosterCounts[position] ?? 0) + 1;
+      }
+      assert.equal(roster!.length, squadSize);
+      assert.ok(isRosterCompositionValid(rosterCounts), `team ${teamId}'s full roster must satisfy the canonical ROSTER_RULES: ${JSON.stringify(rosterCounts)}`);
+
+      // Post-draft lineup initialization: exactly 11 starters, exactly 5
+      // bench, and the starting XI itself satisfies FORMATION_RULES.
+      // Joined against `positionByRosterEntryId` in JS rather than via a
+      // nested `roster_entries!inner(...players(position))` select --
+      // that shape hits a postgrest-js type-inference limit here
+      // (implicit-any), unlike the simpler flat select used below.
+      const slotsResult: { data: { starter: boolean; roster_entry_id: string }[] | null } = await admin
+        .from("lineup_slots")
+        .select("starter, roster_entry_id")
+        .eq("fantasy_round_id", openResult.roundId)
+        .in("roster_entry_id", Array.from(positionByRosterEntryId.keys()));
+      const slots = slotsResult.data;
+
+      const starters = (slots ?? []).filter((s) => s.starter);
+      const bench = (slots ?? []).filter((s) => !s.starter);
+      assert.equal(starters.length, 11, `team ${teamId} must have exactly 11 auto-initialized starters`);
+      assert.equal(bench.length, 5, `team ${teamId} must have exactly 5 players on the bench`);
+
+      const starterCounts: Record<string, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
+      for (const s of starters) {
+        const position = positionByRosterEntryId.get(s.roster_entry_id)!;
+        starterCounts[position] += 1;
+      }
+      assert.equal(starterCounts.GK, 1, "exactly 1 starting GK");
+      assert.ok(starterCounts.DEF >= 3 && starterCounts.DEF <= 5, `DEF starters must be 3-5, got ${starterCounts.DEF}`);
+      assert.ok(starterCounts.MID >= 3 && starterCounts.MID <= 5, `MID starters must be 3-5, got ${starterCounts.MID}`);
+      assert.ok(starterCounts.FWD >= 1 && starterCounts.FWD <= 3, `FWD starters must be 1-3, got ${starterCounts.FWD}`);
+    }
   } finally {
     await cleanupTestLeague(admin, league);
   }

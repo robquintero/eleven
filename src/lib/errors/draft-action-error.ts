@@ -19,6 +19,7 @@ export type DraftActionErrorCode =
   | "PLAYER_NOT_FOUND"
   | "PLAYER_NOT_ACTIVE"
   | "PLAYER_ALREADY_OWNED"
+  | "ROSTER_LIMIT_EXCEEDED"
   | "UNKNOWN";
 
 const KNOWN_CODES: readonly DraftActionErrorCode[] = [
@@ -35,6 +36,7 @@ const KNOWN_CODES: readonly DraftActionErrorCode[] = [
   "PLAYER_NOT_FOUND",
   "PLAYER_NOT_ACTIVE",
   "PLAYER_ALREADY_OWNED",
+  "ROSTER_LIMIT_EXCEEDED",
 ];
 
 export class DraftActionError extends Error {

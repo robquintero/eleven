@@ -18,6 +18,7 @@ test("toDraftActionError maps every known Postgres exception message to its code
     ["PLAYER_NOT_FOUND", "PLAYER_NOT_FOUND"],
     ["PLAYER_NOT_ACTIVE", "PLAYER_NOT_ACTIVE"],
     ["PLAYER_ALREADY_OWNED", "PLAYER_ALREADY_OWNED"],
+    ["ROSTER_LIMIT_EXCEEDED", "ROSTER_LIMIT_EXCEEDED"],
   ];
 
   for (const [message, expectedCode] of cases) {
@@ -56,6 +57,7 @@ test("every DraftActionErrorCode has user-facing copy", () => {
     "PLAYER_NOT_FOUND",
     "PLAYER_NOT_ACTIVE",
     "PLAYER_ALREADY_OWNED",
+    "ROSTER_LIMIT_EXCEEDED",
     "UNKNOWN",
   ];
   for (const code of codes) {

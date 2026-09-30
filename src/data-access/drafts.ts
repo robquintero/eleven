@@ -90,7 +90,7 @@ export async function getDraftState(leagueId: string): Promise<DraftState | null
   const { data: leagueRow } = await supabase.from("fantasy_leagues").select("settings").eq("id", leagueId).maybeSingle();
   const settings = (leagueRow?.settings ?? {}) as { squadSize?: number; pickTimerSeconds?: number };
   const totalRounds = settings.squadSize ?? 16;
-  const pickTimerSeconds = settings.pickTimerSeconds ?? 60;
+  const pickTimerSeconds = settings.pickTimerSeconds ?? 300;
 
   const { data: orderRows } = await supabase
     .from("draft_orders")

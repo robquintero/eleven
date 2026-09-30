@@ -9,7 +9,11 @@ import { submitDraftPickAction, resolveExpiredPickAction } from "@/app/(app)/dra
 import type { DraftState } from "@/data-access/drafts";
 import { pad2 } from "@/lib/team-fixture";
 import type { PlayerDatabasePage } from "@/data-access/players";
-import type { Player } from "@/lib/types/fantasy";
+import type { Player, PlayerPosition } from "@/lib/types/fantasy";
+import { ROSTER_RULES } from "@/domain/fantasy/constants";
+import { draftablePositions, type RosterCounts } from "@/domain/fantasy/roster-rules";
+
+const POSITION_FILTER_OPTIONS = ["ALL", "GK", "DEF", "MID", "FWD"] as const;
 
 /**
  * Ticking countdown to `deadline`, or `null` while not-yet-mounted/no
@@ -43,10 +47,14 @@ export function DraftWorkspace({
   draft,
   availablePlayers,
   onSearch,
+  positionFilter,
+  onPositionFilterChange,
 }: {
   draft: DraftState;
   availablePlayers: PlayerDatabasePage;
   onSearch: (query: string) => void;
+  positionFilter: PlayerPosition | null;
+  onPositionFilterChange: (position: PlayerPosition | null) => void;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Player | null>(null);
@@ -98,9 +106,33 @@ export function DraftWorkspace({
     void playerName;
   }
 
-  const myPickCount = useMemo(
-    () => draft.picks.filter((p) => p.fantasyTeamId === draft.myFantasyTeamId).length,
+  const myPicks = useMemo(
+    () => draft.picks.filter((p) => p.fantasyTeamId === draft.myFantasyTeamId),
     [draft.picks, draft.myFantasyTeamId]
+  );
+  const myPickCount = myPicks.length;
+
+  /**
+   * Live per-position counts for the caller's own squad, and which
+   * positions remain legal to draft right now under the canonical
+   * ROSTER_RULES (Pass 10.5) — the same `draftablePositions` the draft
+   * engine's own SQL enforces authoritatively (this is a UI courtesy for
+   * disabling controls, never the guarantee itself; see
+   * src/domain/fantasy/roster-rules.ts). `picksRemainingIncludingNext` is
+   * this team's total picks minus what it's already made — the draft's
+   * own snake-order gating (`isMyTurn`) is what actually decides whether a
+   * button is clickable at all right now, this only decides WHICH
+   * position, once it is this team's turn.
+   */
+  const myCounts: RosterCounts = useMemo(() => {
+    const counts: RosterCounts = {};
+    for (const pick of myPicks) counts[pick.position] = (counts[pick.position] ?? 0) + 1;
+    return counts;
+  }, [myPicks]);
+  const picksRemainingIncludingNext = draft.totalRounds - myPickCount;
+  const legalPositions = useMemo(
+    () => new Set(draftablePositions(myCounts, picksRemainingIncludingNext)),
+    [myCounts, picksRemainingIncludingNext]
   );
 
   return (
@@ -118,6 +150,27 @@ export function DraftWorkspace({
             onChange={(e) => onSearch(e.target.value)}
             className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
           />
+        </div>
+
+        <div className="mt-2 flex items-center gap-1.5">
+          {POSITION_FILTER_OPTIONS.map((option) => {
+            const value = option === "ALL" ? null : option;
+            const isActive = positionFilter === value;
+            return (
+              <button
+                key={option}
+                type="button"
+                onClick={() => onPositionFilterChange(value)}
+                className={`label-system rounded-control border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                  isActive
+                    ? "border-accent bg-accent text-accent-foreground"
+                    : "border-border text-foreground-secondary hover:bg-muted"
+                }`}
+              >
+                {option}
+              </button>
+            );
+          })}
         </div>
 
         <div className="mt-2 divide-y divide-border border border-border">
@@ -144,11 +197,17 @@ export function DraftWorkspace({
                 </button>
                 <button
                   type="button"
-                  disabled={!draft.isMyTurn || pending !== null}
+                  disabled={!draft.isMyTurn || pending !== null || !legalPositions.has(player.position)}
                   onClick={() => handleDraft(player.id, player.name)}
-                  className="label-system shrink-0 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                  className="label-system flex shrink-0 items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                  {pending === player.id ? "DRAFTING…" : "DRAFT"}
+                  {pending === player.id && (
+                    <span
+                      aria-hidden="true"
+                      className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+                    />
+                  )}
+                  {pending === player.id ? "PROCESSING PICK" : "DRAFT"}
                 </button>
               </div>
             ))
@@ -186,10 +245,31 @@ export function DraftWorkspace({
           )}
         </RailModule>
 
-        <RailModule header="MY_ROSTER" meta={`${myPickCount} / ${draft.totalRounds}`}>
-          <p className="text-xs text-foreground-tertiary">
-            {myPickCount} of {draft.totalRounds} picks made.
-          </p>
+        <RailModule header="SQUAD" meta={`${myPickCount} / ${ROSTER_RULES.squadSize}`}>
+          <div className="space-y-1">
+            {(["GK", "DEF", "MID", "FWD"] as const).map((position) => {
+              const { min, max } = ROSTER_RULES.positionRange[position];
+              const count = myCounts[position] ?? 0;
+              const belowMin = count < min;
+              const atMax = count >= max;
+              return (
+                <div key={position} className="flex items-center justify-between">
+                  <span className="label-system text-[11px] text-foreground-tertiary">{position}</span>
+                  <span
+                    className={`label-system text-[11px] tabular-nums ${
+                      belowMin
+                        ? "font-semibold text-accent"
+                        : atMax
+                          ? "text-foreground-tertiary"
+                          : "text-foreground-secondary"
+                    }`}
+                  >
+                    {count} / {min === max ? min : `${min}–${max}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
         </RailModule>
 
         <RailModule header="RECENT_PICKS">

@@ -26,13 +26,61 @@ players" below).
 
 ## Roster rules
 
-- Squad size: approximately 16 (`FORMATION_RULES.squadSizeApprox`,
-  `src/domain/fantasy/constants.ts` — pre-existing, unchanged this pass).
+Two distinct, non-interchangeable sets of rules govern a team's players —
+don't conflate them:
+
+**Squad composition** (the full 16-player roster a team owns — drafted,
+and later via free agency/waivers/trades) — `ROSTER_RULES`,
+`src/domain/fantasy/constants.ts` (Pass 10.5):
+
+- Squad size: exactly 16.
+- GK: exactly 2 (min 2, max 2).
+- DEF: 4–6.
+- MID: 4–6.
+- FWD: 2–4.
+- These are core fantasy-domain invariants, not merely Draft UI rules —
+  enforced authoritatively server-side in `_perform_draft_pick`
+  (`supabase/migrations/20260930024807_draft_engine.sql`), independently
+  re-derived from the single authoritative pure-TypeScript domain module
+  `src/domain/fantasy/roster-rules.ts` (`isRosterCompositionValid`,
+  `isRosterCompletable`, `canDraftPosition`, `draftablePositions`) that
+  the Draft UI also uses for disabling controls. That module is meant to
+  be reused as-is by future free agency/waivers/trades work — it is not
+  draft-specific.
+- **Mathematical completability**: a roster must never be allowed to
+  reach a state where satisfying the remaining position minimums is
+  impossible given the picks left. Example: with 2 draft picks left and
+  the team still needing 1 GK and 1 DEF to hit minimums, a MID/FWD pick
+  that would consume one of those two remaining slots is rejected
+  (`ROSTER_LIMIT_EXCEEDED`), even though MID/FWD aren't individually at
+  their own maximum.
+- Draft auto-pick (`resolve_expired_pick`) respects the same rules and
+  can never construct an invalid squad — it only ever chooses among
+  positions that remain legal under the same completability check.
+
+**Starting XI** (which 11 of those 16 are active for a round) —
+`FORMATION_RULES`, `src/domain/fantasy/constants.ts` (pre-existing,
+unchanged this pass):
+
 - Starting XI: exactly 11.
 - Formation: GK exactly 1, DEF 3–5, MID 3–5, FWD 1–3. Enforced by
   `isStarterCompositionValid()` (pre-existing) — validated server-side on
   every lineup write, never trusted from the client.
-- Bench: every remaining roster player not in the starting XI.
+- Bench: every remaining roster player not in the starting XI (5 of the
+  16, once a squad is complete).
+- **Post-draft initialization** (Pass 10.5): the moment a team's draft
+  completes, Eleven automatically opens the league's first fantasy round
+  and picks that team's first starting XI deterministically
+  (`chooseAutomaticStartingXi()`, `src/domain/fantasy/auto-lineup.ts` —
+  fills each position's minimum first, then rounds through DEF/MID/FWD
+  depth; no ratings, projections, or provider-form input of any kind)
+  rather than leaving the whole squad on the bench. Since every legally
+  drafted squad already has at least 2 GK / 4 DEF / 4 MID / 2 FWD —
+  exceeding `FORMATION_RULES`' own starting-XI minimums — this always
+  succeeds. A manager can freely rearrange this initial XI afterward
+  through the existing Team lineup-editing UI, exactly as if they'd set
+  it themselves; the auto-selection only ever runs once, at that
+  starting point.
 
 ## No captain multiplier
 
@@ -242,16 +290,20 @@ naturally produces a deterministic bye for whichever team draws the
   distinct, mapped error the client shows as "player already taken,"
   not a generic failure.
 - **Pick timer**: a configurable `pickTimerSeconds` already lives in
-  `fantasy_leagues.settings` (default 60s, pre-existing). The timer's
-  deadline is `drafts.current_pick_started_at + pickTimerSeconds` (a new,
-  additive column — see migrations) — an authoritative persisted
-  timestamp, not a browser countdown. Refreshing/reconnecting reads the
-  same deadline. On expiry, an **auto-pick** runs: deterministically the
-  first available player, ordered by `(position, name)`, matching the
-  drafting team's most under-filled formation slot first, falling back to
-  any eligible player if formation is already satisfiable. No queue
-  system this pass — explicitly deferred, noted as a follow-up (brief
-  §Draft timer allows this).
+  `fantasy_leagues.settings` (default 300s / 5 minutes as of Pass 10.5 —
+  deliberately generous for current testing; not yet configurable
+  per-league). The timer's deadline is
+  `drafts.current_pick_started_at + pickTimerSeconds` (a new, additive
+  column — see migrations) — an authoritative persisted timestamp, not a
+  browser countdown. Refreshing/reconnecting reads the same deadline. On
+  expiry, an **auto-pick** runs: deterministically the first available
+  player, ordered by `(position, name)`, matching the drafting team's
+  most under-filled canonical roster minimum first (see "Roster rules"
+  above), among only the positions that remain legal under the same
+  mathematical-completability check `_perform_draft_pick` itself
+  enforces — it can never construct an invalid squad. No queue system
+  this pass — explicitly deferred, noted as a follow-up (brief §Draft
+  timer allows this).
 - **Completion**: a draft transitions `in_progress → completed` only once
   every team's roster has reached the target squad size with no
   duplicate/orphan picks (validated server-side in the same function that

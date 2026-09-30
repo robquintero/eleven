@@ -151,6 +151,24 @@ declare
   v_overall_pick int;
   v_roster_entry_id uuid;
   v_player_active boolean;
+  -- Canonical 16-player squad composition rules (Pass 10.5) --
+  -- src/domain/fantasy/constants.ts's ROSTER_RULES and
+  -- src/domain/fantasy/roster-rules.ts's isRosterCompletable/
+  -- canDraftPosition, re-derived here in SQL because THIS is the actual
+  -- atomic enforcement point (see this function's own header comment) --
+  -- disabled buttons in the Draft UI are a courtesy, never the guarantee.
+  -- GK has no real range, it's fixed at exactly 2.
+  v_player_position text;
+  v_gk_min constant int := 2; v_gk_max constant int := 2;
+  v_def_min constant int := 4; v_def_max constant int := 6;
+  v_mid_min constant int := 4; v_mid_max constant int := 6;
+  v_fwd_min constant int := 2; v_fwd_max constant int := 4;
+  v_gk_count int; v_def_count int; v_mid_count int; v_fwd_count int;
+  v_next_gk int; v_next_def int; v_next_mid int; v_next_fwd int;
+  v_picks_made int;
+  v_picks_remaining_after int;
+  v_min_shortfall int;
+  v_max_room int;
 begin
   select * into v_draft from public.drafts d where d.id = p_draft_id for update;
   if v_draft.id is null then
@@ -186,7 +204,7 @@ begin
     raise exception 'NOT_YOUR_TURN';
   end if;
 
-  select p.active into v_player_active from public.players p where p.id = p_player_id;
+  select p.active, p.position into v_player_active, v_player_position from public.players p where p.id = p_player_id;
   if v_player_active is null then
     raise exception 'PLAYER_NOT_FOUND';
   end if;
@@ -199,6 +217,45 @@ begin
     where lpo.league_id = v_draft.league_id and lpo.player_id = p_player_id
   ) then
     raise exception 'PLAYER_ALREADY_OWNED';
+  end if;
+
+  -- Roster-limit enforcement (Pass 10.5): reject this pick outright if it
+  -- would exceed the picked position's own maximum, OR if it would leave
+  -- some OTHER position's minimum mathematically unreachable in the picks
+  -- this team has left. Worked example from the brief: 2 picks left, team
+  -- still needs 1 GK and 1 DEF to hit minimums -- a MID/FWD pick here must
+  -- be rejected even though MID/FWD aren't individually maxed.
+  select
+    count(*) filter (where p.position = 'GK'),
+    count(*) filter (where p.position = 'DEF'),
+    count(*) filter (where p.position = 'MID'),
+    count(*) filter (where p.position = 'FWD')
+    into v_gk_count, v_def_count, v_mid_count, v_fwd_count
+  from public.roster_entries re
+  join public.players p on p.id = re.player_id
+  where re.fantasy_team_id = p_team_id and re.status = 'active';
+
+  v_next_gk := v_gk_count + case when v_player_position = 'GK' then 1 else 0 end;
+  v_next_def := v_def_count + case when v_player_position = 'DEF' then 1 else 0 end;
+  v_next_mid := v_mid_count + case when v_player_position = 'MID' then 1 else 0 end;
+  v_next_fwd := v_fwd_count + case when v_player_position = 'FWD' then 1 else 0 end;
+
+  if v_next_gk > v_gk_max or v_next_def > v_def_max or v_next_mid > v_mid_max or v_next_fwd > v_fwd_max then
+    raise exception 'ROSTER_LIMIT_EXCEEDED';
+  end if;
+
+  v_picks_made := v_gk_count + v_def_count + v_mid_count + v_fwd_count;
+  v_picks_remaining_after := v_total_rounds - v_picks_made - 1;
+
+  v_min_shortfall := greatest(v_gk_min - v_next_gk, 0) + greatest(v_def_min - v_next_def, 0)
+    + greatest(v_mid_min - v_next_mid, 0) + greatest(v_fwd_min - v_next_fwd, 0);
+  v_max_room := greatest(v_gk_max - v_next_gk, 0) + greatest(v_def_max - v_next_def, 0)
+    + greatest(v_mid_max - v_next_mid, 0) + greatest(v_fwd_max - v_next_fwd, 0);
+
+  if v_picks_remaining_after < 0
+     or v_min_shortfall > v_picks_remaining_after
+     or v_picks_remaining_after > v_max_room then
+    raise exception 'ROSTER_LIMIT_EXCEEDED';
   end if;
 
   v_overall_pick := (v_draft.current_round - 1) * v_team_count + v_draft.current_pick;
@@ -249,7 +306,7 @@ end;
 $$;
 
 comment on function public._perform_draft_pick(uuid, uuid, uuid, uuid) is
-  'Trusted internal core shared by make_draft_pick and resolve_expired_pick — takes the drafting team explicitly rather than resolving it from auth.uid(), so an auto-pick can act on behalf of the team whose turn timed out. Not exposed to `authenticated` directly.';
+  'Trusted internal core shared by make_draft_pick and resolve_expired_pick — takes the drafting team explicitly rather than resolving it from auth.uid(), so an auto-pick can act on behalf of the team whose turn timed out. Not exposed to `authenticated` directly. Authoritatively enforces the canonical 16-player roster composition rules (GK exactly 2, DEF/MID 4-6, FWD 2-4) — raises ROSTER_LIMIT_EXCEEDED if this pick would exceed a position''s max or make some other position''s minimum mathematically unreachable.';
 
 -- ---------------------------------------------------------------------
 -- make_draft_pick: the user-facing entry point. Resolves the caller's
@@ -293,7 +350,7 @@ end;
 $$;
 
 comment on function public.make_draft_pick(uuid, uuid) is
-  'The manager-facing draft pick action. Resolves the caller''s own team in this draft''s league from auth.uid(), then performs the pick atomically via _perform_draft_pick. Raises NOT_AUTHENTICATED / DRAFT_NOT_FOUND / NOT_LEAGUE_MEMBER / DRAFT_NOT_ACTIVE / NOT_YOUR_TURN / PLAYER_NOT_FOUND / PLAYER_NOT_ACTIVE / PLAYER_ALREADY_OWNED.';
+  'The manager-facing draft pick action. Resolves the caller''s own team in this draft''s league from auth.uid(), then performs the pick atomically via _perform_draft_pick. Raises NOT_AUTHENTICATED / DRAFT_NOT_FOUND / NOT_LEAGUE_MEMBER / DRAFT_NOT_ACTIVE / NOT_YOUR_TURN / PLAYER_NOT_FOUND / PLAYER_NOT_ACTIVE / PLAYER_ALREADY_OWNED / ROSTER_LIMIT_EXCEEDED.';
 
 revoke all on function public.make_draft_pick(uuid, uuid) from public;
 grant execute on function public.make_draft_pick(uuid, uuid) to authenticated;
@@ -330,22 +387,31 @@ declare
   v_league public.fantasy_leagues%rowtype;
   v_timer_seconds int;
   v_team_count int;
+  v_total_rounds int;
   v_expected_position int;
   v_team_id uuid;
   v_chosen_player_id uuid;
-  v_gk_min int := 1; v_def_min int := 3; v_mid_min int := 3; v_fwd_min int := 1;
-  -- Soft caps for AUTO-PICKED squad depth (not a starting-XI rule — a
-  -- team may freely draft/own more than this for bench depth if a real
-  -- manager chooses to). Bounds the deterministic auto-pick specifically
-  -- so it can never produce a roster unable to field a valid XI — found
-  -- live in testing: with no cap, GK sorts first in the fallback
-  -- priority order and nothing ever stopped it from being picked
-  -- repeatedly once its MINIMUM was satisfied, producing e.g. 9 drafted
-  -- goalkeepers and too few outfield players to reach 11 starters. GK's
-  -- cap (2) allows one realistic backup; DEF/MID/FWD match
-  -- FORMATION_RULES' own starting-XI maximums (5/5/3).
-  v_gk_cap int := 2; v_def_cap int := 5; v_mid_cap int := 5; v_fwd_cap int := 3;
+  -- Canonical 16-player squad composition rules (Pass 10.5) — the SAME
+  -- ROSTER_RULES numbers _perform_draft_pick enforces, not the looser
+  -- starting-XI FORMATION_RULES minimums this used before. Auto-pick must
+  -- never construct a roster _perform_draft_pick would itself reject, so
+  -- it re-derives the exact same isRosterCompletable/canDraftPosition
+  -- math (src/domain/fantasy/roster-rules.ts) to choose ONLY among
+  -- positions that stay legal, rather than relying on _perform_draft_pick
+  -- to bail out after the fact (which would surface as an unhandled
+  -- auto-pick failure instead of a safe, deterministic choice).
+  v_gk_min constant int := 2; v_gk_max constant int := 2;
+  v_def_min constant int := 4; v_def_max constant int := 6;
+  v_mid_min constant int := 4; v_mid_max constant int := 6;
+  v_fwd_min constant int := 2; v_fwd_max constant int := 4;
   v_gk_count int; v_def_count int; v_mid_count int; v_fwd_count int;
+  v_picks_made int;
+  v_picks_remaining_incl int;
+  v_remaining_after int;
+  v_next_gk int; v_next_def int; v_next_mid int; v_next_fwd int;
+  v_min_shortfall int;
+  v_max_room int;
+  v_gk_draftable boolean; v_def_draftable boolean; v_mid_draftable boolean; v_fwd_draftable boolean;
   v_deficit_position text;
 begin
   select * into v_draft from public.drafts d where d.id = p_draft_id;
@@ -365,7 +431,12 @@ begin
   end if;
 
   select * into v_league from public.fantasy_leagues fl where fl.id = v_draft.league_id;
-  v_timer_seconds := coalesce((v_league.settings ->> 'pickTimerSeconds')::int, 60);
+  -- 300s (5 min) fallback -- keep in sync with src/domain/fantasy/constants.ts's
+  -- DEFAULT_LEAGUE_SETTINGS.pickTimerSeconds and create_league()'s own
+  -- SQL default (supabase/migrations/20260929141145_functions.sql) if this
+  -- ever changes.
+  v_timer_seconds := coalesce((v_league.settings ->> 'pickTimerSeconds')::int, 300);
+  v_total_rounds := coalesce((v_league.settings ->> 'squadSize')::int, 16);
 
   if v_draft.current_pick_started_at is null
      or p_as_of < v_draft.current_pick_started_at + make_interval(secs => v_timer_seconds) then
@@ -382,46 +453,78 @@ begin
   from public.draft_orders do_
   where do_.draft_id = p_draft_id and do_.position = v_expected_position;
 
-  -- Position-deficit auto-pick: prioritize whichever formation minimum
-  -- (GK 1 / DEF 3 / MID 3 / FWD 1, in that fixed priority order) this
-  -- team's current roster hasn't met yet, then the first eligible,
-  -- unowned player at that position ordered by name. Once every minimum
-  -- is met, falls back to the first eligible, unowned player overall
-  -- (ordered by position GK/DEF/MID/FWD, then name). No rating/points-
-  -- based recommendation of any kind — see docs/game-rules.md "Draft."
+  -- Position-deficit auto-pick: among positions that remain LEGAL to pick
+  -- right now (would not exceed that position's max, and would not make
+  -- any position's minimum mathematically unreachable afterward — the
+  -- exact same check _perform_draft_pick itself enforces), prioritize
+  -- whichever unmet minimum comes first in fixed GK/DEF/MID/FWD order,
+  -- then the first eligible, unowned player at that position ordered by
+  -- name. Once every minimum is met, falls back to the first still-legal
+  -- position in that same GK/DEF/MID/FWD order. No rating/points-based
+  -- recommendation of any kind — see docs/game-rules.md "Draft."
   select count(*) filter (where p.position = 'GK'), count(*) filter (where p.position = 'DEF'),
          count(*) filter (where p.position = 'MID'), count(*) filter (where p.position = 'FWD')
     into v_gk_count, v_def_count, v_mid_count, v_fwd_count
   from public.roster_entries re join public.players p on p.id = re.player_id
   where re.fantasy_team_id = v_team_id and re.status = 'active';
 
+  v_picks_made := v_gk_count + v_def_count + v_mid_count + v_fwd_count;
+  v_picks_remaining_incl := v_total_rounds - v_picks_made;
+  v_remaining_after := v_picks_remaining_incl - 1;
+
+  v_next_gk := v_gk_count + 1;
+  v_min_shortfall := greatest(v_gk_min - v_next_gk, 0) + greatest(v_def_min - v_def_count, 0)
+    + greatest(v_mid_min - v_mid_count, 0) + greatest(v_fwd_min - v_fwd_count, 0);
+  v_max_room := greatest(v_gk_max - v_next_gk, 0) + greatest(v_def_max - v_def_count, 0)
+    + greatest(v_mid_max - v_mid_count, 0) + greatest(v_fwd_max - v_fwd_count, 0);
+  v_gk_draftable := v_next_gk <= v_gk_max and v_min_shortfall <= v_remaining_after and v_remaining_after <= v_max_room;
+
+  v_next_def := v_def_count + 1;
+  v_min_shortfall := greatest(v_gk_min - v_gk_count, 0) + greatest(v_def_min - v_next_def, 0)
+    + greatest(v_mid_min - v_mid_count, 0) + greatest(v_fwd_min - v_fwd_count, 0);
+  v_max_room := greatest(v_gk_max - v_gk_count, 0) + greatest(v_def_max - v_next_def, 0)
+    + greatest(v_mid_max - v_mid_count, 0) + greatest(v_fwd_max - v_fwd_count, 0);
+  v_def_draftable := v_next_def <= v_def_max and v_min_shortfall <= v_remaining_after and v_remaining_after <= v_max_room;
+
+  v_next_mid := v_mid_count + 1;
+  v_min_shortfall := greatest(v_gk_min - v_gk_count, 0) + greatest(v_def_min - v_def_count, 0)
+    + greatest(v_mid_min - v_next_mid, 0) + greatest(v_fwd_min - v_fwd_count, 0);
+  v_max_room := greatest(v_gk_max - v_gk_count, 0) + greatest(v_def_max - v_def_count, 0)
+    + greatest(v_mid_max - v_next_mid, 0) + greatest(v_fwd_max - v_fwd_count, 0);
+  v_mid_draftable := v_next_mid <= v_mid_max and v_min_shortfall <= v_remaining_after and v_remaining_after <= v_max_room;
+
+  v_next_fwd := v_fwd_count + 1;
+  v_min_shortfall := greatest(v_gk_min - v_gk_count, 0) + greatest(v_def_min - v_def_count, 0)
+    + greatest(v_mid_min - v_mid_count, 0) + greatest(v_fwd_min - v_next_fwd, 0);
+  v_max_room := greatest(v_gk_max - v_gk_count, 0) + greatest(v_def_max - v_def_count, 0)
+    + greatest(v_mid_max - v_mid_count, 0) + greatest(v_fwd_max - v_next_fwd, 0);
+  v_fwd_draftable := v_next_fwd <= v_fwd_max and v_min_shortfall <= v_remaining_after and v_remaining_after <= v_max_room;
+
   v_deficit_position := case
-    when v_gk_count < v_gk_min then 'GK'
-    when v_def_count < v_def_min then 'DEF'
-    when v_mid_count < v_mid_min then 'MID'
-    when v_fwd_count < v_fwd_min then 'FWD'
-    -- No unmet minimum: fill toward soft-cap depth, same GK/DEF/MID/FWD
-    -- priority order, but skipping any position already at its cap —
-    -- this is what stops GK (first in priority order) from being
-    -- auto-picked indefinitely once its minimum is already satisfied.
-    when v_gk_count < v_gk_cap then 'GK'
-    when v_def_count < v_def_cap then 'DEF'
-    when v_mid_count < v_mid_cap then 'MID'
-    when v_fwd_count < v_fwd_cap then 'FWD'
+    when v_gk_draftable and v_gk_count < v_gk_min then 'GK'
+    when v_def_draftable and v_def_count < v_def_min then 'DEF'
+    when v_mid_draftable and v_mid_count < v_mid_min then 'MID'
+    when v_fwd_draftable and v_fwd_count < v_fwd_min then 'FWD'
+    when v_gk_draftable then 'GK'
+    when v_def_draftable then 'DEF'
+    when v_mid_draftable then 'MID'
+    when v_fwd_draftable then 'FWD'
     else null
   end;
+
+  if v_deficit_position is null then
+    raise exception 'NO_ELIGIBLE_PLAYER';
+  end if;
 
   select p.id into v_chosen_player_id
   from public.players p
   where p.active = true
-    and (v_deficit_position is null or p.position = v_deficit_position)
+    and p.position = v_deficit_position
     and not exists (
       select 1 from public.league_player_ownership lpo
       where lpo.league_id = v_draft.league_id and lpo.player_id = p.id
     )
-  order by
-    case p.position when 'GK' then 1 when 'DEF' then 2 when 'MID' then 3 when 'FWD' then 4 end,
-    p.name
+  order by p.name
   limit 1;
 
   if v_chosen_player_id is null then
@@ -435,7 +538,7 @@ end;
 $$;
 
 comment on function public.resolve_expired_pick(uuid, timestamptz) is
-  'Callable by any league member (via auth.uid()) or by trusted server code (service_role) — only actually acts once the persisted pick-timer deadline has passed as of `p_as_of` (defaults to real now(), overridable for the simulation harness; else raises TIMER_NOT_EXPIRED). Deterministic auto-pick: fills the drafting team''s biggest unmet formation minimum first (GK/DEF/MID/FWD priority order, then player name), falling back to the first eligible player overall once minimums are satisfied. Delegates to _perform_draft_pick() for the actual atomic pick.';
+  'Callable by any league member (via auth.uid()) or by trusted server code (service_role) — only actually acts once the persisted pick-timer deadline has passed as of `p_as_of` (defaults to real now(), overridable for the simulation harness; else raises TIMER_NOT_EXPIRED). Deterministic auto-pick: among positions that remain legal under the canonical ROSTER_RULES (GK exactly 2, DEF/MID 4-6, FWD 2-4, and never making a minimum mathematically unreachable), fills the drafting team''s biggest unmet minimum first (GK/DEF/MID/FWD priority order, then player name), falling back to the first still-legal position once minimums are satisfied. Can never construct an invalid squad. Delegates to _perform_draft_pick() for the actual atomic pick.';
 
 revoke all on function public.resolve_expired_pick(uuid, timestamptz) from public;
 grant execute on function public.resolve_expired_pick(uuid, timestamptz) to authenticated;

@@ -15,5 +15,6 @@ export const DRAFT_ACTION_ERROR_COPY: Record<DraftActionErrorCode, string> = {
   PLAYER_NOT_FOUND: "DRAFT / PLAYER_NOT_FOUND — that player doesn't exist.",
   PLAYER_NOT_ACTIVE: "DRAFT / PLAYER_NOT_ACTIVE — that player isn't currently eligible.",
   PLAYER_ALREADY_OWNED: "DRAFT / ALREADY_TAKEN — another team already drafted that player.",
+  ROSTER_LIMIT_EXCEEDED: "DRAFT / ROSTER_LIMIT — that pick would leave your roster unable to meet position requirements.",
   UNKNOWN: "Something went wrong. Try again.",
 };

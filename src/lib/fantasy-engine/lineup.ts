@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeLockInstant, isLocked } from "../../domain/fantasy/lineup-lock.ts";
 import { isStarterCompositionValid } from "../../domain/fantasy/constants.ts";
+import { chooseAutomaticStartingXi } from "../../domain/fantasy/auto-lineup.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
 import type { RoundWindow } from "../../domain/fantasy/round-calendar.ts";
 import type { Database } from "../supabase/database.types.ts";
@@ -11,11 +12,16 @@ import type { Database } from "../supabase/database.types.ts";
  * team, the moment the round opens (`openNextRound` calls this once per
  * team). Carries forward the PREVIOUS round's starter/bench placement as
  * the new default when one exists (a manager who does nothing keeps last
- * week's lineup, the common real-product convention) — otherwise every
- * player starts benched (round 1, or a roster entry acquired since the
- * last round). `locked_at` is computed and stored immediately — fully
- * deterministic from the round's fixture window, no separate "locking
- * tick" required (see docs/game-rules.md "Player locking").
+ * week's lineup, the common real-product convention). For a team's VERY
+ * FIRST round (no previous round at all — the moment its draft just
+ * completed), `chooseAutomaticStartingXi()` picks a deterministic, valid
+ * initial XI instead of benching everyone (Pass 10.5) — a real manager
+ * can then rearrange it normally through `updateLineup()`. A roster
+ * entry acquired AFTER a team's first round (no prior slot of its own,
+ * even though earlier rounds exist) still starts benched, unchanged.
+ * `locked_at` is computed and stored immediately — fully deterministic
+ * from the round's fixture window, no separate "locking tick" required
+ * (see docs/game-rules.md "Player locking").
  */
 export async function createRoundLineupSlots(
   admin: SupabaseClient<Database>,
@@ -45,6 +51,18 @@ export async function createRoundLineupSlots(
     previousSlotByRosterEntry = new Map((previousSlots ?? []).map((s) => [s.roster_entry_id, s]));
   }
 
+  let autoInitialStarterIds: Set<string> | null = null;
+  if (!previousRoundId) {
+    const rosterForAutoLineup = rosterEntries
+      .map((entry) => ({
+        rosterEntryId: entry.id,
+        position: (entry.players as { position: string } | null)?.position as PlayerPosition | undefined,
+      }))
+      .filter((entry): entry is { rosterEntryId: string; position: PlayerPosition } => Boolean(entry.position));
+    const { starters } = chooseAutomaticStartingXi(rosterForAutoLineup);
+    autoInitialStarterIds = new Set(starters.map((s) => s.rosterEntryId));
+  }
+
   const clubIds = Array.from(new Set(rosterEntries.map((r) => (r.players as { club_id: string } | null)?.club_id).filter((id): id is string => Boolean(id))));
   const { data: clubFixtures } = await admin
     .from("fixtures")
@@ -66,7 +84,7 @@ export async function createRoundLineupSlots(
   const rows = rosterEntries.map((entry) => {
     const player = entry.players as { club_id: string; position: string } | null;
     const previous = previousSlotByRosterEntry.get(entry.id);
-    const starter = previous?.starter ?? false;
+    const starter = previousRoundId ? (previous?.starter ?? false) : (autoInitialStarterIds?.has(entry.id) ?? false);
     const slot = starter ? (player?.position ?? "BENCH") : "BENCH";
     const kickoffs = player ? (kickoffsByClubId.get(player.club_id) ?? []) : [];
     const lockedAt = computeLockInstant(kickoffs);

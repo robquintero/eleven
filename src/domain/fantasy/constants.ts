@@ -23,6 +23,31 @@ export const FORMATION_RULES: {
 };
 
 /**
+ * The canonical 16-player SQUAD (not starting-XI) composition rule —
+ * every roster (drafted, and later free-agency/waivers/trades) must
+ * satisfy this, not just `FORMATION_RULES`' looser starting-XI ranges.
+ * Note the two rule sets are deliberately different: a squad needs a
+ * *deeper* bench than any single matchday's XI requires (e.g. exactly 2
+ * GK on the roster so a manager always has a backup, even though only 1
+ * ever starts). See `src/domain/fantasy/roster-rules.ts` for the
+ * authoritative validation functions built on this — Pass 11's free
+ * agency/waivers/trades are expected to reuse those, not re-derive their
+ * own copy of these numbers.
+ */
+export const ROSTER_RULES: {
+  squadSize: number;
+  positionRange: Record<PlayerPosition, { min: number; max: number }>;
+} = {
+  squadSize: 16,
+  positionRange: {
+    GK: { min: 2, max: 2 },
+    DEF: { min: 4, max: 6 },
+    MID: { min: 4, max: 6 },
+    FWD: { min: 2, max: 4 },
+  },
+};
+
+/**
  * The minimum number of managers required before a commissioner may
  * start the draft — deliberately NOT the same as `settings.maxTeams`
  * (the league's configured target size). A league configured for 10
@@ -42,7 +67,12 @@ export const DEFAULT_LEAGUE_SETTINGS: LeagueSettings = {
   waiverMode: "priority",
   playoffEnabled: true,
   draftType: "snake",
-  pickTimerSeconds: 60,
+  // 5 minutes -- deliberately generous for current testing (Pass 10.5).
+  // Mirrored in create_league()'s own SQL default
+  // (supabase/migrations/20260929141145_functions.sql) and
+  // resolve_expired_pick()'s defensive fallback -- keep all three in
+  // sync if this ever changes. Not configurable per-league this pass.
+  pickTimerSeconds: 300,
 };
 
 /**

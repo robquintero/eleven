@@ -36,7 +36,7 @@ import { join } from "node:path";
 const APPLICATION_ROOTS = ["src/app", "src/components", "src/data-access"];
 const EXEMPT_PATH_PREFIXES = ["src/app/api/cron/"];
 /** Exact file paths (not prefixes) permitted to import `@/lib/supabase/admin` for a privileged fantasy-engine write — see the module doc comment above. Keep this list narrow; add a file only alongside a doc comment in that file explaining the specific privileged mutation it performs. */
-const EXEMPT_EXACT_PATHS = ["src/app/(app)/team/actions.ts"];
+const EXEMPT_EXACT_PATHS = ["src/app/(app)/team/actions.ts", "src/app/(app)/draft/actions.ts"];
 const FORBIDDEN_SPECIFIERS = [
   "@/lib/football-providers/api-football",
   "@/lib/football-ingestion",

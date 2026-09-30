@@ -1,10 +1,20 @@
 /**
- * Deterministic starting-XI selection for the simulation harness ONLY
- * (docs/game-rules.md "Simulation") — a real manager always chooses their
- * own lineup through the Team workspace; nothing here is a "smart
- * lineup" feature for real play. Pure function of a roster's position
- * counts; no rating/projection/points input of any kind (same
- * "no sophisticated recommendations" rule as the draft auto-pick).
+ * Deterministic starting-XI selection. Two callers use this:
+ *
+ *   1. The simulation harness (docs/game-rules.md "Simulation") — a
+ *      stand-in for a manager's own choice.
+ *   2. Post-draft lineup initialization (Pass 10.5) — the moment a
+ *      team's draft completes, this picks its FIRST real starting XI
+ *      automatically, so a manager's squad doesn't sit entirely on the
+ *      bench until they manually set one. After initialization a real
+ *      manager can freely rearrange it through the existing Team
+ *      lineup-editing UI, exactly as if they'd set it themselves — this
+ *      function only ever runs once, at that starting point.
+ *
+ * Never a "smart lineup" feature beyond that starting point — no
+ * rating/projection/points input of any kind (same "no sophisticated
+ * recommendations" rule as the draft auto-pick). Pure function of a
+ * roster's position counts.
  */
 
 import { FORMATION_RULES } from "./constants.ts";
