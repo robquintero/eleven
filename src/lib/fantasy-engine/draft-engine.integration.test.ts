@@ -326,12 +326,17 @@ test("a locked starter cannot be moved, even long after the round has finalized"
     ];
     await updateLineup(admin, teamId, openResult.roundId, validXi, new Date("2026-08-25T00:00:00Z"));
 
+    // Scoped to THIS team's own roster entries -- since Pass 10.5, every
+    // team's round 1 gets an automatic starting XI (not just this one
+    // that explicitly called updateLineup), so an unscoped query could
+    // just as easily find some OTHER team's locked starter instead.
     const { data: lockedSlot } = await admin
       .from("lineup_slots")
       .select("id, starter, roster_entry_id")
       .eq("fantasy_round_id", openResult.roundId)
       .eq("starter", true)
       .not("locked_at", "is", null)
+      .in("roster_entry_id", roster!.map((r) => r.id))
       .limit(1)
       .maybeSingle();
 
@@ -354,7 +359,7 @@ test("a locked starter cannot be moved, even long after the round has finalized"
   }
 });
 
-test("matchup scoring excludes bench points entirely -- a team with a real starting XI shows real points, a team with none set shows exactly zero", { skip }, async () => {
+test("matchup scoring excludes bench points entirely -- a manually-set XI and an automatically-initialized one (Pass 10.5) both show real, sane points", { skip }, async () => {
   const admin = createAdminClient();
   const league = await createTestLeague(admin, 4, 16);
   try {
@@ -368,7 +373,13 @@ test("matchup scoring excludes bench points entirely -- a team with a real start
     if (!openResult.ok) return;
 
     const teamWithLineup = league.teamIds[0];
-    const teamWithoutLineup = league.teamIds[1];
+    // Renamed from the pre-Pass-10.5 "teamWithoutLineup" -- since this
+    // pass, EVERY team's round 1 gets an automatic starting XI the moment
+    // it opens (createRoundLineupSlots), so there is no longer a
+    // completed-draft team that truly has zero starters. This team is
+    // exercised here specifically to prove that auto-initialized (not
+    // manually set) starters also score correctly, never negative/NaN.
+    const teamWithAutoLineup = league.teamIds[1];
 
     const { data: roster } = await admin.from("roster_entries").select("id, players(position)").eq("fantasy_team_id", teamWithLineup).eq("status", "active");
     const byPos: Record<string, string[]> = { GK: [], DEF: [], MID: [], FWD: [] };
@@ -387,15 +398,17 @@ test("matchup scoring excludes bench points entirely -- a team with a real start
     const { data: scores } = await admin
       .from("matchup_scores")
       .select("fantasy_team_id, live_points")
-      .in("fantasy_team_id", [teamWithLineup, teamWithoutLineup]);
+      .in("fantasy_team_id", [teamWithLineup, teamWithAutoLineup]);
 
     const withLineupScore = scores!.find((s) => s.fantasy_team_id === teamWithLineup)!;
-    const withoutLineupScore = scores!.find((s) => s.fantasy_team_id === teamWithoutLineup);
+    const withAutoLineupScore = scores!.find((s) => s.fantasy_team_id === teamWithAutoLineup);
 
-    // The team with no lineup ever set has no starters at all -- its score
-    // row (if one exists) must be exactly 0, never a fabricated value.
-    if (withoutLineupScore) assert.equal(withoutLineupScore.live_points, 0);
+    // Neither team is ever truly lineup-less post-Pass-10.5 -- both a
+    // manually-set XI and an automatically-initialized one must produce a
+    // real, sane (non-negative, non-fabricated) score.
     assert.ok(withLineupScore.live_points >= 0, "a real starting XI against real historical fixtures never produces a negative or nonsensical aggregate");
+    assert.ok(withAutoLineupScore, "the auto-initialized team must have a real matchup_scores row too, not an absent one");
+    assert.ok(withAutoLineupScore!.live_points >= 0, "an automatically-initialized starting XI (Pass 10.5) must also score sanely, never negative or NaN");
 
     const finalizeResult = await finalizeRoundIfReady(admin, openResult.roundId, new Date(openResult.window.endsAt.getTime() + 25 * 3600 * 1000));
     assert.equal(finalizeResult.finalized, true, "this historical window's fixtures should already be fully settled");
@@ -407,13 +420,16 @@ test("matchup scoring excludes bench points entirely -- a team with a real start
 // ---------------------------------------------------------------------
 // Pass 10.5: canonical 16-player roster composition rules (GK exactly 2,
 // DEF/MID 4-6, FWD 2-4), authoritatively enforced in _perform_draft_pick.
-// squadSize is set well above what these tests actually consume so a
-// team never hits the draft's own round-completion path mid-test.
+// squadSize must stay 16 (the true canonical total) here, NOT some
+// arbitrary larger number -- the max achievable total across all four
+// positions' own maximums is 2+6+6+4=18, so any squadSize above 18 makes
+// the completability check reject EVERY pick from the very first one
+// (there would never be enough total room to reach that target).
 // ---------------------------------------------------------------------
 
 test("a team cannot draft a 3rd GK or a 7th DEF -- both are rejected with ROSTER_LIMIT_EXCEEDED, and legal picks keep working afterward", { skip }, async () => {
   const admin = createAdminClient();
-  const league = await createTestLeague(admin, 2, 20);
+  const league = await createTestLeague(admin, 2, 16);
   try {
     const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
     const draftId = draft![0].draft_id;
@@ -444,7 +460,7 @@ test("a team cannot draft a 3rd GK or a 7th DEF -- both are rejected with ROSTER
 
 test("a team cannot draft a 7th MID or a 5th FWD -- both are rejected with ROSTER_LIMIT_EXCEEDED", { skip }, async () => {
   const admin = createAdminClient();
-  const league = await createTestLeague(admin, 2, 20);
+  const league = await createTestLeague(admin, 2, 16);
   try {
     const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
     const draftId = draft![0].draft_id;
@@ -470,22 +486,27 @@ test("a team cannot draft a 7th MID or a 5th FWD -- both are rejected with ROSTE
 
 test("a pick that would make a position's minimum mathematically unreachable is rejected, even though that position itself isn't maxed", { skip }, async () => {
   const admin = createAdminClient();
-  // A small squadSize (6, not 16) is deliberate here -- it lets this test
-  // reach "only 2 picks left" in a handful of RPC calls instead of playing
-  // out most of a real 16-round draft. This league's squad can never
-  // reach a fully valid 16-player composition (irrelevant to this test,
-  // which only checks ONE pick's legality, never calls draftToCompletion).
-  const league = await createTestLeague(admin, 2, 6);
+  // squadSize=12 -- the TRUE minimum total (GK2+DEF4+MID4+FWD2=12), not
+  // an arbitrary small number. This is deliberately the tightest possible
+  // valid league: every pick from the very first one has zero slack, so
+  // "only 2 picks left" arises naturally after exactly 10 picks, without
+  // playing out a full 16-round draft. (A squadSize below 12 is invalid
+  // for the same reason a squadSize above 18 is -- see the comment above
+  // the position-max tests below.)
+  const league = await createTestLeague(admin, 2, 12);
   try {
     const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
     const draftId = draft![0].draft_id;
     const teamClient = league.clients[0];
 
-    // Build: GK 1 (needs 1 more), DEF 3 (needs 1 more) -- 4 picks made, 2 remain.
-    assert.equal(await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "GK"), null);
-    assert.equal(await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "DEF"), null);
-    assert.equal(await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "DEF"), null);
-    assert.equal(await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "DEF"), null);
+    // Build up to: GK 1 (needs 1 more), DEF 3 (needs 1 more), MID 4 (met,
+    // no room left under squadSize=12's zero slack), FWD 2 (met) -- 10
+    // picks made, exactly 2 remain.
+    const sequence: PlayerPosition[] = ["GK", "DEF", "DEF", "DEF", "MID", "MID", "MID", "MID", "FWD", "FWD"];
+    for (const position of sequence) {
+      const err = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, position);
+      assert.equal(err, null, `building up to the tight spot: ${position} pick should succeed`);
+    }
 
     const illegalMid = await draftFirstAvailableAtPosition(admin, teamClient, draftId, league.leagueId, "MID");
     assert.equal(
@@ -562,6 +583,24 @@ test("a full 2-manager auto-drafted simulation: both teams end with legal 16-pla
       assert.ok(starterCounts.DEF >= 3 && starterCounts.DEF <= 5, `DEF starters must be 3-5, got ${starterCounts.DEF}`);
       assert.ok(starterCounts.MID >= 3 && starterCounts.MID <= 5, `MID starters must be 3-5, got ${starterCounts.MID}`);
       assert.ok(starterCounts.FWD >= 1 && starterCounts.FWD <= 3, `FWD starters must be 1-3, got ${starterCounts.FWD}`);
+    }
+
+    // H2H matchup generation still works: round 1 opening must have
+    // scheduled a real matchup pairing both teams (round-robin, see
+    // "H2H schedule & scoring" in docs/game-rules.md) -- not just lineup
+    // slots. And the scoring/lock pipeline remains intact end to end:
+    // refreshMatchupScores and finalizeRoundIfReady must both run clean
+    // against the auto-initialized (not manually set) starting XIs.
+    const { data: matchups } = await admin.from("matchups").select("id, home_fantasy_team_id, away_fantasy_team_id").eq("fantasy_round_id", openResult.roundId);
+    assert.equal(matchups!.length, 1, "2 teams must produce exactly 1 H2H matchup for round 1");
+    const pairedTeamIds = [matchups![0].home_fantasy_team_id, matchups![0].away_fantasy_team_id].sort();
+    assert.deepEqual(pairedTeamIds, [...league.teamIds].sort(), "the matchup must pair exactly these 2 teams, no fabricated or missing side");
+
+    await refreshMatchupScores(admin, openResult.roundId);
+    const { data: scores } = await admin.from("matchup_scores").select("fantasy_team_id, live_points").eq("matchup_id", matchups![0].id);
+    assert.equal(scores!.length, 2, "both teams must get a real matchup_scores row from their auto-initialized starting XIs");
+    for (const s of scores!) {
+      assert.ok(Number.isFinite(s.live_points) && s.live_points >= 0, `team ${s.fantasy_team_id}'s live_points must be a sane non-negative number, got ${s.live_points}`);
     }
   } finally {
     await cleanupTestLeague(admin, league);
