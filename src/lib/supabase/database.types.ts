@@ -248,6 +248,7 @@ export type Database = {
           completed_at: string | null
           created_at: string
           current_pick: number
+          current_pick_started_at: string | null
           current_round: number
           id: string
           league_id: string
@@ -260,6 +261,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           current_pick?: number
+          current_pick_started_at?: string | null
           current_round?: number
           id?: string
           league_id: string
@@ -272,6 +274,7 @@ export type Database = {
           completed_at?: string | null
           created_at?: string
           current_pick?: number
+          current_pick_started_at?: string | null
           current_round?: number
           id?: string
           league_id?: string
@@ -1268,6 +1271,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      _perform_draft_pick: {
+        Args: {
+          p_actor_user_id: string
+          p_draft_id: string
+          p_player_id: string
+          p_team_id: string
+        }
+        Returns: {
+          fantasy_team_id: string
+          pick_number: number
+          round: number
+        }[]
+      }
       create_league: {
         Args: {
           p_name: string
@@ -1298,7 +1314,31 @@ export type Database = {
           league_id: string
         }[]
       }
+      make_draft_pick: {
+        Args: { p_draft_id: string; p_player_id: string }
+        Returns: {
+          fantasy_team_id: string
+          pick_number: number
+          round: number
+        }[]
+      }
+      resolve_expired_pick: {
+        Args: { p_as_of?: string; p_draft_id: string }
+        Returns: {
+          auto_picked: boolean
+          fantasy_team_id: string
+          pick_number: number
+          player_id: string
+          round: number
+        }[]
+      }
       shares_league_with: { Args: { p_user_id: string }; Returns: boolean }
+      start_draft: {
+        Args: { p_league_id: string }
+        Returns: {
+          draft_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
