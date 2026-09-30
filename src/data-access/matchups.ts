@@ -1,6 +1,8 @@
 import "server-only";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+import { buildStandingsTable, rankStandings } from "@/domain/fantasy/standings";
+import type { MatchupOutcome } from "@/domain/fantasy/standings";
 
 export interface CurrentMatchup {
   id: string;
@@ -84,14 +86,18 @@ export interface StandingsRow {
   losses: number;
   draws: number;
   pointsFor: number;
+  pointsAgainst: number;
 }
 
 /**
  * League standings derived from completed (`status = 'final'`) matchups'
  * `matchup_scores` — never a stored win/loss column (the schema
  * deliberately has none; see supabase/migrations/…fantasy_leagues.sql).
- * `[]` until at least one matchup has been played, which is every league
- * today.
+ * Ranking/tiebreak logic lives in `@/domain/fantasy/standings`
+ * (wins, then points-for, then head-to-head, then points-against
+ * ascending — docs/game-rules.md "Standings") so it's pure and
+ * independently tested rather than duplicated here. `[]` until at least
+ * one matchup has been played.
  */
 export async function getStandings(leagueId: string): Promise<StandingsRow[]> {
   if (!isSupabaseConfigured()) return [];
@@ -108,53 +114,36 @@ export async function getStandings(leagueId: string): Promise<StandingsRow[]> {
 
   if (!matchups || matchups.length === 0) return [];
 
-  const teamIds = new Set<string>();
-  for (const m of matchups) {
-    teamIds.add(m.home_fantasy_team_id);
-    teamIds.add(m.away_fantasy_team_id);
-  }
+  const outcomes: MatchupOutcome[] = matchups.map((m) => {
+    const scores = m.matchup_scores ?? [];
+    const home = scores.find((s) => s.fantasy_team_id === m.home_fantasy_team_id);
+    const away = scores.find((s) => s.fantasy_team_id === m.away_fantasy_team_id);
+    return {
+      homeTeamId: m.home_fantasy_team_id,
+      awayTeamId: m.away_fantasy_team_id,
+      homePoints: home?.final_points ?? 0,
+      awayPoints: away?.final_points ?? 0,
+    };
+  });
+
+  const table = rankStandings(buildStandingsTable(outcomes), outcomes);
 
   const { data: teams } = await supabase
     .from("fantasy_teams")
     .select("id, name")
-    .in("id", Array.from(teamIds));
+    .in(
+      "id",
+      table.map((r) => r.fantasyTeamId)
+    );
   const nameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
 
-  const rows = new Map<string, StandingsRow>();
-  for (const id of teamIds) {
-    rows.set(id, {
-      fantasyTeamId: id,
-      teamName: nameById.get(id) ?? "—",
-      wins: 0,
-      losses: 0,
-      draws: 0,
-      pointsFor: 0,
-    });
-  }
-
-  for (const m of matchups) {
-    const scores = m.matchup_scores ?? [];
-    const home = scores.find((s) => s.fantasy_team_id === m.home_fantasy_team_id);
-    const away = scores.find((s) => s.fantasy_team_id === m.away_fantasy_team_id);
-    const homePts = home?.final_points ?? 0;
-    const awayPts = away?.final_points ?? 0;
-
-    const homeRow = rows.get(m.home_fantasy_team_id)!;
-    const awayRow = rows.get(m.away_fantasy_team_id)!;
-    homeRow.pointsFor += homePts;
-    awayRow.pointsFor += awayPts;
-
-    if (homePts > awayPts) {
-      homeRow.wins += 1;
-      awayRow.losses += 1;
-    } else if (awayPts > homePts) {
-      awayRow.wins += 1;
-      homeRow.losses += 1;
-    } else {
-      homeRow.draws += 1;
-      awayRow.draws += 1;
-    }
-  }
-
-  return Array.from(rows.values()).sort((a, b) => b.wins - a.wins || b.pointsFor - a.pointsFor);
+  return table.map((row) => ({
+    fantasyTeamId: row.fantasyTeamId,
+    teamName: nameById.get(row.fantasyTeamId) ?? "—",
+    wins: row.wins,
+    losses: row.losses,
+    draws: row.draws,
+    pointsFor: row.pointsFor,
+    pointsAgainst: row.pointsAgainst,
+  }));
 }

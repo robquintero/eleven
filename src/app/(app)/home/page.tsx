@@ -53,6 +53,14 @@ export default async function HomePage() {
         managerName={profile?.displayName ?? "Manager"}
         teamName={team?.name ?? league.name}
         leagueName={league.name}
+        // `Greeting`'s `round` prop expects a single "LOCKS <deadline>" —
+        // that shape assumes one global weekly lineup deadline, which
+        // Pass 10's real model doesn't have (locking is per-player, at
+        // each player's own first eligible kickoff — docs/game-rules.md
+        // "Player locking"). Passing a misleading single deadline here
+        // would be worse than the truthful "no round" state; left as a
+        // follow-up once Greeting's shape is revisited for the real
+        // per-player lock model.
         round={null}
       />
 
@@ -73,7 +81,7 @@ export default async function HomePage() {
           <StartingXI players={startingXI} />
         </div>
 
-        <OperationsRail starters={squad.starters} standings={standings} hasActiveRound={false} />
+        <OperationsRail starters={squad.starters} standings={standings} hasActiveRound={matchup !== null} />
       </div>
 
       <section>

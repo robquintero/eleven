@@ -34,7 +34,7 @@ export default async function MatchupPage() {
       <ComingSoon
         icon={Swords}
         title="Awaiting league draft"
-        description="Matchups are scheduled once your league's draft is complete. No draft engine is available yet."
+        description="Matchups are scheduled once your league's draft is complete."
       />
     );
   }

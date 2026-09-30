@@ -46,13 +46,18 @@ export default async function TeamPage() {
         <StripCell label="BENCH" value={pad2(squad.bench.length)} />
       </div>
 
-      <p className="mt-2 text-xs text-foreground-tertiary">
-        {team
-          ? "Lineup editing unlocks once your league's draft is complete."
-          : "You don't have a fantasy team in this league yet."}
-      </p>
+      {!team && (
+        <p className="mt-2 text-xs text-foreground-tertiary">
+          You don&apos;t have a fantasy team in this league yet.
+        </p>
+      )}
 
-      <TeamWorkspace squad={squad} matchdayNumber={null} />
+      <TeamWorkspace
+        squad={squad}
+        matchdayNumber={null}
+        leagueId={league.id}
+        fantasyTeamId={team?.id ?? null}
+      />
     </div>
   );
 }

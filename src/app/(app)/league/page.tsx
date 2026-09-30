@@ -162,6 +162,11 @@ export default async function LeaguePage() {
                       ? "Completed"
                       : "Not yet available"}
                 </p>
+                {draftStatus && (
+                  <Link href="/draft" className="label-system mt-1.5 inline-block text-[11px] text-accent hover:underline">
+                    OPEN DRAFT ROOM ↗
+                  </Link>
+                )}
               </div>
 
               <div className="border border-border p-4">
@@ -177,7 +182,7 @@ export default async function LeaguePage() {
                         </span>
                         <span className="flex-1 text-sm text-foreground">{row.teamName}</span>
                         <span className="label-system text-xs tabular-nums text-foreground-tertiary">
-                          {row.wins}-{row.losses}-{row.draws}
+                          {row.wins}-{row.losses}-{row.draws} · {row.pointsFor.toFixed(1)} PF
                         </span>
                       </div>
                     ))}
