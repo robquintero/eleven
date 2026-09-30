@@ -12,7 +12,8 @@
         "status": { "short": "NS" }
       },
       "league": { "id": 39, "season": 2026, "round": "Regular Season - 8" },
-      "teams": { "home": { "id": 50 }, "away": { "id": 42 } }
+      "teams": { "home": { "id": 50 }, "away": { "id": 42 } },
+      "goals": { "home": null, "away": null }
     },
     {
       "fixture": {
@@ -21,7 +22,8 @@
         "status": { "short": "FT" }
       },
       "league": { "id": 39, "season": 2026, "round": "Regular Season - 8" },
-      "teams": { "home": { "id": 42 }, "away": { "id": 50 } }
+      "teams": { "home": { "id": 42 }, "away": { "id": 50 } },
+      "goals": { "home": 2, "away": 1 }
     },
     {
       "fixture": {
@@ -30,7 +32,8 @@
         "status": { "short": "PST" }
       },
       "league": { "id": 39, "season": 2026, "round": "Regular Season - 8" },
-      "teams": { "home": { "id": 50 }, "away": { "id": 42 } }
+      "teams": { "home": { "id": 50 }, "away": { "id": 42 } },
+      "goals": { "home": null, "away": null }
     }
   ]
 }

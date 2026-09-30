@@ -457,9 +457,11 @@ export type Database = {
       fixtures: {
         Row: {
           away_club_id: string
+          away_score: number | null
           competition_id: string
           created_at: string
           home_club_id: string
+          home_score: number | null
           id: string
           kickoff_at: string
           season: number
@@ -468,9 +470,11 @@ export type Database = {
         }
         Insert: {
           away_club_id: string
+          away_score?: number | null
           competition_id: string
           created_at?: string
           home_club_id: string
+          home_score?: number | null
           id?: string
           kickoff_at: string
           season: number
@@ -479,9 +483,11 @@ export type Database = {
         }
         Update: {
           away_club_id?: string
+          away_score?: number | null
           competition_id?: string
           created_at?: string
           home_club_id?: string
+          home_score?: number | null
           id?: string
           kickoff_at?: string
           season?: number

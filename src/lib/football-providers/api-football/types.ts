@@ -135,6 +135,11 @@ export interface ApiFootballFixtureItem {
     home: { id: number };
     away: { id: number };
   };
+  /** Null until the fixture has kicked off; populated (and updated) live, then finalized at FT. */
+  goals: {
+    home: number | null;
+    away: number | null;
+  };
 }
 
 // ---------------------------------------------------------------------

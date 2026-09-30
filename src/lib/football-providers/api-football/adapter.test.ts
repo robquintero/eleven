@@ -216,6 +216,18 @@ test("normalizeFixture maps a finished fixture correctly", () => {
   assert.equal(normalized.status, "final");
 });
 
+test("normalizeFixture maps the final score for a completed fixture", () => {
+  const normalized = normalizeFixture(fixtures.response[1]);
+  assert.equal(normalized.homeScore, 2);
+  assert.equal(normalized.awayScore, 1);
+});
+
+test("normalizeFixture leaves the score undefined (never 0) before kickoff", () => {
+  const normalized = normalizeFixture(fixtures.response[0]);
+  assert.equal(normalized.homeScore, undefined);
+  assert.equal(normalized.awayScore, undefined);
+});
+
 test("normalizeFixture maps a postponed fixture correctly", () => {
   const normalized = normalizeFixture(fixtures.response[2]);
   assert.equal(normalized.status, "postponed");

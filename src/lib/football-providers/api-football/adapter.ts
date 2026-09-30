@@ -165,6 +165,8 @@ export function normalizeFixture(item: ApiFootballFixtureItem): NormalizedFixtur
     kickoffAt: new Date(item.fixture.date).toISOString(),
     status: mapFixtureStatus(item.fixture.status.short),
     round: item.league.round,
+    homeScore: item.goals.home ?? undefined,
+    awayScore: item.goals.away ?? undefined,
   };
 }
 
