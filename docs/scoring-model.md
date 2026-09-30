@@ -238,6 +238,56 @@ identical result across 5 repeated calls, and a missed polling interval
 still landing on the correct final score regardless of which intermediate
 snapshots were actually observed.
 
+## Players workspace integration (Phase 7)
+
+Wired the Players workspace to real `ELEVEN_STANDARD_V1` output:
+season-cumulative points (a new PTS column, both desktop table and mobile
+list) and points-per-appearance in the player inspector's Season panel, a
+new Form Tracker panel (last 3/5/10 match averages,
+`src/lib/selectors/form-tracker.ts`), and per-match points in the Recent
+Usage match list. `player.fantasyPoints` (a single ROUND's score) is left
+alone — it belongs to the Team page's future live-matchup context, which
+has no round scheduler yet; this pass only touches the round-independent,
+already-real cumulative season data.
+
+Two real defects surfaced live while building this, both fixed on this
+branch:
+
+1. **RLS silently hid every canonical score.** The original
+   `fantasy_player_scores` SELECT policy only matched rows joined through
+   `fantasy_rounds` — correct when every score belonged to a round, but
+   Pass 9's own `scoring_engine_foundation` migration made
+   `fantasy_round_id` nullable specifically because canonical scores are
+   round-independent, and every row this engine writes has
+   `fantasy_round_id = NULL`. Against the old policy, that join can never
+   match, so no authenticated user could read ANY canonical score —
+   confirmed live (PTS rendered "—" for Raphinha despite 8 real scored
+   matches summing to 100.5). Fixed via an additive policy,
+   `authenticated can read canonical fantasy_player_scores`, mirroring
+   `player_match_stats`'s existing `using (true)` policy: a canonical
+   score is derived from public real-football data, not league-private.
+   The original league-scoped policy is untouched for a future
+   round-scoped row.
+
+2. **`getPlayerRecentMatches` wasn't actually ordering by recency.**
+   `.order("kickoff_at", { referencedTable: "fixtures" })` doesn't order
+   the outer `player_match_stats` rows by an embedded many-to-one
+   relation's column — PostgREST silently no-ops it. This was a latent
+   bug even for the old 5-match usage trend (a short list where being
+   out-of-order was easy to miss), but it directly corrupts Form
+   Tracker's "most recent N" windows, which depend on genuine recency.
+   Fixed by dropping the DB-level order/limit and sorting the fetched
+   rows by `kickoff_at` in JS before slicing to the requested count — a
+   player's full-season appearance count is well under 100, so fetching
+   all of it is cheap.
+
+Verified end-to-end against the live database and dev server (a temporary
+Supabase Auth test user, a real signed-in session cookie, and a curl of
+the actual rendered `/players` page — the same technique used for prior
+passes' live QA): PTS renders correctly (100.5 for Raphinha, matching an
+independent DB sum), and the Form Tracker's `last3`/`last5` values equal
+the average of the correct, chronologically-ordered 3/5 matches.
+
 ## Known limitations
 
 - No pass-completion, duel, foul, or penalty signal (not ingested this

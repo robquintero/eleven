@@ -10,7 +10,7 @@ import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
 const rowGrid =
-  "grid grid-cols-[2rem_1fr_2.75rem_3rem_5rem_3.5rem_6.5rem] items-center gap-3 lg:grid-cols-[2rem_1fr_2.75rem_3rem_2.5rem_5rem_3.5rem_3.5rem_6.5rem]";
+  "grid grid-cols-[2rem_1fr_2.75rem_3rem_5rem_3.5rem_3.5rem_6.5rem] items-center gap-3 lg:grid-cols-[2rem_1fr_2.75rem_3rem_2.5rem_5rem_3.5rem_3.5rem_3.5rem_6.5rem]";
 
 function HeaderCell({
   label,
@@ -92,6 +92,7 @@ export function PlayerTable({
           onSort={onSort}
           className="hidden lg:flex"
         />
+        <HeaderCell label="PTS" activeSort={sort} onSort={onSort} />
         <HeaderCell label="STATUS" activeSort={sort} onSort={onSort} className="justify-self-end" />
       </div>
 
@@ -161,6 +162,10 @@ export function PlayerTable({
 
               <span className="label-system hidden text-[11px] text-foreground-tertiary lg:block">
                 {player.seasonStats ? player.seasonStats.starts : "—"}
+              </span>
+
+              <span className="label-system text-sm font-semibold text-foreground">
+                {player.totalPoints ?? "—"}
               </span>
 
               <OwnershipStatus player={player} className="justify-self-end text-[11px]" />

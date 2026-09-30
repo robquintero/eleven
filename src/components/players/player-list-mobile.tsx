@@ -55,8 +55,8 @@ export function PlayerListMobile({
 
             <div className="shrink-0 text-right">
               <p className="label-system text-sm font-semibold text-foreground">
-                {player.seasonStats ? player.seasonStats.minutes : "—"}{" "}
-                <span className="text-[10px] font-normal text-foreground-tertiary">MIN</span>
+                {player.totalPoints ?? "—"}{" "}
+                <span className="text-[10px] font-normal text-foreground-tertiary">PTS</span>
               </p>
               <OwnershipStatus player={player} className="text-[10px]" />
             </div>
