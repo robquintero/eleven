@@ -105,14 +105,14 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
 
   const { data: slots } = await supabase
     .from("lineup_slots")
-    .select("roster_entry_id, starter, locked_at")
+    .select("roster_entry_id, starter, locked_at, updated_at")
     .eq("fantasy_round_id", currentRound.id)
     .in("roster_entry_id", Array.from(playerByRosterEntryId.keys()));
 
   const slotByRosterEntryId = new Map((slots ?? []).map((s) => [s.roster_entry_id, s]));
   const now = new Date();
 
-  const starterEntries: Array<{ rosterEntryId: string; player: Player; locked: boolean }> = [];
+  const starterEntries: Array<{ rosterEntryId: string; player: Player; locked: boolean; updatedAt: string }> = [];
   const bench: Player[] = [];
 
   for (const [rosterEntryId, player] of playerByRosterEntryId) {
@@ -122,11 +122,27 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
         rosterEntryId,
         player,
         locked: isLocked(slot.locked_at ? new Date(slot.locked_at) : null, now),
+        updatedAt: slot.updated_at,
       });
     } else {
       bench.push(player);
     }
   }
+
+  // Pass 10.5C.2: sorted so a manager's specific slot choices (e.g. "right
+  // CB" vs "left CB") survive a refresh as faithfully as the EXISTING
+  // schema allows. `lineup_slots` has no dedicated slot-index column, and
+  // this pass deliberately doesn't add one (see the pass's own report for
+  // why) -- but `updateLineup()` already writes a batch of changes
+  // sequentially, in the order given, so `updated_at` ascending recovers
+  // the manager's intended left-to-right order for whichever slots they
+  // actually just set (see `team-workspace.tsx`, which now constructs
+  // fills in slot-sequence order specifically so this works). A starter
+  // never individually touched since the original auto-generated XI (or
+  // by an older swap) simply keeps whatever relative order its own write
+  // produced -- still stable and deterministic on every read, just not
+  // meaningfully "chosen" for that specific slot.
+  starterEntries.sort((a, b) => a.updatedAt.localeCompare(b.updatedAt));
 
   const counts: Partial<Record<PlayerPosition, number>> = {};
   for (const s of starterEntries) counts[s.player.position] = (counts[s.player.position] ?? 0) + 1;

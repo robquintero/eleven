@@ -15,98 +15,100 @@ import { ModuleHeader } from "@/components/ui/module-header";
 import { RailModule } from "@/components/ui/rail-module";
 import { swapLineupAction, changeFormationAction, fillEmptySlotsAction } from "@/app/(app)/team/actions";
 import { FORMATION_RULES } from "@/domain/fantasy/constants";
-import { SUPPORTED_FORMATIONS, emptySlotCounts, type FormationName } from "@/domain/fantasy/formations";
-import { layoutStartingXi } from "@/lib/selectors/pitch-layout";
+import { SUPPORTED_FORMATIONS, type FormationName } from "@/domain/fantasy/formations";
+import { assignToSlots, formationSlots, type FormationSlot } from "@/lib/selectors/pitch-layout";
 import { pad2 } from "@/lib/team-fixture";
 import type { LineupSlot, Player, PlayerAvailability, PlayerPosition, Squad } from "@/lib/types/fantasy";
 
 const availabilityOrder: PlayerAvailability[] = ["available", "doubtful", "injured", "suspended"];
-const POSITION_ORDER: PlayerPosition[] = ["GK", "DEF", "MID", "FWD"];
 
 /**
- * Merges the real persisted starters with any locally-pending (unsaved)
- * fills and, for whatever's still missing, empty-slot placeholders — up
- * to the target formation's own shape (Pass 10.5C). Real starters are
- * NEVER hidden even if they exceed the target count for their position
- * (shouldn't happen via any flow this app offers, but this never drops a
- * real player from view either way). `layoutStartingXi` only needs each
- * item's position to place it, so pending fills are laid out exactly like
- * real starters, and rendered as ordinary `PlayerNode`s on the pitch
- * (`Pitch` distinguishes "player" vs "empty" purely by the presence of a
- * `player` field) — clicking one is handled specially (see
- * `handleSelectStarter`) to unassign it rather than start a swap.
+ * One `PitchItem` per formation slot, in a fixed priority per slot:
+ * a locally-queued (unsaved) fill first, then the real persisted
+ * starter, then empty. `Pitch` itself only distinguishes "player" vs
+ * "empty" by whether a `player` field is present — pending fills are
+ * rendered as ordinary `PlayerNode`s, using the SAME slot id as their
+ * target slot, so clicking one is unambiguous (see
+ * `handleSelectStarterOrPending`).
  */
-function buildPitchItems(starters: LineupSlot[], pendingFills: Map<string, { position: PlayerPosition; player: Player }>, formation: FormationName): PitchItem[] {
-  const entries: { position: PlayerPosition; value: { kind: "player"; slot: LineupSlot } | { kind: "pending"; playerId: string; player: Player } | { kind: "empty"; key: string } }[] = [];
-  const filledCounts: Partial<Record<PlayerPosition, number>> = {};
-
-  for (const position of POSITION_ORDER) {
-    const real = starters.filter((s) => s.position === position);
-    for (const slot of real) entries.push({ position, value: { kind: "player", slot } });
-
-    const pendingAtPosition = Array.from(pendingFills.entries()).filter(([, v]) => v.position === position);
-    for (const [playerId, v] of pendingAtPosition) entries.push({ position, value: { kind: "pending", playerId, player: v.player } });
-
-    filledCounts[position] = real.length + pendingAtPosition.length;
-  }
-
-  const empty = emptySlotCounts(filledCounts, formation);
-  for (const position of POSITION_ORDER) {
-    for (let i = 0; i < empty[position]; i++) entries.push({ position, value: { kind: "empty", key: `empty-${position}-${i}` } });
-  }
-
-  return layoutStartingXi(entries, formation).map(({ position, value, x, y }): PitchItem => {
-    if (value.kind === "player") return { ...value.slot, x, y };
-    if (value.kind === "pending") return { id: `pending-${value.playerId}`, position, x, y, player: value.player, locked: false };
-    return { id: value.key, position, x, y } satisfies EmptyPitchSlot;
+function buildPitchItems(
+  slots: FormationSlot[],
+  occupancy: Map<string, LineupSlot>,
+  pendingAssignments: Map<string, Player>
+): PitchItem[] {
+  return slots.map((slot): PitchItem => {
+    const pendingPlayer = pendingAssignments.get(slot.id);
+    if (pendingPlayer) {
+      return { id: slot.id, position: slot.position, x: slot.x, y: slot.y, player: pendingPlayer, locked: false };
+    }
+    const real = occupancy.get(slot.id);
+    if (real) {
+      return { id: slot.id, position: slot.position, x: slot.x, y: slot.y, player: real.player, locked: real.locked };
+    }
+    return { id: slot.id, position: slot.position, x: slot.x, y: slot.y } satisfies EmptyPitchSlot;
   });
 }
 
+type Selection =
+  | { kind: "starter"; slotId: string; player: Player }
+  | { kind: "emptySlot"; slotId: string; position: PlayerPosition }
+  | { kind: "bench"; player: Player }
+  | null;
+
 /**
- * Real lineup editing: select a starter or bench player, then select the
- * other side to swap them — persisted via `swapLineupAction`
- * (src/app/(app)/team/actions.ts), which re-validates lock state and
- * formation validity server-side before writing anything. Read-only
- * (no edit affordance at all) when there's no team, matching
- * "Interaction truthfulness" — see docs/product-state.md.
+ * Real lineup editing (Pass 10.5C.2 — see the pass's own report for the
+ * full design rationale):
  *
- * Pass 10.5C also adds: the formation selector stays visible and usable
- * even with an incomplete/empty starting XI (feasibility is always judged
- * against the FULL 16-player roster, not just current starters — see
- * `rosterCounts` below), and the pitch always shows the target
- * formation's full 11 slots, empty ones included, so a manager can select
- * an empty slot and fill it from the bench directly. Selecting a
- * formation from the dropdown still auto-resolves a complete XI via
- * `changeFormationAction` when the roster can supply it in full (Pass
- * 10.5B, unchanged); manual empty-slot fills are queued client-side and
- * only committed once they'd bring the team to exactly 11 (an "editing"
- * state is never itself persisted as a valid lineup — see
- * `fillEmptySlotsAction`'s own doc comment).
+ * - Every rendered pitch slot has a STABLE id ("DEF-0".."DEF-3", etc. —
+ *   `formationSlots()`), not a generically-recomputed left-to-right
+ *   position. A player assigned to a specific slot stays there for the
+ *   rest of the editing session regardless of what's assigned elsewhere
+ *   afterward.
+ * - Clicking an EMPTY, editable slot automatically enters edit mode and
+ *   selects that exact slot — no separate "Edit lineup" click required
+ *   first. Locked slots are never affected (they're never empty; the
+ *   explicit "Edit lineup" button remains for the swap flow on occupied
+ *   slots).
+ * - Once an empty slot is selected, the bench is filtered to that slot's
+ *   position — everyone else stays visible but is genuinely disabled
+ *   (`BenchRow`'s own `disabled` prop), never merely dimmed by color.
+ * - Manually-built fills are purely local (`pendingAssignments`) until
+ *   Done: there is exactly one authoritative persistence point
+ *   (`handleDoneOrEdit`), never an automatic save mid-build (Pass
+ *   10.5C.1's fix, preserved here) — see that function's own comment.
+ * - Starter↔bench swaps are unchanged: select an occupied slot, then a
+ *   bench player (or vice versa), persisted immediately via
+ *   `swapLineupAction`, re-validated server-side exactly as before.
+ *
+ * Read-only (no edit affordance at all) when there's no team, matching
+ * "Interaction truthfulness" — see docs/product-state.md. Also read-only,
+ * with a truthful explanation, when the server-side admin client isn't
+ * configured at all (`lineupEditingAvailable`) — the Team UI must never
+ * expose a lineup editor it can't actually persist through.
  */
 export function TeamWorkspace({
   squad,
   matchdayNumber,
   leagueId,
   fantasyTeamId,
+  lineupEditingAvailable,
 }: {
   squad: Squad;
   matchdayNumber: number | null;
   leagueId: string;
   fantasyTeamId: string | null;
+  lineupEditingAvailable: boolean;
 }) {
   const router = useRouter();
   const [detail, setDetail] = useState<Player | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [selected, setSelected] = useState<
-    | { side: "starter"; slot: LineupSlot }
-    | { side: "bench"; player: Player }
-    | { side: "empty"; emptySlotId: string; position: PlayerPosition }
-    | null
-  >(null);
-  const [pendingFills, setPendingFills] = useState<Map<string, { position: PlayerPosition; player: Player }>>(new Map());
+  const [selected, setSelected] = useState<Selection>(null);
+  const [pendingAssignments, setPendingAssignments] = useState<Map<string, Player>>(new Map());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const canEdit = Boolean(fantasyTeamId) && lineupEditingAvailable;
 
   function openPlayer(player: Player) {
     setDetail(player);
@@ -135,13 +137,17 @@ export function TeamWorkspace({
   // 11-slot target to build toward.
   const effectiveFormation: FormationName = currentFormation ?? "4-4-2";
 
-  const visibleBench = squad.bench.filter((p) => !pendingFills.has(p.id));
-  const pitchItems = buildPitchItems(squad.starters, pendingFills, effectiveFormation);
-  const totalAssigned = squad.starters.length + pendingFills.size;
+  const slots = formationSlots(effectiveFormation);
+  const occupancy = assignToSlots(squad.starters, slots);
+  const pendingPlayerIds = new Set(Array.from(pendingAssignments.values()).map((p) => p.id));
+  const visibleBench = squad.bench.filter((p) => !pendingPlayerIds.has(p.id));
+  const pitchItems = buildPitchItems(slots, occupancy, pendingAssignments);
+  const totalAssigned = occupancy.size + pendingAssignments.size;
+  const benchFilterPosition = selected?.kind === "emptySlot" ? selected.position : null;
 
   async function handleFormationChange(formation: FormationName) {
     if (!fantasyTeamId || pending) return;
-    setPendingFills(new Map());
+    setPendingAssignments(new Map());
     setSelected(null);
     setPending(true);
     setError(null);
@@ -177,71 +183,63 @@ export function TeamWorkspace({
     }
   }
 
-  /**
-   * Queues a bench player against an empty slot's position, purely
-   * client-side (an "editing" state, never itself a valid persisted
-   * lineup) — Pass 10.5C.1: this used to ALSO auto-save the instant the
-   * queued count reached 11, which raced against the separate "Done"
-   * button's own unconditional discard of `pendingFills`. If the save
-   * hadn't resolved (or hadn't even been triggered on the exact slot the
-   * manager perceived as "last"), clicking Done wiped the in-progress XI
-   * with nothing ever persisted. There is now exactly ONE persistence
-   * point for manually-built fills: `handleDoneOrEdit` below, triggered
-   * only by the explicit Done action.
-   */
-  function queueFill(player: Player, position: PlayerPosition) {
-    setPendingFills((prev) => {
+  /** Queues a bench player against a SPECIFIC slot id, purely client-side — see this component's own doc comment and `handleDoneOrEdit`. */
+  function queueFill(slotId: string, player: Player) {
+    setPendingAssignments((prev) => {
       const next = new Map(prev);
-      next.set(player.id, { position, player });
+      next.set(slotId, player);
       return next;
     });
     setSelected(null);
     setError(null);
   }
 
-  function unqueueFill(playerId: string) {
-    setPendingFills((prev) => {
+  function unqueueFill(slotId: string) {
+    setPendingAssignments((prev) => {
       const next = new Map(prev);
-      next.delete(playerId);
+      next.delete(slotId);
       return next;
     });
   }
 
-  function handleSelectStarter(slot: LineupSlot) {
-    if (slot.id.startsWith("pending-")) {
+  function handleSelectStarterOrPending(item: LineupSlot) {
+    if (pendingAssignments.has(item.id)) {
       if (!editing) return;
-      unqueueFill(slot.id.slice("pending-".length));
+      unqueueFill(item.id);
       return;
     }
     if (!editing) {
-      openPlayer(slot.player);
+      openPlayer(item.player);
       return;
     }
-    if (slot.locked) {
+    if (item.locked) {
       setError("That player's match has already started — their lineup slot is locked.");
       return;
     }
-    if (selected?.side === "bench") {
-      trySwap(slot.player.id, selected.player.id);
+    if (selected?.kind === "bench") {
+      trySwap(item.player.id, selected.player.id);
       return;
     }
-    setSelected(selected?.side === "starter" && selected.slot.id === slot.id ? null : { side: "starter", slot });
+    setSelected(selected?.kind === "starter" && selected.slotId === item.id ? null : { kind: "starter", slotId: item.id, player: item.player });
   }
 
   function handleSelectEmptySlot(emptySlot: EmptyPitchSlot) {
-    if (!editing) return;
-    if (selected?.side === "bench") {
+    if (!canEdit) return;
+    // An obviously-interactive empty slot doesn't require "Edit lineup"
+    // first (Pass 10.5C.2) -- clicking it activates editing directly.
+    if (!editing) setEditing(true);
+    if (selected?.kind === "bench") {
       if (selected.player.position !== emptySlot.position) {
         setError(`That slot needs a ${emptySlot.position}.`);
         return;
       }
-      queueFill(selected.player, emptySlot.position);
+      queueFill(emptySlot.id, selected.player);
       return;
     }
     setSelected(
-      selected?.side === "empty" && selected.emptySlotId === emptySlot.id
+      selected?.kind === "emptySlot" && selected.slotId === emptySlot.id
         ? null
-        : { side: "empty", emptySlotId: emptySlot.id, position: emptySlot.position }
+        : { kind: "emptySlot", slotId: emptySlot.id, position: emptySlot.position }
     );
   }
 
@@ -250,48 +248,52 @@ export function TeamWorkspace({
       openPlayer(player);
       return;
     }
-    if (selected?.side === "starter") {
-      trySwap(selected.slot.player.id, player.id);
+    if (selected?.kind === "starter") {
+      trySwap(selected.player.id, player.id);
       return;
     }
-    if (selected?.side === "empty") {
+    if (selected?.kind === "emptySlot") {
       if (player.position !== selected.position) {
         setError(`That slot needs a ${selected.position}.`);
         return;
       }
-      queueFill(player, selected.position);
+      queueFill(selected.slotId, player);
       return;
     }
-    setSelected(selected?.side === "bench" && selected.player.id === player.id ? null : { side: "bench", player });
+    setSelected(selected?.kind === "bench" && selected.player.id === player.id ? null : { kind: "bench", player });
   }
 
   /**
    * The ONE authoritative persistence point for manually-built empty-slot
-   * fills (Pass 10.5C.1 — see `queueFill`'s own comment for what this
-   * replaces). Entering edit mode is unconditional and always starts
-   * clean. Exiting it (Done):
+   * fills (Pass 10.5C.1, preserved here — see `queueFill`'s comment).
+   * Entering edit mode is unconditional and always starts clean. Exiting
+   * it (Done):
    *   - with no pending fills queued, just exits — nothing to save.
    *   - with pending fills queued, attempts to save them FIRST, through
    *     the same `fillEmptySlotsAction` → `updateLineup()` path as
-   *     before; `updateLineup`'s own "exactly 11, valid formation, no
-   *     locked slot" validation is untouched and remains fully
-   *     authoritative. Only on success does this clear the pending state
-   *     and actually exit edit mode. On failure (including a genuinely
-   *     incomplete XI — never exactly 11 — which `updateLineup` itself
-   *     correctly rejects), edit mode and every queued selection stay
-   *     exactly as they were, with the existing error treatment shown —
-   *     never a silent discard.
+   *     before; that validation ("exactly 11, valid formation, no locked
+   *     slot") is untouched and remains fully authoritative. Only on
+   *     success does this clear the pending state and exit edit mode. On
+   *     failure, edit mode and every queued selection stay exactly as
+   *     they were, with the existing error treatment shown — never a
+   *     silent discard.
+   *
+   * Fills are sent in SLOT-SEQUENCE order (Pass 10.5C.2) specifically so
+   * `updateLineup`'s own sequential per-row writes leave `updated_at`
+   * ascending in the manager's intended left-to-right order — see
+   * `roster.ts`'s read-side sort for why.
    */
   async function handleDoneOrEdit() {
     if (!editing) {
+      if (!canEdit) return;
       setEditing(true);
       setSelected(null);
-      setPendingFills(new Map());
+      setPendingAssignments(new Map());
       setError(null);
       return;
     }
 
-    if (pendingFills.size === 0) {
+    if (pendingAssignments.size === 0) {
       setEditing(false);
       setSelected(null);
       setError(null);
@@ -301,14 +303,16 @@ export function TeamWorkspace({
     if (!fantasyTeamId || pending) return;
     setPending(true);
     setError(null);
-    const fills = Array.from(pendingFills.entries()).map(([playerId, v]) => ({ playerId, position: v.position }));
+    const fills = slots
+      .filter((slot) => pendingAssignments.has(slot.id))
+      .map((slot) => ({ playerId: pendingAssignments.get(slot.id)!.id, position: slot.position }));
     const result = await fillEmptySlotsAction(leagueId, fantasyTeamId, fills);
     setPending(false);
     if (result?.error) {
       setError(result.error);
       return;
     }
-    setPendingFills(new Map());
+    setPendingAssignments(new Map());
     setSelected(null);
     setEditing(false);
     router.refresh();
@@ -319,17 +323,19 @@ export function TeamWorkspace({
       {fantasyTeamId && (
         <div className="mt-4 flex items-center justify-between">
           <p className="text-xs text-foreground-tertiary">
-            {editing
-              ? pendingFills.size > 0
-                ? `Building lineup — ${totalAssigned} / ${FORMATION_RULES.startersTotal} selected. Click Done to save.`
-                : "Select a starter, then a bench player (or vice versa) to swap them — or select an empty slot to fill it from the bench."
-              : "Selecting a footballer opens their record."}
+            {!lineupEditingAvailable
+              ? "Lineup editing is temporarily unavailable — the server isn't configured for it right now."
+              : editing
+                ? pendingAssignments.size > 0
+                  ? `Building lineup — ${totalAssigned} / ${FORMATION_RULES.startersTotal} selected. Click Done to save.`
+                  : "Select a starter, then a bench player (or vice versa) to swap them — or select an empty slot to fill it from the bench."
+                : "Selecting a footballer opens their record. Select an empty pitch slot to start building your XI."}
           </p>
           <Button
             variant={editing ? "outline" : "default"}
             className="rounded-control"
             onClick={handleDoneOrEdit}
-            disabled={pending}
+            disabled={pending || (!editing && !canEdit)}
           >
             {editing ? (
               <>
@@ -354,7 +360,7 @@ export function TeamWorkspace({
                 <FormationSelector
                   currentFormation={currentFormation}
                   rosterCounts={rosterCounts}
-                  disabled={pending}
+                  disabled={pending || !canEdit}
                   onChange={handleFormationChange}
                 />
               ) : (
@@ -367,11 +373,11 @@ export function TeamWorkspace({
               slots={pitchItems}
               formation={squad.formation}
               editing={editing}
-              selectedSlotId={selected?.side === "starter" ? selected.slot.id : null}
-              swapTargetPosition={selected?.side === "bench" ? selected.player.position : null}
-              onSelectSlot={handleSelectStarter}
-              selectedEmptySlotId={selected?.side === "empty" ? selected.emptySlotId : null}
-              fillTargetPosition={selected?.side === "bench" ? selected.player.position : null}
+              selectedSlotId={selected?.kind === "starter" ? selected.slotId : null}
+              swapTargetPosition={selected?.kind === "bench" ? selected.player.position : null}
+              onSelectSlot={handleSelectStarterOrPending}
+              selectedEmptySlotId={selected?.kind === "emptySlot" ? selected.slotId : null}
+              fillTargetPosition={selected?.kind === "bench" ? selected.player.position : null}
               onSelectEmptySlot={handleSelectEmptySlot}
             />
             {!fantasyTeamId && (
@@ -399,8 +405,9 @@ export function TeamWorkspace({
                     index={index}
                     player={player}
                     editing={editing}
-                    selected={selected?.side === "bench" && selected.player.id === player.id}
-                    swapTarget={selected?.side === "starter" || selected?.side === "empty"}
+                    selected={selected?.kind === "bench" && selected.player.id === player.id}
+                    swapTarget={selected?.kind === "starter" || selected?.kind === "emptySlot"}
+                    disabled={benchFilterPosition !== null && player.position !== benchFilterPosition}
                     onSelect={() => handleSelectBench(player)}
                   />
                 ))}

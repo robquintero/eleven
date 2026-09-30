@@ -1,3 +1,4 @@
+import { Ban } from "lucide-react";
 import { availabilityLabel, playerFixtureCode } from "@/lib/team-fixture";
 import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
@@ -38,6 +39,7 @@ export function BenchRow({
   editing = false,
   selected = false,
   swapTarget = false,
+  disabled = false,
   onSelect,
 }: {
   index: number;
@@ -45,6 +47,8 @@ export function BenchRow({
   editing?: boolean;
   selected?: boolean;
   swapTarget?: boolean;
+  /** Pass 10.5C.2: true when an empty slot of a DIFFERENT position is selected -- this player can't legally fill it. Genuinely non-interactive (native `disabled`), not just dimmed, and never relies on color alone: a Ban icon + reduced opacity + `cursor-not-allowed` all carry the same meaning independently. */
+  disabled?: boolean;
   onSelect: () => void;
 }) {
   const isFlagged =
@@ -57,15 +61,18 @@ export function BenchRow({
     <button
       type="button"
       onClick={onSelect}
+      disabled={disabled}
+      aria-label={disabled ? `${player.name} (wrong position for the selected slot)` : undefined}
       className={cn(
         "grid w-full grid-cols-[1.25rem_2.25rem_1fr_auto] items-center gap-2 rounded-lg py-2 pr-2 pl-1 text-left transition-colors sm:grid-cols-[1.25rem_2rem_1fr_2.25rem_4.25rem]",
-        editing && "cursor-pointer",
+        editing && !disabled && "cursor-pointer",
         selected && "bg-accent/10 ring-1 ring-accent",
-        swapTarget && !selected && "bg-accent/5 ring-1 ring-accent/30"
+        swapTarget && !selected && !disabled && "bg-accent/5 ring-1 ring-accent/30",
+        disabled && "cursor-not-allowed opacity-40"
       )}
     >
       <span className="label-system text-[11px] text-foreground-tertiary">
-        {String(index + 1).padStart(2, "0")}
+        {disabled ? <Ban className="size-3" strokeWidth={2} aria-hidden="true" /> : String(index + 1).padStart(2, "0")}
       </span>
 
       <span className="label-system flex w-7 shrink-0 items-center justify-center rounded-md bg-muted py-1 text-[10px] font-semibold text-foreground-secondary sm:w-8">

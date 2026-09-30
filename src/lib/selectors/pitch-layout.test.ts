@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { layoutStartingXi } from "./pitch-layout.ts";
+import { layoutStartingXi, formationSlots, assignToSlots } from "./pitch-layout.ts";
 
 test("a lone player in a row is centered at x=50", () => {
   const result = layoutStartingXi([{ position: "GK", value: "keeper" }]);
@@ -159,4 +159,100 @@ test("no formation argument at all still uses the original generic even spread (
   const xs = result.map((r) => r.x).sort((a, b) => a - b);
   assert.equal(xs[0], 10);
   assert.equal(xs[1], 90);
+});
+
+// ---------------------------------------------------------------------
+// Pass 10.5C.2: stable slot identity -- formationSlots() gives every
+// starting-XI position a fixed id, and assignToSlots() maps a
+// stably-ordered list of items onto those ids without ever reshuffling
+// items already placed just because more get added later.
+// ---------------------------------------------------------------------
+
+test("formationSlots produces exactly 11 slots with unique, stable ids for every supported formation", () => {
+  const shapes: Record<string, { GK: number; DEF: number; MID: number; FWD: number }> = {
+    "4-4-2": { GK: 1, DEF: 4, MID: 4, FWD: 2 },
+    "4-3-3": { GK: 1, DEF: 4, MID: 3, FWD: 3 },
+    "4-2-3-1": { GK: 1, DEF: 4, MID: 5, FWD: 1 },
+    "3-5-2": { GK: 1, DEF: 3, MID: 5, FWD: 2 },
+    "3-4-3": { GK: 1, DEF: 3, MID: 4, FWD: 3 },
+  };
+  for (const [formation, shape] of Object.entries(shapes) as ["4-4-2" | "4-3-3" | "4-2-3-1" | "3-5-2" | "3-4-3", typeof shapes[string]][]) {
+    const slots = formationSlots(formation);
+    assert.equal(slots.length, 11, `${formation} must have exactly 11 slots`);
+    const ids = new Set(slots.map((s) => s.id));
+    assert.equal(ids.size, 11, `${formation}'s slot ids must all be unique`);
+    for (const position of ["GK", "DEF", "MID", "FWD"] as const) {
+      assert.equal(slots.filter((s) => s.position === position).length, shape[position], `${formation} ${position} slot count`);
+    }
+  }
+});
+
+test("formationSlots is deterministic -- calling it twice for the same formation gives identical ids and coordinates", () => {
+  assert.deepEqual(formationSlots("4-3-3"), formationSlots("4-3-3"));
+});
+
+test("assignToSlots: item i of a position lands on that position's i-th slot, in the given (stable) order", () => {
+  const slots = formationSlots("4-4-2");
+  const players = [
+    { position: "DEF" as const, name: "leftmost" },
+    { position: "DEF" as const, name: "second" },
+    { position: "DEF" as const, name: "third" },
+    { position: "DEF" as const, name: "rightmost" },
+  ];
+  const assignment = assignToSlots(players, slots);
+  assert.equal(assignment.get("DEF-0")!.name, "leftmost");
+  assert.equal(assignment.get("DEF-1")!.name, "second");
+  assert.equal(assignment.get("DEF-2")!.name, "third");
+  assert.equal(assignment.get("DEF-3")!.name, "rightmost");
+});
+
+test("4-4-2 left/right striker placement remains stable: assigning the second striker does not move the first", () => {
+  const slots = formationSlots("4-4-2");
+  // Simulates the editing sequence: striker A is already placed (e.g. via
+  // a prior fill), THEN striker B gets added -- A's slot must not move.
+  const afterFirst = assignToSlots([{ position: "FWD" as const, name: "A" }], slots);
+  assert.equal(afterFirst.get("FWD-0")!.name, "A");
+
+  const afterSecond = assignToSlots(
+    [
+      { position: "FWD" as const, name: "A" },
+      { position: "FWD" as const, name: "B" },
+    ],
+    slots
+  );
+  assert.equal(afterSecond.get("FWD-0")!.name, "A", "the first striker must stay on FWD-0");
+  assert.equal(afterSecond.get("FWD-1")!.name, "B", "the second striker takes the remaining slot, FWD-1");
+});
+
+test("assigning a player to a specific slot does not move players already assigned to other slots, across mixed positions", () => {
+  const slots = formationSlots("4-3-3");
+  const before = assignToSlots(
+    [
+      { position: "DEF" as const, name: "def-a" },
+      { position: "MID" as const, name: "mid-a" },
+    ],
+    slots
+  );
+  const defSlotForA = [...before.entries()].find(([, v]) => v.name === "def-a")![0];
+  const midSlotForA = [...before.entries()].find(([, v]) => v.name === "mid-a")![0];
+
+  // Adding MORE players of the SAME positions must not relocate the ones already placed.
+  const after = assignToSlots(
+    [
+      { position: "DEF" as const, name: "def-a" },
+      { position: "DEF" as const, name: "def-b" },
+      { position: "MID" as const, name: "mid-a" },
+      { position: "MID" as const, name: "mid-b" },
+    ],
+    slots
+  );
+  assert.equal(after.get(defSlotForA)!.name, "def-a", "def-a must still occupy its original slot");
+  assert.equal(after.get(midSlotForA)!.name, "mid-a", "mid-a must still occupy its original slot");
+});
+
+test("assignToSlots leaves unfilled slots absent from the map (never fabricates an occupant)", () => {
+  const slots = formationSlots("4-4-2");
+  const assignment = assignToSlots([{ position: "GK" as const, name: "keeper" }], slots);
+  assert.equal(assignment.size, 1);
+  assert.equal(assignment.has("DEF-0"), false);
 });

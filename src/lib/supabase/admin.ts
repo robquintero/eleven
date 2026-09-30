@@ -10,10 +10,12 @@ import type { Database } from "@/lib/supabase/database.types";
  * requires `service_role`, by design, so a leaked anon/authenticated
  * session can never be used to corrupt the football universe.
  *
- * This client is used EXCLUSIVELY by `src/lib/football-ingestion/*` (the
- * CLI sync commands) — never by `src/data-access/*`, never by anything a
- * request from the browser can reach. If you're tempted to import this
- * from application/UI code, you want `src/lib/supabase/server.ts` instead.
+ * Also used by a narrow, explicitly-justified allowlist of Server Action
+ * files that need a privileged write no RLS policy allows `authenticated`
+ * to do directly (Team lineup editing, draft round-1 auto-open) — see
+ * `no-provider-imports-in-app.test.ts`'s own `EXEMPT_EXACT_PATHS`. Not
+ * used by `src/data-access/*`, which always goes through the
+ * RLS-respecting `src/lib/supabase/server.ts` client instead.
  *
  * Reads `SUPABASE_SECRET_KEY` (this project's newer Supabase API key
  * naming, matching `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`), falling back
@@ -24,12 +26,11 @@ import type { Database } from "@/lib/supabase/database.types";
  * `.env.local`; it is never committed and never printed by any script in
  * this codebase.
  */
-export function isSupabaseAdminConfigured(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL &&
-      (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
-  );
-}
+// Relative import (not `@/`) -- this file is loaded directly by the
+// integration test harness via `node --experimental-strip-types`, which
+// (per this codebase's established convention) doesn't resolve `@/`
+// path-alias VALUE imports the way Next's own bundler does.
+export { isSupabaseAdminConfigured } from "./service-role-status.ts";
 
 export function createAdminClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
