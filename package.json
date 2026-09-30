@@ -11,7 +11,8 @@
     "football:check": "node --env-file=.env.local --conditions=react-server --experimental-strip-types src/lib/football-providers/api-football/check-connectivity.ts",
     "football:sync": "node --env-file=.env.local --conditions=react-server --experimental-strip-types src/lib/football-ingestion/cli.ts",
     "scoring:backfill": "node --env-file=.env.local --conditions=react-server --experimental-strip-types src/lib/scoring/cli.ts",
-    "scoring:replay": "node --env-file=.env.local --conditions=react-server --experimental-strip-types src/lib/scoring/cli.ts replay"
+    "scoring:replay": "node --env-file=.env.local --conditions=react-server --experimental-strip-types src/lib/scoring/cli.ts replay",
+    "fantasy:simulate": "node --env-file=.env.local --conditions=react-server --experimental-strip-types src/lib/fantasy-engine/cli.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
