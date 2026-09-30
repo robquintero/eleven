@@ -55,7 +55,7 @@ function buildPitchItems(starters: LineupSlot[], pendingFills: Map<string, { pos
     for (let i = 0; i < empty[position]; i++) entries.push({ position, value: { kind: "empty", key: `empty-${position}-${i}` } });
   }
 
-  return layoutStartingXi(entries).map(({ position, value, x, y }): PitchItem => {
+  return layoutStartingXi(entries, formation).map(({ position, value, x, y }): PitchItem => {
     if (value.kind === "player") return { ...value.slot, x, y };
     if (value.kind === "pending") return { id: `pending-${value.playerId}`, position, x, y, player: value.player, locked: false };
     return { id: value.key, position, x, y } satisfies EmptyPitchSlot;
@@ -178,42 +178,33 @@ export function TeamWorkspace({
   }
 
   /**
-   * Queues a bench player against an empty slot's position, client-side
-   * only (an "editing" state, never itself a valid persisted lineup — see
-   * this component's own doc comment). Auto-commits the WHOLE queued
-   * batch the moment it would bring the team to exactly
-   * `FORMATION_RULES.startersTotal` (11) -- never before, since
-   * `updateLineup()` (via `fillEmptySlotsAction`) only ever accepts a
-   * complete, valid composition in one shot.
+   * Queues a bench player against an empty slot's position, purely
+   * client-side (an "editing" state, never itself a valid persisted
+   * lineup) — Pass 10.5C.1: this used to ALSO auto-save the instant the
+   * queued count reached 11, which raced against the separate "Done"
+   * button's own unconditional discard of `pendingFills`. If the save
+   * hadn't resolved (or hadn't even been triggered on the exact slot the
+   * manager perceived as "last"), clicking Done wiped the in-progress XI
+   * with nothing ever persisted. There is now exactly ONE persistence
+   * point for manually-built fills: `handleDoneOrEdit` below, triggered
+   * only by the explicit Done action.
    */
-  async function queueFill(player: Player, position: PlayerPosition) {
-    const next = new Map(pendingFills);
-    next.set(player.id, { position, player });
+  function queueFill(player: Player, position: PlayerPosition) {
+    setPendingFills((prev) => {
+      const next = new Map(prev);
+      next.set(player.id, { position, player });
+      return next;
+    });
     setSelected(null);
     setError(null);
-
-    if (squad.starters.length + next.size >= FORMATION_RULES.startersTotal) {
-      if (!fantasyTeamId || pending) return;
-      setPending(true);
-      const fills = Array.from(next.entries()).map(([playerId, v]) => ({ playerId, position: v.position }));
-      const result = await fillEmptySlotsAction(leagueId, fantasyTeamId, fills);
-      setPending(false);
-      if (result?.error) {
-        setError(result.error);
-        setPendingFills(next);
-      } else {
-        setPendingFills(new Map());
-        router.refresh();
-      }
-    } else {
-      setPendingFills(next);
-    }
   }
 
   function unqueueFill(playerId: string) {
-    const next = new Map(pendingFills);
-    next.delete(playerId);
-    setPendingFills(next);
+    setPendingFills((prev) => {
+      const next = new Map(prev);
+      next.delete(playerId);
+      return next;
+    });
   }
 
   function handleSelectStarter(slot: LineupSlot) {
@@ -274,11 +265,53 @@ export function TeamWorkspace({
     setSelected(selected?.side === "bench" && selected.player.id === player.id ? null : { side: "bench", player });
   }
 
-  function toggleEditing() {
-    setEditing((prev) => !prev);
-    setSelected(null);
-    setPendingFills(new Map());
+  /**
+   * The ONE authoritative persistence point for manually-built empty-slot
+   * fills (Pass 10.5C.1 — see `queueFill`'s own comment for what this
+   * replaces). Entering edit mode is unconditional and always starts
+   * clean. Exiting it (Done):
+   *   - with no pending fills queued, just exits — nothing to save.
+   *   - with pending fills queued, attempts to save them FIRST, through
+   *     the same `fillEmptySlotsAction` → `updateLineup()` path as
+   *     before; `updateLineup`'s own "exactly 11, valid formation, no
+   *     locked slot" validation is untouched and remains fully
+   *     authoritative. Only on success does this clear the pending state
+   *     and actually exit edit mode. On failure (including a genuinely
+   *     incomplete XI — never exactly 11 — which `updateLineup` itself
+   *     correctly rejects), edit mode and every queued selection stay
+   *     exactly as they were, with the existing error treatment shown —
+   *     never a silent discard.
+   */
+  async function handleDoneOrEdit() {
+    if (!editing) {
+      setEditing(true);
+      setSelected(null);
+      setPendingFills(new Map());
+      setError(null);
+      return;
+    }
+
+    if (pendingFills.size === 0) {
+      setEditing(false);
+      setSelected(null);
+      setError(null);
+      return;
+    }
+
+    if (!fantasyTeamId || pending) return;
+    setPending(true);
     setError(null);
+    const fills = Array.from(pendingFills.entries()).map(([playerId, v]) => ({ playerId, position: v.position }));
+    const result = await fillEmptySlotsAction(leagueId, fantasyTeamId, fills);
+    setPending(false);
+    if (result?.error) {
+      setError(result.error);
+      return;
+    }
+    setPendingFills(new Map());
+    setSelected(null);
+    setEditing(false);
+    router.refresh();
   }
 
   return (
@@ -288,18 +321,19 @@ export function TeamWorkspace({
           <p className="text-xs text-foreground-tertiary">
             {editing
               ? pendingFills.size > 0
-                ? `Building lineup — ${totalAssigned} / ${FORMATION_RULES.startersTotal} selected.`
+                ? `Building lineup — ${totalAssigned} / ${FORMATION_RULES.startersTotal} selected. Click Done to save.`
                 : "Select a starter, then a bench player (or vice versa) to swap them — or select an empty slot to fill it from the bench."
               : "Selecting a footballer opens their record."}
           </p>
           <Button
             variant={editing ? "outline" : "default"}
             className="rounded-control"
-            onClick={toggleEditing}
+            onClick={handleDoneOrEdit}
+            disabled={pending}
           >
             {editing ? (
               <>
-                <X className="mr-1.5 size-3.5" strokeWidth={2} /> Done
+                <X className="mr-1.5 size-3.5" strokeWidth={2} /> {pending ? "Saving…" : "Done"}
               </>
             ) : (
               <>

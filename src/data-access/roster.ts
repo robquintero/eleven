@@ -131,7 +131,18 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
   const counts: Partial<Record<PlayerPosition, number>> = {};
   for (const s of starterEntries) counts[s.player.position] = (counts[s.player.position] ?? 0) + 1;
 
-  const laidOut = layoutStartingXi(starterEntries.map((s) => ({ position: s.player.position, value: s })));
+  // Computed once, reused both for the friendly formation label AND
+  // (Pass 10.5C.1) to pick realistic, formation-specific pitch
+  // coordinates instead of a generic evenly-spaced grid — `undefined`
+  // when the counts don't match one of the 5 named shapes (e.g. reached
+  // only through individual manual swaps), in which case layout falls
+  // back to the original even spread.
+  const namedFormation = namedFormationForCounts({ DEF: counts.DEF ?? 0, MID: counts.MID ?? 0, FWD: counts.FWD ?? 0 });
+
+  const laidOut = layoutStartingXi(
+    starterEntries.map((s) => ({ position: s.player.position, value: s })),
+    namedFormation ?? undefined
+  );
 
   const starters = laidOut.map(({ value, x, y }) => ({
     id: value.rosterEntryId,
@@ -150,10 +161,7 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
     // — true whether that XI was reached via the selector or a manual
     // swap. Falls back to the plain derived label for any other, less
     // common combination FORMATION_RULES still allows.
-    formation:
-      starterEntries.length > 0
-        ? (namedFormationForCounts({ DEF: counts.DEF ?? 0, MID: counts.MID ?? 0, FWD: counts.FWD ?? 0 }) ?? deriveFormationLabel(counts))
-        : "—",
+    formation: starterEntries.length > 0 ? (namedFormation ?? deriveFormationLabel(counts)) : "—",
     starters,
     bench,
   };
