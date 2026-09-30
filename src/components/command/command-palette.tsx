@@ -9,7 +9,6 @@ import { primaryNav } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 const actions = [
-  { id: "draft-room", label: "Draft Room" },
   { id: "waivers", label: "Waivers" },
   { id: "propose-trade", label: "Propose Trade" },
   { id: "transactions", label: "Transactions" },
