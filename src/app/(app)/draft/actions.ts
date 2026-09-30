@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
-import { openNextRound } from "@/lib/fantasy-engine/rounds";
+import { ensureFirstRoundOpened } from "@/lib/fantasy-engine/rounds";
 import { toDraftActionError } from "@/lib/errors/draft-action-error";
 import { DRAFT_ACTION_ERROR_COPY } from "@/lib/errors/draft-action-error-copy";
 import { getPlayerDatabase, type PlayerDatabasePage } from "@/data-access/players";
@@ -35,26 +35,16 @@ async function maybeOpenFirstRound(draftId: string): Promise<void> {
   if (!isSupabaseAdminConfigured()) return;
   const admin = createAdminClient();
 
-  const { data: draft } = await admin.from("drafts").select("league_id, status").eq("id", draftId).maybeSingle();
-  if (!draft || draft.status !== "completed") return;
+  const { data: draft } = await admin.from("drafts").select("league_id").eq("id", draftId).maybeSingle();
+  if (!draft) return;
 
-  const { data: existingRound } = await admin
-    .from("fantasy_rounds")
-    .select("id")
-    .eq("league_id", draft.league_id)
-    .limit(1)
-    .maybeSingle();
-  if (existingRound) return;
-
-  try {
-    await openNextRound(admin, draft.league_id, new Date());
-  } catch {
-    // Never fail the pick/draft-completion response over this -- opening
-    // round 1 is a best-effort follow-up, not part of the pick's own
-    // success/failure. A commissioner can still be unblocked later (e.g.
-    // once eligible fixture data exists) without needing to redo anything
-    // here.
-  }
+  // Best-effort from here (Pass 10.5C): `ensureFirstRoundOpened` itself
+  // never throws -- it logs and returns. This used to be the ONLY attempt
+  // at opening round 1, with no way to recover if it silently failed; the
+  // exact same check now also runs from the Team page's own read path, so
+  // a transient failure here self-heals the next time anyone looks at
+  // their squad instead of leaving it permanently bench-only.
+  await ensureFirstRoundOpened(admin, draft.league_id);
 }
 
 export async function startDraftAction(leagueId: string): Promise<DraftActionState> {
@@ -85,18 +75,25 @@ export async function submitDraftPickAction(draftId: string, playerId: string): 
 
 /**
  * Powers the Draft workspace's live player search — real, server-side
- * filtered/paginated free-agent players in this specific league (never a
- * full fetch filtered in the browser, same convention as the Players
- * workspace). `ownership: "free"` + `activeLeagueId` together are exactly
- * "unowned in this league" — the same real `league_player_ownership`
- * check the draft's own `make_draft_pick` RPC enforces server-side.
+ * filtered/paginated players in this specific league (never a full fetch
+ * filtered in the browser, same convention as the Players workspace).
+ *
+ * Pass 10.5C: deliberately does NOT filter by `ownership: "free"` anymore
+ * -- a drafted player must stay visible on the board (for draft
+ * context/history) rather than silently vanishing from whatever page the
+ * manager was looking at, so `activeLeagueId` alone is passed, which
+ * annotates every returned player's real `ownership` ("mine"/"owned"/
+ * "free") without excluding any of them. `draft-workspace.tsx` renders
+ * anything not "free" as dimmed/crossed-out and non-interactive -- the
+ * `make_draft_pick` RPC's own `league_player_ownership` check remains the
+ * actual authority either way, this is purely presentational.
  */
 export async function getAvailablePlayersAction(
   leagueId: string,
   query: string,
   position?: PlayerPosition
 ): Promise<PlayerDatabasePage> {
-  return getPlayerDatabase({ activeLeagueId: leagueId, ownership: "free", query, position, pageSize: 30 });
+  return getPlayerDatabase({ activeLeagueId: leagueId, query, position, pageSize: 30 });
 }
 
 /**

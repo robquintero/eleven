@@ -139,3 +139,27 @@ export function computeFormationChange(
 
   return { ok: true, changes };
 }
+
+/**
+ * How many EMPTY starting-XI slots remain per position to reach
+ * `formation`'s full 11-player shape, given how many are already filled
+ * at each position (real starters, and/or locally-queued-but-unsaved
+ * fills — the caller decides what counts as "filled") — Pass 10.5C. Never
+ * negative: a position already at or past its target simply has 0 empty
+ * slots, it's never treated as "over capacity" here (that's a completely
+ * different, already-handled case — see `computeFormationChange`'s own
+ * max-exceeded check for actual persisted lineup changes). Pure, and
+ * deliberately agnostic to pitch layout/coordinates — this only answers
+ * "how many, of which position," not "where."
+ */
+export function emptySlotCounts(
+  filledCounts: Partial<Record<PlayerPosition, number>>,
+  formation: FormationName
+): Record<PlayerPosition, number> {
+  const target = formationTargetCounts(formation);
+  const result = {} as Record<PlayerPosition, number>;
+  for (const position of POSITIONS) {
+    result[position] = Math.max(0, target[position] - (filledCounts[position] ?? 0));
+  }
+  return result;
+}

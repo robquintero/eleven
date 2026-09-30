@@ -7,6 +7,7 @@ import {
   canRosterSupplyFormation,
   namedFormationForCounts,
   computeFormationChange,
+  emptySlotCounts,
   type FormationRosterPlayer,
 } from "./formations.ts";
 
@@ -131,4 +132,44 @@ test("computeFormationChange: no-op when the roster is already in the target for
   const result = computeFormationChange(roster, "4-4-2");
   assert.equal(result.ok, true);
   if (result.ok) assert.deepEqual(result.changes, []);
+});
+
+// ---------------------------------------------------------------------
+// Pass 10.5C: the formation selector must stay usable with an incomplete
+// or completely empty starting XI, feasibility must always be judged
+// against the manager's FULL roster (not merely whoever's currently
+// starting), and the pitch must show exactly the missing slots so a
+// manager can fill them manually from the bench.
+// ---------------------------------------------------------------------
+
+test("emptySlotCounts: a completely empty XI (0 filled anywhere) needs the formation's full shape", () => {
+  assert.deepEqual(emptySlotCounts({}, "4-4-2"), { GK: 1, DEF: 4, MID: 4, FWD: 2 });
+});
+
+test("emptySlotCounts: a partially-filled XI only reports the shortfall per position", () => {
+  assert.deepEqual(emptySlotCounts({ GK: 1, DEF: 2, MID: 4, FWD: 0 }, "4-4-2"), { GK: 0, DEF: 2, MID: 0, FWD: 2 });
+});
+
+test("emptySlotCounts never goes negative when a position already meets or exceeds the target", () => {
+  assert.deepEqual(emptySlotCounts({ GK: 1, DEF: 6, MID: 4, FWD: 2 }, "4-4-2"), { GK: 0, DEF: 0, MID: 0, FWD: 0 });
+});
+
+test("formation feasibility with a completely empty starting XI is judged from the roster's full 16-player composition, not the (empty) starting XI", () => {
+  // 0 starters, but the roster (bench) has enough of everything for 4-3-3.
+  const fullRosterCounts = { GK: 2, DEF: 4, MID: 3, FWD: 3 };
+  assert.equal(canRosterSupplyFormation(fullRosterCounts, "4-3-3"), true);
+  // The same roster genuinely cannot supply 3-4-3 (needs 3 FWD... it has 3, but only 3 DEF, needs at least 3 -- has exactly 3, so let's use one that's truly infeasible):
+  assert.equal(canRosterSupplyFormation(fullRosterCounts, "4-2-3-1"), false, "needs 5 MID, roster only has 3");
+});
+
+test("all five supported formations remain individually assessable even when every roster player is on the bench -- none silently unavailable due to 0 starters", () => {
+  const fullRoster16 = { GK: 2, DEF: 5, MID: 5, FWD: 4 };
+  const feasibility = Object.fromEntries(SUPPORTED_FORMATIONS.map((f) => [f, canRosterSupplyFormation(fullRoster16, f)]));
+  assert.deepEqual(feasibility, {
+    "4-4-2": true,
+    "4-3-3": true,
+    "4-2-3-1": true,
+    "3-5-2": true,
+    "3-4-3": true,
+  });
 });

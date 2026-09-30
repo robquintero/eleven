@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { Ban } from "lucide-react";
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { RailModule } from "@/components/ui/rail-module";
@@ -174,7 +175,7 @@ export function DraftWorkspace({
       <section>
         <ModuleHeader
           title="AVAILABLE_PLAYERS"
-          meta={`${availablePlayers.total} FREE`}
+          meta={`${availablePlayers.total} PLAYERS`}
         />
         <div className="mt-2 flex items-center gap-2 border border-border px-2.5 py-1.5">
           <input
@@ -211,40 +212,70 @@ export function DraftWorkspace({
           {availablePlayers.players.length === 0 ? (
             <p className="p-4 text-center text-sm text-foreground-tertiary">NO AVAILABLE PLAYERS MATCH</p>
           ) : (
-            availablePlayers.players.map((player) => (
-              <div key={player.id} className="flex items-center gap-3 px-3 py-2">
-                <span className="label-system w-9 shrink-0 rounded-md bg-muted py-1 text-center text-[11px] font-semibold text-foreground-secondary">
-                  {player.position}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSelected(player);
-                    setInspectorOpen(true);
-                  }}
-                  className="min-w-0 flex-1 text-left"
+            availablePlayers.players.map((player) => {
+              // Pass 10.5C: a drafted player stays on the board (context/
+              // history), never disappears -- dimmed + struck-through +
+              // an explicit textual DRAFTED/YOUR PICK state, never
+              // interactive as a pick, and never relying on color alone
+              // (the strike-through + Ban icon + text all carry the same
+              // meaning independently). `ownership` reflects the real,
+              // authoritative `league_player_ownership` state (Pass
+              // 10.5B's getPlayerDatabase), so this updates correctly the
+              // moment polling refreshes it -- for a pick made by this
+              // manager (isMyTurn's own team) or by any other manager.
+              const isDrafted = player.ownership != null && player.ownership !== "free";
+              return (
+                <div
+                  key={player.id}
+                  className={`flex items-center gap-3 px-3 py-2 ${isDrafted ? "opacity-50" : ""}`}
                 >
-                  <p className="truncate text-sm font-medium text-foreground">{player.name}</p>
-                  <p className="label-system truncate text-[11px] text-foreground-tertiary">
-                    {player.club.shortName}
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  disabled={!draft.isMyTurn || pending !== null || !legalPositions.has(player.position)}
-                  onClick={() => handleDraft(player.id)}
-                  className="label-system flex shrink-0 items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  {pending === player.id && (
+                  <span className="label-system w-9 shrink-0 rounded-md bg-muted py-1 text-center text-[11px] font-semibold text-foreground-secondary">
+                    {player.position}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelected(player);
+                      setInspectorOpen(true);
+                    }}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <p
+                      className={`truncate text-sm font-medium text-foreground ${isDrafted ? "line-through decoration-2 decoration-foreground-tertiary" : ""}`}
+                    >
+                      {player.name}
+                    </p>
+                    <p className="label-system truncate text-[11px] text-foreground-tertiary">
+                      {player.club.shortName}
+                    </p>
+                  </button>
+                  {isDrafted ? (
                     <span
-                      aria-hidden="true"
-                      className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent"
-                    />
+                      className="label-system flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground-tertiary"
+                      aria-label={player.ownership === "mine" ? "Already on your roster" : "Already drafted by another team"}
+                    >
+                      <Ban className="size-3" strokeWidth={2} aria-hidden="true" />
+                      {player.ownership === "mine" ? "YOUR PICK" : "DRAFTED"}
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={!draft.isMyTurn || pending !== null || !legalPositions.has(player.position)}
+                      onClick={() => handleDraft(player.id)}
+                      className="label-system flex shrink-0 items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {pending === player.id && (
+                        <span
+                          aria-hidden="true"
+                          className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+                        />
+                      )}
+                      {pending === player.id ? "PROCESSING PICK" : "DRAFT"}
+                    </button>
                   )}
-                  {pending === player.id ? "PROCESSING PICK" : "DRAFT"}
-                </button>
-              </div>
-            ))
+                </div>
+              );
+            })
           )}
         </div>
         {error && <p className="mt-2 text-xs text-destructive">{error}</p>}

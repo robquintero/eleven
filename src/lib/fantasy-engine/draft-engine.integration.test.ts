@@ -23,7 +23,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient, isSupabaseAdminConfigured } from "../supabase/admin.ts";
-import { openNextRound, refreshMatchupScores, finalizeRoundIfReady } from "./rounds.ts";
+import { openNextRound, refreshMatchupScores, finalizeRoundIfReady, ensureFirstRoundOpened } from "./rounds.ts";
 import { updateLineup } from "./lineup.ts";
 import { isRosterCompositionValid, type RosterCounts } from "../../domain/fantasy/roster-rules.ts";
 import type { Database } from "../supabase/database.types.ts";
@@ -602,6 +602,177 @@ test("a full 2-manager auto-drafted simulation: both teams end with legal 16-pla
     for (const s of scores!) {
       assert.ok(Number.isFinite(s.live_points) && s.live_points >= 0, `team ${s.fantasy_team_id}'s live_points must be a sane non-negative number, got ${s.live_points}`);
     }
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+// ---------------------------------------------------------------------
+// Pass 10.5C: the "all 16 players stuck on the bench" regression fix.
+// `ensureFirstRoundOpened` is the self-healing check that now runs both
+// right after the pick that completes a draft AND from the Team page's
+// own read path -- these tests exercise it directly (the same function
+// both call), proving it reliably produces the auto-generated 11/5 split
+// even when called well after the draft completed, with no round having
+// been opened yet by anything else.
+// ---------------------------------------------------------------------
+
+test("ensureFirstRoundOpened: a completed draft with no round yet self-heals into a real round with the auto-generated 11/5 split", { skip }, async () => {
+  const admin = createAdminClient();
+  const managers = 2;
+  const squadSize = 16;
+  const league = await createTestLeague(admin, managers, squadSize);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    await draftToCompletion(admin, draftId, managers, squadSize);
+
+    // Deliberately never call openNextRound/maybeOpenFirstRound at all --
+    // this simulates the exact regression (draft completed, round-1
+    // never got opened for whatever reason) and proves the self-heal
+    // recovers it on its own, using the real current clock exactly like
+    // the Team page's own call does.
+    const { data: roundBefore } = await admin.from("fantasy_rounds").select("id").eq("league_id", league.leagueId).maybeSingle();
+    assert.equal(roundBefore, null, "test setup: no round should exist yet");
+
+    await ensureFirstRoundOpened(admin, league.leagueId);
+
+    const { data: roundAfter } = await admin.from("fantasy_rounds").select("id").eq("league_id", league.leagueId).maybeSingle();
+    assert.ok(roundAfter, "ensureFirstRoundOpened must create round 1");
+
+    for (const teamId of league.teamIds) {
+      const { data: roster } = await admin.from("roster_entries").select("id").eq("fantasy_team_id", teamId).eq("status", "active");
+      const rosterIds = (roster ?? []).map((r) => r.id);
+      const slotsResult: { data: { starter: boolean }[] | null } = await admin
+        .from("lineup_slots")
+        .select("starter")
+        .eq("fantasy_round_id", roundAfter!.id)
+        .in("roster_entry_id", rosterIds);
+      const slots = slotsResult.data;
+      const starters = (slots ?? []).filter((s) => s.starter).length;
+      const bench = (slots ?? []).filter((s) => !s.starter).length;
+      assert.equal(starters, 11, `team ${teamId} must have exactly 11 starters after self-heal, not stuck all-bench`);
+      assert.equal(bench, 5, `team ${teamId} must have exactly 5 bench players after self-heal`);
+    }
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("ensureFirstRoundOpened is a safe no-op once a round already exists -- never creates a second one", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    await draftToCompletion(admin, draftId, 2, 16);
+
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    assert.ok(openResult.ok);
+
+    await ensureFirstRoundOpened(admin, league.leagueId);
+
+    const { data: rounds } = await admin.from("fantasy_rounds").select("id").eq("league_id", league.leagueId);
+    assert.equal(rounds!.length, 1, "calling ensureFirstRoundOpened again must not create a duplicate round");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+// ---------------------------------------------------------------------
+// Pass 10.5C: manual empty-slot recovery. `fillEmptySlotsAction` itself
+// is a thin Server Action wrapper (ownership check, then a batch of pure
+// promotions through the SAME updateLineup() primitive already exercised
+// above) that can't be called directly outside a real Next.js request
+// (it isn't -- only revalidatePath needs that, updateLineup doesn't), so
+// these exercise updateLineup() directly with the exact shape
+// fillEmptySlotsAction constructs, proving the underlying persistence
+// layer that action delegates to behaves correctly for this new flow.
+// ---------------------------------------------------------------------
+
+test("updateLineup: promoting bench players to fill every empty slot (building an XI from scratch) succeeds and reaches exactly 11/5", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    await draftToCompletion(admin, draftId, 2, 16);
+
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    assert.ok(openResult.ok);
+    if (!openResult.ok) return;
+
+    const teamId = league.teamIds[0];
+    // Simulate the all-bench regression for this one team specifically --
+    // directly, via a raw update, deliberately bypassing updateLineup()
+    // itself. This is the correct way to set it up: updateLineup() always
+    // requires the RESULTING count to be exactly 11, so it can never be
+    // used to reach 0 (that would itself violate the very invariant this
+    // test exists to prove) -- the real bug's all-bench state arises from
+    // createRoundLineupSlots's own raw upsert, which isn't bound by that
+    // rule either, exactly like this.
+    const { data: roster } = await admin.from("roster_entries").select("id, players(position)").eq("fantasy_team_id", teamId).eq("status", "active");
+    const rosterIds = roster!.map((r) => r.id);
+    await admin.from("lineup_slots").update({ starter: false, slot: "BENCH" }).eq("fantasy_round_id", openResult.roundId).in("roster_entry_id", rosterIds);
+
+    const { data: allBench } = await admin.from("lineup_slots").select("starter").eq("fantasy_round_id", openResult.roundId).in("roster_entry_id", rosterIds);
+    assert.equal((allBench ?? []).filter((s) => s.starter).length, 0, "test setup: team must now have 0 starters, all 16 on the bench");
+
+    // Manually build a legal 4-4-2 from scratch: 1 GK, 4 DEF, 4 MID, 2 FWD.
+    const byPosition: Record<string, string[]> = { GK: [], DEF: [], MID: [], FWD: [] };
+    for (const r of roster!) byPosition[(r.players as { position: string }).position].push(r.id);
+    const fills = [
+      ...byPosition.GK.slice(0, 1).map((id) => ({ rosterEntryId: id, starter: true as const, position: "GK" as const })),
+      ...byPosition.DEF.slice(0, 4).map((id) => ({ rosterEntryId: id, starter: true as const, position: "DEF" as const })),
+      ...byPosition.MID.slice(0, 4).map((id) => ({ rosterEntryId: id, starter: true as const, position: "MID" as const })),
+      ...byPosition.FWD.slice(0, 2).map((id) => ({ rosterEntryId: id, starter: true as const, position: "FWD" as const })),
+    ];
+    assert.equal(fills.length, 11, "test setup: exactly 11 fills queued, matching 4-4-2");
+
+    const fillResult = await updateLineup(admin, teamId, openResult.roundId, fills, new Date("2026-09-08T00:00:00Z"));
+    assert.deepEqual(fillResult, { ok: true });
+
+    const { data: finalSlots } = await admin.from("lineup_slots").select("starter").eq("fantasy_round_id", openResult.roundId).in("roster_entry_id", rosterIds);
+    assert.equal((finalSlots ?? []).filter((s) => s.starter).length, 11, "exactly 11 starters after filling every empty slot");
+    assert.equal((finalSlots ?? []).filter((s) => !s.starter).length, 5, "exactly 5 bench remain");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("updateLineup: an incomplete fill (fewer than 11) is rejected -- an in-progress editing state is never itself a valid persisted lineup", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    await draftToCompletion(admin, draftId, 2, 16);
+
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    assert.ok(openResult.ok);
+    if (!openResult.ok) return;
+
+    const teamId = league.teamIds[0];
+    const { data: roster } = await admin.from("roster_entries").select("id, players(position)").eq("fantasy_team_id", teamId).eq("status", "active");
+    const rosterIds = roster!.map((r) => r.id);
+    // Same raw-bypass setup as the test above -- see its comment for why
+    // updateLineup() itself can never be used to reach 0 starters.
+    await admin.from("lineup_slots").update({ starter: false, slot: "BENCH" }).eq("fantasy_round_id", openResult.roundId).in("roster_entry_id", rosterIds);
+
+    const byPosition: Record<string, string[]> = { GK: [], DEF: [], MID: [], FWD: [] };
+    for (const r of roster!) byPosition[(r.players as { position: string }).position].push(r.id);
+    // Only 5 of the 11 needed fills -- a genuine "still editing" state.
+    const partialFills = [
+      ...byPosition.GK.slice(0, 1).map((id) => ({ rosterEntryId: id, starter: true as const, position: "GK" as const })),
+      ...byPosition.DEF.slice(0, 4).map((id) => ({ rosterEntryId: id, starter: true as const, position: "DEF" as const })),
+    ];
+    assert.equal(partialFills.length, 5);
+
+    const result = await updateLineup(admin, teamId, openResult.roundId, partialFills, new Date("2026-09-08T00:00:00Z"));
+    assert.deepEqual(result, { ok: false, error: "INVALID_FORMATION" }, "5 starters is never a valid persisted lineup, even mid-edit");
+
+    const { data: stillBench } = await admin.from("lineup_slots").select("starter").eq("fantasy_round_id", openResult.roundId).in("roster_entry_id", rosterIds);
+    assert.equal((stillBench ?? []).filter((s) => s.starter).length, 0, "the rejected write must not have partially applied anything");
   } finally {
     await cleanupTestLeague(admin, league);
   }

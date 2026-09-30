@@ -109,6 +109,41 @@ export async function openNextRound(
   return { ok: true, roundId: roundRow.id, roundNumber, window };
 }
 
+/**
+ * Self-healing "open round 1 the moment this league's draft is complete"
+ * check (Pass 10.5C) — a completed draft with no round yet should never
+ * be a permanent, unrecoverable state. Originally this only ran once, as
+ * a best-effort side effect of the pick that completed the draft
+ * (`src/app/(app)/draft/actions.ts`'s old `maybeOpenFirstRound`, silently
+ * swallowing any failure so it could never break the pick's own
+ * response) — if that single attempt didn't succeed for any reason
+ * (a transient error, `openNextRound` itself returning `{ok:false}`,
+ * etc.), nothing ever retried it, leaving every roster stuck bench-only
+ * indefinitely (the "all 16 players on the bench" regression). Calling
+ * this from the Team page's own read path too means the very next time
+ * anyone looks at their squad, it gets a chance to self-heal — without
+ * touching `createRoundLineupSlots`/`chooseAutomaticStartingXi` at all,
+ * which were never the broken layer. Cheap to call unconditionally: both
+ * early-return checks make it a no-op in the overwhelmingly common case
+ * (a round already exists).
+ */
+export async function ensureFirstRoundOpened(admin: SupabaseClient<Database>, leagueId: string): Promise<void> {
+  const { data: draft } = await admin.from("drafts").select("status").eq("league_id", leagueId).maybeSingle();
+  if (!draft || draft.status !== "completed") return;
+
+  const { data: existingRound } = await admin.from("fantasy_rounds").select("id").eq("league_id", leagueId).limit(1).maybeSingle();
+  if (existingRound) return;
+
+  try {
+    const result = await openNextRound(admin, leagueId, new Date());
+    if (!result.ok) {
+      console.error(`ensureFirstRoundOpened: openNextRound failed for league ${leagueId}: ${result.error}`);
+    }
+  } catch (err) {
+    console.error(`ensureFirstRoundOpened: openNextRound threw for league ${leagueId}`, err);
+  }
+}
+
 interface StarterRow {
   fantasyTeamId: string;
   playerId: string;

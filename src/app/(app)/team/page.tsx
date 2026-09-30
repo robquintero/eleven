@@ -1,5 +1,6 @@
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { TeamWorkspace } from "@/components/team/team-workspace";
+import { ensureFirstRoundOpenedAction } from "@/app/(app)/team/actions";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getUserLeagues } from "@/data-access/leagues";
 import { getUserSquad } from "@/data-access/roster";
@@ -16,6 +17,11 @@ export default async function TeamPage() {
   const activeLeagueId = await getActiveLeagueId(leagues);
   const league = leagues.find((l) => l.id === activeLeagueId) ?? leagues[0];
   const team = await getUserTeamInLeague(league.id);
+
+  // Pass 10.5C: self-heals a completed draft whose round 1 never got
+  // opened (see ensureFirstRoundOpenedAction's own doc comment) --
+  // cheap no-op once a round already exists, which is true almost always.
+  if (team) await ensureFirstRoundOpenedAction(league.id);
 
   const squad: Squad = team
     ? await getUserSquad(league.id, team.id)

@@ -61,7 +61,9 @@ export default async function DraftPage() {
     );
   }
 
-  const initialPlayers = await getPlayerDatabase({ activeLeagueId: league.id, ownership: "free", pageSize: 30 });
+  // Pass 10.5C: no `ownership: "free"` filter -- drafted players stay on
+  // the board (dimmed/unavailable, see draft-workspace.tsx), never vanish.
+  const initialPlayers = await getPlayerDatabase({ activeLeagueId: league.id, pageSize: 30 });
 
   return <DraftPageClient leagueId={league.id} draft={draft} hasTeam={Boolean(team)} initialPlayers={initialPlayers} />;
 }
