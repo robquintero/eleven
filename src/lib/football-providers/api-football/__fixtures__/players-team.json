@@ -2,7 +2,7 @@
   "get": "players",
   "parameters": { "team": "50", "season": "2026" },
   "errors": [],
-  "results": 3,
+  "results": 4,
   "paging": { "current": 1, "total": 1 },
   "response": [
     {
@@ -15,6 +15,7 @@
       "statistics": [
         {
           "team": { "id": 50 },
+          "league": { "id": 39 },
           "games": { "position": "Attacker", "number": 9 }
         }
       ]
@@ -29,6 +30,7 @@
       "statistics": [
         {
           "team": { "id": 50 },
+          "league": { "id": 39 },
           "games": { "position": "Goalkeeper", "number": 31 }
         }
       ]
@@ -43,7 +45,33 @@
       "statistics": [
         {
           "team": { "id": 50 },
+          "league": { "id": 39 },
           "games": { "position": null, "number": null }
+        }
+      ]
+    },
+    {
+      "player": {
+        "id": 1496,
+        "name": "Raphinha",
+        "lastname": "Dias Belloli",
+        "nationality": "Brazil"
+      },
+      "statistics": [
+        {
+          "team": { "id": 50 },
+          "league": { "id": 556 },
+          "games": { "position": "Forward", "number": null }
+        },
+        {
+          "team": { "id": 50 },
+          "league": { "id": 2 },
+          "games": { "position": "Attacker", "number": 11 }
+        },
+        {
+          "team": { "id": 50 },
+          "league": { "id": 39 },
+          "games": { "position": "Attacker", "number": 11 }
         }
       ]
     }

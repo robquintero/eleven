@@ -63,6 +63,9 @@ export interface NormalizedFixture {
   status: FixtureStatus;
   /** Provider round name, e.g. "Regular Season - 5" or "League Stage - 1" — not persisted to `fixtures` (no schema column), used only to filter qualifying rounds out of a sync before anything is written. See `syncFixtures`'s `roundFilter` option. */
   round: string;
+  /** `undefined` before kickoff. Powers clean-sheet derivation at scoring time — see `fixtures.home_score`/`away_score`'s migration comment. */
+  homeScore?: number;
+  awayScore?: number;
 }
 
 /**

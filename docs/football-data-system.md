@@ -228,6 +228,104 @@ branch's commit history for the full detail:
   inventing a "real" abbreviation Eleven has no authority to assign.
   `clubs.short_name` (the UI-facing value) is untouched.
 
+## Player universe integrity (Pass 9 Phase 0)
+
+Pass 9 opened with a report that Raphinha (Barcelona) was missing from
+the populated Players database. Traced end-to-end rather than patched
+as a one-off:
+
+**Root cause.** API-Football's `/players` response gives a player ONE
+`statistics` entry PER COMPETITION they appeared in for a team, not one
+entry per team — Raphinha had three entries for Barcelona (Spanish Super
+Cup, Champions League, La Liga), all with the same `team.id` but
+different `league.id`/`games.position`. `normalizePlayer` picked
+whichever entry matched `team.id` first, with no regard for which
+competition the caller actually wanted or whether that entry's position
+was even recognized. His Super Cup entry sorted first and reported
+`position: "Forward"` — a real, valid label `POSITION_MAP` simply didn't
+have (only `"Attacker"` was mapped) — so he was silently folded into the
+generic "skipped" count with no distinct failure signal at all.
+
+**Fix** (`adapter.ts`'s `normalizePlayer`, `ApiFootballPlayerItem`'s
+`statistics[].league.id` field, `POSITION_MAP`): select a statistics
+entry by preference — exact competition being synced, then any entry for
+the club with a recognized position, then any entry for the club, never a
+different club's entry. `"Forward"` is now a recognized synonym for
+`"Attacker"`. `sync-players.ts` also now logs *which* player was skipped
+and why, instead of a silent count.
+
+**Blast radius, measured empirically** (not estimated): re-running
+`players` sync for all ~96 Big Five clubs with the fix recovered exactly
+**5 players** system-wide (Raphinha at Barcelona, plus one each at
+Arsenal, Man Utd, Atlético Madrid, and Lens). Re-running the fixture-stats
+backfill then recovered **25 previously-skipped `player_match_stats`
+rows** for those same players — which fully re-explains the "28 domestic
+stat participants skipped" figure from the original population report.
+That report's guess ("players no longer on any current squad") was
+**wrong**; the real cause was this defect. Only 3 stat-skip cases remain
+genuinely unresolvable (see below).
+
+**Remaining 3 unresolvable players are a real provider data gap, not a
+bug**: T. Tuterov (Sunderland), José Ángel (Espanyol), Rafa Fernández
+(Osasuna) — every statistics entry for their club reports `position:
+null` (the provider has no position on file for them at all, in any
+competition). Correctly skipped, not fabricated.
+
+**Sanity check**: the provider's own `/players/topscorers` endpoint (an
+independent, provider-sourced "who's prominent" signal — never a
+hardcoded name list) for all five Big Five leagues, 8 players each = 40
+total, all resolve correctly in Eleven with matching club and position,
+including confirming Bayern München (`BAY`) vs Bayer Leverkusen
+(`BAY168`) stay correctly distinct.
+
+**Reusable audit tooling** (`src/lib/football-ingestion/audit.ts`, `npm
+run football:sync -- audit` / `audit-squad`): `audit` is a zero-provider-
+request database-integrity report (player counts by competition,
+duplicate-identity check, provider-mapping-count consistency, recent skip
+reasons) — safe to run anytime, as often as useful, to answer "is
+Eleven's current draftable Big Five player universe internally
+consistent?" without hunting for famous players by hand. `audit-squad
+--code X --club Y` costs one real request and does the deeper "does
+Eleven's squad for this club match the provider's right now" comparison,
+for spot-checking a specific club on demand — deliberately not run
+automatically for all ~96 clubs every time (that's a bulk operation, not
+a routine health check).
+
+**Historical identity vs. current eligibility.** The schema already
+represents this distinction — `players.active` (default `true`) exists
+for exactly this — and `getPlayerDatabase()` already filters
+`active = true` for the draftable view. What doesn't exist yet is the
+*other side*: nothing currently flips a departed player to `active =
+false` when they drop off every Big Five club's current squad (Big Five
+membership is compared, and a squad refresh only ever creates/updates
+players present in the current response — it never notices a player's
+absence). No schema change is needed to represent this; a future
+reconciliation pass would compare "who was on this club's roster" against
+"who the provider returns now" and deactivate the difference. Deliberately
+not built in Pass 9 (out of scope — squad-departure detection is adjacent
+to roster-management concerns, not scoring/live-sync foundation) but the
+column is already there and already respected by every read.
+
+## Club naming / search UX (Pass 9)
+
+Three deliberately distinct concepts (`src/lib/club-display.ts`'s module
+doc comment): `club.id` (canonical identity), `club.name` (full
+human-readable name), `club.shortName` (compact operational abbreviation
+— never canonical, never guaranteed unique: see the Bayern/Leverkusen
+collision above). The Players club filter previously showed only
+`shortName` — genuinely ambiguous, since Bayern München and Bayer
+Leverkusen both display `"BAY"`. Fixed: `getClubFilters()` now returns
+`name` too, and the filter/search surfaces display `clubDisplayLabel()`
+("Bayern München · BAY") as the primary, always-unambiguous label — dense
+surfaces (the player table's CLUB column, fixture strips) are untouched
+and keep the bare abbreviation, which is correct there.
+`getPlayerDatabase()`'s search now also matches a player's club by full
+name or abbreviation (`"Barcelona"` and `"BAR"` both surface Barcelona's
+players), resolved via a separate club-id lookup rather than an
+embedded-relation `.or()` filter (not reliably supported across a
+PostgREST join). `matchesClubQuery()`/`clubDisplayLabel()` are pure and
+unit-tested, including the Bayern/Leverkusen case explicitly.
+
 ## Idempotency
 
 Running any `sync-*` command twice must never duplicate a row. Mechanisms,
@@ -423,3 +521,89 @@ tested, consistent with this codebase's existing convention that
 Supabase-touching `data-access`/write code is exercised manually rather
 than mocked — see the Pass 8 final report's "Controlled live validation"
 section for what was actually run against the real project.
+
+## Fantasy scoring (Pass 9)
+
+`player_match_stats` now feeds a real, versioned scoring engine —
+`src/domain/fantasy/scoring.ts` (`ELEVEN_STANDARD_V1`) — with results
+persisted to `fantasy_player_scores` via `src/lib/scoring/backfill.ts`
+(`npm run scoring:backfill`). See `docs/scoring-model.md` for the full
+field-coverage audit, empirical calibration, and backfill results.
+
+## Live sync foundation (Pass 9, Phase 6)
+
+Scoring a completed season is a one-time backfill; keeping scores current
+during a LIVE matchday needs a different shape — centralized, fixture-aware,
+quota-conscious, and safe to invoke as often as needed. Three new pieces:
+
+1. **`src/domain/football/sync-cadence.ts`** — a pure function,
+   `determineFixtureSyncCadence(fixture, now)`, deciding whether ONE stored
+   fixture needs a fresh sync right now. `now` is always an explicit
+   argument (never `Date.now()`/`new Date()` read internally), per the
+   brief's clock-abstraction rule — production passes the real clock,
+   tests pass a fixed instant (see `sync-cadence.test.ts`). It has no
+   internal loop or timer; "every 10 minutes while live" is a property of
+   how often something calls it, not of anything in the function itself —
+   that's what makes the interval configurable (10min → 5min → 2min → 1min)
+   without a redesign: change the one `LIVE_INTERVAL_MINUTES` constant, or
+   the caller's invocation frequency, never the decision logic.
+
+2. **`src/lib/football-ingestion/live-sync.ts`** — `runLiveSyncTick(admin,
+   now?)`, ONE bounded pass: reads every stored fixture that isn't
+   provably settled forever, runs each through the cadence function,
+   syncs only the competitions/fixtures that actually need it (via the
+   existing `syncFixtures`/`syncFixtureStats`), and recomputes
+   `fantasy_player_scores` for exactly the fixtures touched (via
+   `backfillScores({ fixtureIds })` — the same engine as the historical
+   backfill, never a separate "live" scoring path). On a day with nothing
+   live or near kickoff, this costs **zero** provider requests — confirmed
+   live: `npm run football:sync -- live-tick` against the real database on
+   2026-09-29 considered 2,058 stored fixtures, found 0 needing sync (the
+   soonest scheduled fixture was 10 days out), and made 0 provider
+   requests. This is the "do NOT blindly poll every competition every 10
+   min 24/7" requirement holding in practice, not just in design.
+
+3. **`src/app/api/cron/football-live-tick/route.ts`** — the production-safe
+   HTTP job entry point a deployed cron would call, wrapping the identical
+   `runLiveSyncTick`. Fails closed: refuses to run unless `CRON_SECRET` is
+   set AND the request's `Authorization: Bearer <secret>` header matches —
+   an unauthenticated version would let anyone trigger provider requests
+   against Eleven's quota on demand. This route is explicitly exempted
+   (and ONLY this route — see `no-provider-imports-in-app.test.ts`'s
+   narrow-exemption test) from the "no application code imports the
+   ingestion layer" architecture guard, because it isn't reachable by any
+   page load — it's the job entry point itself.
+
+### Live sync — activating the cron (the exact remaining step)
+
+Nothing calls `/api/cron/football-live-tick` automatically yet. No
+`vercel.json` exists in this repo, and none was added this pass —
+per the brief ("do not silently create expensive polling... document the
+exact remaining step rather than inventing configuration"), activating it
+is a deliberate, separate decision:
+
+1. In the Vercel project's environment variables, set `CRON_SECRET` to a
+   generated random value (e.g. `openssl rand -hex 32`) for the Production
+   environment.
+2. Add a `vercel.json` at the repo root with a `crons` entry, e.g.:
+   ```json
+   { "crons": [{ "path": "/api/cron/football-live-tick", "schedule": "*/10 * * * *" }] }
+   ```
+   (Vercel Cron's minimum granularity is 1 minute on paid plans; start at
+   the brief's conservative 10-minute cadence and tighten later by editing
+   only this schedule string.)
+3. Redeploy. Vercel will then call the route on schedule with its own
+   cron-invocation auth; add that as a second accepted credential in the
+   route only if Vercel's own cron signing is preferred over the
+   hand-rolled `CRON_SECRET` bearer check — either is fine, not decided
+   here since no cron is active yet.
+
+### Sync observability
+
+`src/lib/football-ingestion/sync-health.ts` (`npm run football:sync --
+sync-health`, zero provider requests) answers the brief's observability
+questions from stored state alone: recent sync events (reusing
+`domain_events`, the same table `recordSyncEvent` already wrote every
+sync to — no new table), currently-live fixture count, the last scoring
+recomputation timestamp, and the total scored-row count. No dashboard —
+a structured JSON snapshot, per brief §Phase 6.

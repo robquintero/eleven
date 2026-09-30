@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-panel";
 import type { RecentMatchRow } from "@/data-access/players";
 import { getUsageTrend } from "@/lib/selectors/usage-trend";
+import { getFormWindows } from "@/lib/selectors/form-tracker";
 import { availabilityLabel, formatKickoff, formatKickoffTime } from "@/lib/team-fixture";
 import type { Player, PlayerOwnership } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
@@ -95,6 +96,7 @@ export function PlayerInspectorContent({
   const ownership = player.ownership;
   const stats = player.seasonStats;
   const usageTrend = recentMatches ? getUsageTrend(recentMatches) : undefined;
+  const formWindows = recentMatches ? getFormWindows(recentMatches) : undefined;
   const isFlagged = player.availability === "injured" || player.availability === "suspended";
   const isDoubtful = player.availability === "doubtful";
 
@@ -161,6 +163,8 @@ export function PlayerInspectorContent({
       <TerminalPanelSection>
         <p className="label-system text-[11px] text-foreground-tertiary">Season</p>
         <div className="mt-1">
+          <StatRow label="PTS" value={player.totalPoints ?? "—"} />
+          <StatRow label="PTS/APP" value={player.averagePoints ?? "—"} />
           <StatRow label="APP" value={stats ? stats.appearances : "—"} />
           <StatRow label="STARTS" value={stats ? stats.starts : "—"} />
           <StatRow label="MIN" value={stats ? stats.minutes : "—"} />
@@ -169,6 +173,21 @@ export function PlayerInspectorContent({
           {stats?.cleanSheets !== undefined && <StatRow label="CS" value={stats.cleanSheets} />}
           {stats?.saves !== undefined && <StatRow label="SAVES" value={stats.saves} />}
         </div>
+      </TerminalPanelSection>
+
+      <TerminalPanelSection>
+        <p className="label-system text-[11px] text-foreground-tertiary">Form_tracker</p>
+        {recentMatches === undefined || recentMatches === null ? (
+          <p className="mt-2 text-xs text-foreground-tertiary">Loading…</p>
+        ) : !formWindows || (formWindows.last3 === null && formWindows.last5 === null && formWindows.last10 === null) ? (
+          <p className="mt-2 text-xs text-foreground-tertiary">INSUFFICIENT MATCH DATA</p>
+        ) : (
+          <div className="mt-1">
+            <StatRow label="LAST 3" value={formWindows.last3 ?? "INSUFFICIENT"} />
+            <StatRow label="LAST 5" value={formWindows.last5 ?? "INSUFFICIENT"} />
+            <StatRow label="LAST 10" value={formWindows.last10 ?? "INSUFFICIENT"} />
+          </div>
+        )}
       </TerminalPanelSection>
 
       <TerminalPanelSection>
@@ -193,8 +212,13 @@ export function PlayerInspectorContent({
                     {match.isHome ? "vs" : "@"} {match.opponent} ·{" "}
                     {formatKickoffTime(match.kickoffAt)}
                   </span>
-                  <span className="label-system text-[11px] text-foreground-secondary">
-                    {match.minutes}&apos; {match.started ? "" : "(SUB)"}
+                  <span className="label-system flex items-center gap-2 text-[11px] text-foreground-secondary">
+                    <span>
+                      {match.minutes}&apos; {match.started ? "" : "(SUB)"}
+                    </span>
+                    <span className="font-semibold text-foreground">
+                      {match.fantasyPoints ?? "—"}
+                    </span>
                   </span>
                 </div>
               ))}

@@ -107,6 +107,8 @@ export async function syncFixtures(
             kickoff_at: f.kickoffAt,
             status: f.status,
             season: competitionRow.season!,
+            home_score: f.homeScore ?? null,
+            away_score: f.awayScore ?? null,
           }))
         )
         .select("id");
@@ -132,6 +134,11 @@ export async function syncFixtures(
           away_club_id: clubMappings.get(item.awayClubExternalId)!,
           kickoff_at: item.kickoffAt,
           status: item.status,
+          // Always overwritten on every sync (never merged/max'd) — scores
+          // only ever come from the provider's current response, matching
+          // status/kickoff_at's existing "trust the latest sync" behavior.
+          home_score: item.homeScore ?? null,
+          away_score: item.awayScore ?? null,
         })
         .eq("id", internalId);
 

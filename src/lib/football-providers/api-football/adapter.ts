@@ -30,6 +30,13 @@ const POSITION_MAP: Record<string, PlayerPosition> = {
   Defender: "DEF",
   Midfielder: "MID",
   Attacker: "FWD",
+  // "Forward" is a real, distinct label API-Football uses on some
+  // per-competition statistics entries (discovered live: Raphinha's
+  // Spanish Super Cup entry reports "Forward" while his same-season
+  // La Liga/UCL entries for the same club report "Attacker") — same
+  // outfield-striker position, different string. See docs/football-data-system.md
+  // "Player universe integrity" for the full story.
+  Forward: "FWD",
 };
 
 /** `undefined` when API-Football reports a position Eleven doesn't have a mapping for — callers should skip the player rather than guess. */
@@ -102,17 +109,37 @@ export function normalizeClub(item: ApiFootballTeamItem, competitionExternalId: 
 }
 
 /**
- * Returns `null` (rather than a partially-guessed player) when the
- * provider's position string doesn't map to one Eleven understands, or
- * when the player has no statistics entry for the requested team at all
- * — an ingestion service should skip these, not invent data.
+ * `item.statistics` has ONE ENTRY PER COMPETITION the player appeared in
+ * for a team, not one entry per team (see `ApiFootballPlayerItem`'s doc
+ * comment) — so picking "the" entry for `clubExternalId` needs a
+ * preference order, not just the first array match:
+ *
+ *   1. the entry for the exact competition being synced (most accurate
+ *      shirt number/position for that context)
+ *   2. any entry for this club with a position Eleven recognizes
+ *      (guards against a domestic-cup entry reporting an unrecognized
+ *      label like "Forward" while the league entry for the same
+ *      club/season reports the recognized "Attacker" — discovered live
+ *      via Raphinha at Barcelona, whose Spanish Super Cup entry happened
+ *      to sort first)
+ *   3. any entry for this club at all
+ *
+ * Returns `null` when the player has no statistics entry for the
+ * requested club at all, or when none of that club's entries has a
+ * position Eleven understands — an ingestion service should skip that
+ * player rather than guess from an unrelated club's entry or invent a
+ * position.
  */
 export function normalizePlayer(
   item: ApiFootballPlayerItem,
   clubExternalId: string,
   competitionExternalId: string
 ): NormalizedPlayer | null {
-  const stats = item.statistics.find((s) => String(s.team.id) === clubExternalId) ?? item.statistics[0];
+  const clubStats = item.statistics.filter((s) => String(s.team.id) === clubExternalId);
+  const stats =
+    clubStats.find((s) => String(s.league.id) === competitionExternalId) ??
+    clubStats.find((s) => mapPosition(s.games.position) !== undefined) ??
+    clubStats[0];
   const position = mapPosition(stats?.games.position);
   if (!position) return null;
 
@@ -138,6 +165,8 @@ export function normalizeFixture(item: ApiFootballFixtureItem): NormalizedFixtur
     kickoffAt: new Date(item.fixture.date).toISOString(),
     status: mapFixtureStatus(item.fixture.status.short),
     round: item.league.round,
+    homeScore: item.goals.home ?? undefined,
+    awayScore: item.goals.away ?? undefined,
   };
 }
 

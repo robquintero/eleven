@@ -94,8 +94,20 @@ export interface ApiFootballPlayerItem {
     lastname: string | null;
     nationality: string | null;
   };
+  /**
+   * One entry PER COMPETITION the player appeared in for a given team+
+   * season — NOT one entry per team. A player who played league, cup, and
+   * continental fixtures for the same club has THREE entries here, all
+   * with the same `team.id` but different `league.id`/`games.position`
+   * (discovered live: a domestic Super Cup entry can report `position:
+   * "Forward"` while the same player's league-competition entry for the
+   * same team reports `"Attacker"` — see adapter.ts's `normalizePlayer`
+   * for why this means `team.id` alone is never enough to pick the right
+   * entry).
+   */
   statistics: Array<{
     team: { id: number };
+    league: { id: number };
     games: {
       position: string | null;
       number: number | null;
@@ -122,6 +134,11 @@ export interface ApiFootballFixtureItem {
   teams: {
     home: { id: number };
     away: { id: number };
+  };
+  /** Null until the fixture has kicked off; populated (and updated) live, then finalized at FT. */
+  goals: {
+    home: number | null;
+    away: number | null;
   };
 }
 

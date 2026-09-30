@@ -327,29 +327,32 @@ export type Database = {
         Row: {
           breakdown: Json
           calculated_at: string
-          fantasy_round_id: string
+          fantasy_round_id: string | null
           fixture_id: string
           id: string
           player_id: string
           points: number
+          scoring_rule_version: string
         }
         Insert: {
           breakdown?: Json
           calculated_at?: string
-          fantasy_round_id: string
+          fantasy_round_id?: string | null
           fixture_id: string
           id?: string
           player_id: string
           points?: number
+          scoring_rule_version?: string
         }
         Update: {
           breakdown?: Json
           calculated_at?: string
-          fantasy_round_id?: string
+          fantasy_round_id?: string | null
           fixture_id?: string
           id?: string
           player_id?: string
           points?: number
+          scoring_rule_version?: string
         }
         Relationships: [
           {
@@ -457,9 +460,11 @@ export type Database = {
       fixtures: {
         Row: {
           away_club_id: string
+          away_score: number | null
           competition_id: string
           created_at: string
           home_club_id: string
+          home_score: number | null
           id: string
           kickoff_at: string
           season: number
@@ -468,9 +473,11 @@ export type Database = {
         }
         Insert: {
           away_club_id: string
+          away_score?: number | null
           competition_id: string
           created_at?: string
           home_club_id: string
+          home_score?: number | null
           id?: string
           kickoff_at: string
           season: number
@@ -479,9 +486,11 @@ export type Database = {
         }
         Update: {
           away_club_id?: string
+          away_score?: number | null
           competition_id?: string
           created_at?: string
           home_club_id?: string
+          home_score?: number | null
           id?: string
           kickoff_at?: string
           season?: number
