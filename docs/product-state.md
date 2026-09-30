@@ -70,10 +70,13 @@ added**:
 | `ACTIVE` | a `drafts` row exists with `status = 'completed'` |
 | `COMPLETED` | `fantasy_leagues.status` is `completed`/`archived` |
 
-Because the draft engine is Pass 8+, no league in the product today can
-reach `DRAFTING`/`ACTIVE` through real data — every real league resolves to
-`WAITING_FOR_MANAGERS` or `READY_FOR_DRAFT`. The states exist so the model
-doesn't need to change shape once the draft engine lands.
+**Pass 10 update**: the draft engine (`start_draft`/`make_draft_pick`,
+`supabase/migrations/20260930024807_draft_engine.sql`) is real, so
+`DRAFTING`/`ACTIVE` are now genuinely reachable — a full league (real
+manager count) whose commissioner starts the draft reaches `DRAFTING`
+immediately, and `ACTIVE` once every team's roster is complete. No
+lifecycle column changed shape to make this true, exactly as this
+section originally predicted.
 
 ## Active league context
 
@@ -97,28 +100,34 @@ a real membership check on every request.
 - A league that exists but isn't `ACTIVE`:
   `src/components/dashboard/league-status-panel.tsx` on Home, and the
   `LEAGUE_STATUS` section on `/league` — real member count/capacity, real
-  invite code (commissioners only), "DRAFT: NOT YET AVAILABLE."
+  invite code (commissioners only). **Pass 10**: once the league is full
+  (`READY_FOR_DRAFT`), a real commissioner-only "Start draft" button
+  replaces the old permanent "DRAFT: NOT YET AVAILABLE" copy.
 
 ## Screen-by-screen truthful states
 
 | Screen | Real/derived source | Empty state |
 |---|---|---|
-| Home | `getUserLeagues`, `getUserSquad`, `getCurrentMatchup`, `getStandings`, `getRecentActivity` | No league → onboarding. Not active → `LeagueStatusPanel`. Matchup/standings/activity always render their own "not scheduled/no results yet/no activity yet" branch while empty. |
-| Team | `getUserTeamInLeague`, `getUserSquad` | No league → onboarding. Squad empty (always, pre-draft) → "NO SQUAD," 0 starters/bench, no "Edit lineup" control (nothing to persist edits to). |
-| Matchup | `getCurrentMatchup` behind the league-lifecycle gate | Pre-draft → "Awaiting league draft." Otherwise the same nullable `MatchupCommand` as Home. |
-| Players | `getPlayerDatabase()` (`public.players`, real, server-side filtered/paginated — see `docs/football-data-system.md`) | `total: 0` and no ingestion has run anywhere → "0 PLAYERS / NO PLAYER DATA AVAILABLE." Once Pass 8's `football:sync` has ingested real data, the full scouting workspace (search/filter/sort/pagination/inspector) activates on it — never a mock roster. |
-| League | `getLeagueDetail`, `getDraftStatus`, `getStandings`, `getRecentActivity` | Real members list, real capacity, "NOT YET AVAILABLE" draft, "NO RESULTS YET" / "NO TRANSACTIONS YET." |
+| Home | `getUserLeagues`, `getUserSquad`, `getCurrentMatchup`, `getStandings`, `getRecentActivity` | No league → onboarding. Not active → `LeagueStatusPanel`. Matchup/standings/activity render their own "not scheduled/no results yet/no activity yet" branch until a real round/result/transaction exists. |
+| Team | `getUserTeamInLeague`, `getUserSquad` | No league → onboarding. Pre-draft → "NO SQUAD," 0 starters/bench. **Pass 10**: once drafted, a real "Edit lineup" control persists real swaps via `swapLineupAction` — locked slots and invalid formations are rejected server-side, never silently accepted or silently no-op'd. |
+| Draft | `getDraftStatus`, `getDraftState` (**Pass 10, new screen**) | `WAITING_FOR_MANAGERS`/`READY_FOR_DRAFT` → a `ComingSoon` gate (with a real, commissioner-only "Start draft" button once the league is full). `DRAFTING` → the real draft room: real available players, real turn/timer, real picks feed. |
+| Matchup | `getCurrentMatchup` behind the league-lifecycle gate | Pre-draft/drafting → "Awaiting league draft." **Pass 10**: once `ACTIVE` with an open round, shows the real `MatchupCommand` (real opponent, real live/final points) instead of always-null. |
+| Players | `getPlayerDatabase()` (`public.players`, real, server-side filtered/paginated — see `docs/football-data-system.md`) | `total: 0` and no ingestion has run anywhere → "0 PLAYERS / NO PLAYER DATA AVAILABLE." Real season PTS and Form Tracker per Pass 9. |
+| League | `getLeagueDetail`, `getDraftStatus`, `getStandings`, `getRecentActivity` | Real members list, real capacity. **Pass 10**: DRAFT panel now links to the real `/draft` room once one exists; STANDINGS reflects real, tiebreak-ranked results (`src/domain/fantasy/standings.ts`) once at least one round has finalized. |
 
 ## Interaction truthfulness
 
-- Team's lineup used to be edited in local React state and presented as if
-  saved. There is no persistence path for that yet (no `lineup_slots` are
-  ever written), so the "Edit lineup" control and the local-mutation state
-  machine were **removed**, not disabled-with-a-tooltip — the control
-  didn't correspond to any real system to gate.
-- The command palette's `Draft Room` / `Waivers` / `Propose Trade` /
-  `Transactions` actions stay `disabled` with a `SOON` label (pre-existing,
-  correct pattern) — never fake-functional.
+- **Pass 10**: Team's lineup is now genuinely editable — the "Edit
+  lineup" control persists real swaps through `swapLineupAction` →
+  `updateLineup()`, which re-validates lock state and formation validity
+  server-side before writing anything. This is the exact control this
+  section previously said had been removed for having "no real system to
+  gate" — it now does.
+- The command palette's `Waivers` / `Propose Trade` / `Transactions`
+  actions stay `disabled` with a `SOON` label — still correct, since
+  those systems remain out of scope. `Draft Room` is no longer in that
+  list: it's a real, always-enabled nav destination (`/draft`) — see
+  `docs/game-rules.md` "Draft."
 - Player search in the command palette was removed rather than wired to an
   empty player list that would silently never match anything.
 
@@ -138,17 +147,26 @@ populated."
   stops being empty exactly where ingestion has run; `getPlayerDatabase()`'s
   shape didn't change when real rows started appearing. Full Big Five
   population is a separate, explicitly-approved future step.
-- **Draft engine** writes `drafts`/`draft_picks`/`roster_entries`/
-  `league_player_ownership` → `getUserSquad()` starts returning real
-  starters/bench; lifecycle starts reaching `DRAFTING`/`ACTIVE`.
-- **Round scheduler** writes `fantasy_rounds`/`lineup_slots` → Home's
-  "NO ACTIVE ROUND" and Team's "NOT SCHEDULED" next-lock resolve to real
-  data; `getCurrentMatchup()`'s shape does not change.
-- **Scoring engine** writes `matchup_scores`/`fantasy_player_scores` →
-  `getStandings()` starts returning real win/loss records instead of `[]`.
-- **Transaction-writing systems** (waivers/trades/drops, once built) write
-  `transactions` → `getRecentActivity()` stops being empty.
+- **Draft engine (Pass 10, landed)** writes `drafts`/`draft_picks`/
+  `roster_entries`/`league_player_ownership` via `start_draft`/
+  `make_draft_pick` — `getUserSquad()` returns real starters/bench once
+  drafted; lifecycle genuinely reaches `DRAFTING`/`ACTIVE`.
+- **Round/lineup/matchup engine (Pass 10, landed)** —
+  `src/lib/fantasy-engine/{rounds,lineup}.ts` writes
+  `fantasy_rounds`/`lineup_slots`/`matchups`/`matchup_scores`. Home's
+  round-dependent state and `getCurrentMatchup()` resolve to real data
+  once a league is `ACTIVE` and has opened its first round.
+- **Scoring engine (Pass 9, landed)** writes `fantasy_player_scores` —
+  `getStandings()` returns real, tiebreak-ranked win/loss/points-for/
+  points-against records once at least one round has finalized, instead
+  of `[]`.
+- **Transaction-writing systems** (waivers/trades/drops — still out of
+  scope past Pass 10) will write `transactions` → `getRecentActivity()`
+  stops being empty for those event types (draft picks already write
+  real `transactions` rows as of Pass 10).
 
-None of the above is implemented in this pass — see the repo's commit
-history for what Pass 7.5 actually shipped versus what it deliberately left
+Pass 10 did not begin waivers, trades, FAAB, playoffs beyond basic
+schedule repetition, commissioner override tooling, notifications, or a
+native app — see `docs/game-rules.md` "Out of scope" and the repo's
+commit history for the exact boundary.
 for later.

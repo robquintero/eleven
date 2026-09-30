@@ -1,10 +1,13 @@
 # Eleven — Domain Model
 
 This document explains Eleven's internal domain model: the entities, how
-they relate, and the invariants the backend (built in a later pass) must
-enforce. The types described here live in `src/domain/` — see
-`docs/architecture.md` for how that relates to the code the UI actually
-runs on today.
+they relate, and the invariants the backend must enforce. The types
+described here live in `src/domain/` — see `docs/architecture.md` for
+how that relates to the code the UI actually runs on today. Football
+scoring (invariant #10) is real as of Pass 9; the draft/roster/lineup/
+matchup/standings invariants below are real and enforced as of Pass 10 —
+see `docs/game-rules.md` for the exact rules and
+`src/lib/fantasy-engine/*` for the implementation.
 
 ## The core split: real football vs. fantasy
 

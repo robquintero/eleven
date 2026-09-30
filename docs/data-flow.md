@@ -3,8 +3,11 @@
 High-level flows through the architecture described in
 `docs/architecture.md`, using the entities from `docs/domain-model.md`.
 Flow 1 is real as of Pass 8 (see `docs/football-data-system.md` for the
-full detail); flows 2 onward remain the target shape for the backend
-passes that follow.
+full detail). Flow 4 is real as of Pass 9 (see `docs/scoring-model.md`).
+Flows 2, 3, and 5 are real as of Pass 10 (see `docs/game-rules.md` for
+the exact rules and `src/lib/fantasy-engine/*` for the implementation).
+Flows 6 and 7 (waivers, trades) remain the target shape for a future
+pass — explicitly out of scope for Pass 10.
 
 ## 1. Football API ingestion (Pass 8 — real)
 
@@ -29,65 +32,92 @@ own ID format or schema shape again. A future scheduled sync job would
 call the exact same `sync-*.ts` functions the CLI calls — see
 `docs/football-data-system.md` "Future scheduled sync."
 
-## 2. Draft pick → player ownership
+## 2. Draft pick → player ownership (Pass 10 — real)
 
 ```
-Manager makes a pick (or the pick timer expires and an autopick runs)
-  → Draft engine checks: is this player already owned in this league?
-    (query LeaguePlayerOwnership for leagueId + playerId)
-  → If free: create DraftPick, RosterEntry, LeaguePlayerOwnership, Transaction (type: draft_pick)
-  → If already owned: reject — this is invariant #4
-  → Draft.currentPick advances; snake order reverses at the end of each round
+Manager makes a pick (make_draft_pick RPC), or a client-polled timer
+expiry triggers resolve_expired_pick (auto-pick)
+  → `select ... for update` on the drafts row serializes concurrent picks
+    for the same draft — the real atomicity mechanism, not merely a
+    documented invariant (see supabase/migrations/20260930024807_draft_engine.sql)
+  → Checks: is it this team's turn (snake math)? Is the player active
+    and unowned in this league (LeaguePlayerOwnership PK is the final
+    guarantee even if the row lock were somehow bypassed)?
+  → If free: create DraftPick, RosterEntry, LeaguePlayerOwnership, Transaction (type: draft_pick) — one atomic transaction
+  → If already owned or not this team's turn: reject with a specific error (PLAYER_ALREADY_OWNED / NOT_YOUR_TURN), never a raw constraint error
+  → drafts.current_pick advances; snake order reverses each round; the
+    final pick transitions status to 'completed'
 ```
 
-## 3. Lineup update
+Auto-pick (`resolve_expired_pick`) is deterministic — fills the drafting
+team's biggest unmet formation minimum first, then the first eligible
+player by name — never a ratings-based recommendation. See
+`docs/game-rules.md` "Draft."
+
+## 3. Lineup update (Pass 10 — real)
 
 ```
-Manager edits their Starting XI/bench on the Team screen
-  → For each affected RosterEntry, upsert a LineupSlot for the current
-    FantasyRound (slot, starter: true/false)
+Manager selects a starter then a bench player (or vice versa) on the
+Team screen → swapLineupAction (src/app/(app)/team/actions.ts)
+  → Verifies the caller actually owns this fantasy team (their own
+    RLS-respecting session), then calls updateLineup()
+    (src/lib/fantasy-engine/lineup.ts) via the service-role client — no
+    authenticated INSERT/UPDATE policy exists on lineup_slots by design
+  → All-or-nothing: rejects the whole batch if any touched slot is
+    already locked, or if the resulting starter composition wouldn't be
+    a valid formation (src/domain/fantasy/constants.ts)
   → No global "lock the whole lineup" step — each LineupSlot's lockedAt
-    is set independently once *that player's* Fixture kicks off
-  → Emit LINEUP_UPDATED (and, later, PLAYER_LOCKED per slot as kickoffs pass)
+    is computed and stored once, when the round opens, from that
+    player's actual eligible fixtures (src/domain/fantasy/lineup-lock.ts)
 ```
 
-This is the flow `src/lib/selectors/lineup.ts`'s `swapPlayers()` already
-models at the UI/view-model level today — the backend version does the
-same conceptual swap, just persisted as `LineupSlot` rows instead of
-array indices in React state.
+`src/lib/selectors/lineup.ts`'s `swapPlayers()` models the same swap at
+the UI/view-model level — `TeamWorkspace`'s edit mode reuses that exact
+interaction shape, now persisted for real instead of local React state.
 
-## 4. Real stats → Eleven scoring
+## 4. Real stats → Eleven scoring (Pass 9 — real)
 
 ```
-Fixture goes final
+Fixture goes final (+ Pass 9's post-FT reconciliation window closes)
   → PlayerMatchStats recorded for every player involved (raw, unweighted)
-  → Scoring engine loads the active ScoringRule set
-  → For each player: apply each rule's multiplier (+ positionModifier if
-    present) to the matching stat, sum the result
-  → Write one FantasyPlayerScore per player per fixture, with a
-    stat-by-stat breakdown (not just the total) for auditability
+  → calculateFantasyScore() (src/domain/fantasy/scoring.ts) — a pure,
+    versioned function (ELEVEN_STANDARD_V1), NOT the scoring_rules table
+    (which stays unused — see docs/scoring-model.md "Tradeoffs" for why
+    a hardcoded, tested, versioned formula was chosen over a database-
+    driven rule editor for this pass)
+  → npm run scoring:backfill upserts one FantasyPlayerScore per player
+    per fixture per scoring_rule_version, with a category-by-category
+    breakdown (not just the total) for auditability
 ```
 
 The frontend never performs this calculation. A provider's own
-"fantasy points" field (if one exists) is ignored entirely — see
-invariant #10.
+"fantasy points"/rating field is ignored entirely — see invariant #10.
 
-## 5. Fantasy score → matchup score
+## 5. Fantasy score → matchup score (Pass 10 — real)
 
 ```
-FantasyPlayerScore rows exist for a round's fixtures
-  → For each FantasyTeam in a Matchup, sum FantasyPlayerScore.points
-    across every starting LineupSlot for that round
-  → Write/update MatchupScore.livePoints for each side as fixtures
-    progress (this can run incrementally, not just once at the end)
-  → When every relevant Fixture is final and the FantasyRound closes,
-    set MatchupScore.finalPoints and Matchup.status = "final"
-  → Emit MATCHUP_STARTED / PLAYER_POINTS_UPDATED / MATCHUP_FINAL /
-    ROUND_FINALIZED at the appropriate points along the way
+FantasyPlayerScore rows exist for fixtures in a round's window
+  → refreshMatchupScores() (src/lib/fantasy-engine/rounds.ts): for each
+    Matchup, sum FantasyPlayerScore.points across every STARTING
+    LineupSlot's player, across every eligible fixture that player
+    played within the round's window (the double-match-round feature —
+    docs/game-rules.md "Multi-fixture players"). Bench points never
+    count. Always recomputed from canonical scores, never incremented —
+    Pass 9's rule, extended here.
+  → Write/update MatchupScore.livePoints for each side (safe to re-run
+    any number of times; re-running twice on unchanged data converges to
+    identical rows)
+  → finalizeRoundIfReady(): only once EVERY fixture in the round's
+    window has reached final+settled (or postponed) does it set
+    MatchupScore.finalPoints and Matchup.status/FantasyRound.status to
+    "final"/"completed" — a single still-reconciling fixture holds the
+    whole round open (see docs/game-rules.md "H2H schedule & scoring")
+  → Emits ROUND_OPENED / MATCHUP_FINALIZED / ROUND_FINALIZED domain
+    events (reusing the existing domain_events table, no new one)
 ```
 
-`MatchupScore.projectedPoints` is computed separately (and optionally) —
-it never blocks or gates the live/final numbers above.
+`MatchupScore.projectedPoints` remains unused this pass — optional per
+the brief, deferred in favor of correctness over charts.
 
 ## 6. Waiver processing
 

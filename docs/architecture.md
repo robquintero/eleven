@@ -287,6 +287,36 @@ from `src/data-access/leagues.ts`: `"server-only"` can't be resolved by
 plain `node --test`, so anything meant to be unit-tested needs to live
 where that guard isn't in its import chain.
 
+**Added in Pass 10** (see `docs/game-rules.md` for the full rules detail):
+
+```
+src/domain/fantasy/
+  round-calendar.ts                  the Tue->Mon window as pure calendar math — no I/O, no league concept
+  lineup-lock.ts                     first-eligible-kickoff locking (computeLockInstant/isLocked)
+  draft-order.ts                     snake pick math + seedable-RNG shuffle
+  schedule.ts                        round-robin circle method (byes for odd counts)
+  standings.ts                       buildStandingsTable/rankStandings — wins, points-for, head-to-head, points-against
+  auto-lineup.ts                     SIMULATION-ONLY deterministic valid-XI chooser, never a real manager's lineup
+
+src/lib/fantasy-engine/               server-only, mirrors football-ingestion's conventions
+  round-eligibility.ts                finds the next non-blank fixture window; getEligibleFixtureIds
+  lineup.ts                          createRoundLineupSlots (locks computed/stored at round-open), updateLineup (all-or-nothing)
+  rounds.ts                          openNextRound / refreshMatchupScores / finalizeRoundIfReady
+  simulate.ts                        runSimulation() — the full-lifecycle harness (real temp auth users + league)
+  cli.ts                              npm run fantasy:simulate [-- --managers N --rounds N ...]
+  draft-engine.integration.test.ts    COMMITTED integration tests against the real DB — npm run test:integration
+
+supabase/migrations/20260930024807_draft_engine.sql
+                                      start_draft / make_draft_pick / resolve_expired_pick / _perform_draft_pick
+                                      (SECURITY DEFINER, same pattern as create_league/join_league_by_invite_code)
+
+src/app/(app)/draft/                 new route: the real draft room (gated through WAITING_FOR_MANAGERS/READY_FOR_DRAFT/DRAFTING)
+src/app/(app)/team/actions.ts        swapLineupAction — the one narrow, tested exemption to the
+                                      no-admin-client-in-app guard (no RLS write policy exists for lineup_slots by design)
+src/components/draft/                the draft workspace UI (reuses PlayerInspector from the Players workspace)
+src/lib/errors/draft-action-error*.ts mirrors league-action-error.ts for every draft RPC failure mode
+```
+
 ## No enterprise cosplay
 
 Deliberately absent, and not planned for a future pass without a concrete
@@ -305,8 +335,11 @@ each one is small enough to land, verify, and stop:
 |---|---|
 | **7A** | Provider foundation — API-Football client/adapter/errors, normalized contracts, Big Five config, coverage discovery, quota awareness, manual connectivity check. No ingestion, no UI change. |
 | **7.5** | Product Reality — removed the fantasy-side mock layer (`src/lib/mock/*`), made Dashboard/Team/Players/League read real Supabase data. Did not touch football ingestion. |
-| **8** | Football data system — the real ingestion pipeline (`src/lib/football-ingestion/*`, `npm run football:sync`): competitions/clubs/players/fixtures/player_match_stats, provider identity resolution, idempotency, quota discipline. Restored the full Players scouting workspace on real data. **This pass.** Only a small controlled sample was ingested — see `docs/football-data-system.md` and the Pass 8 final report for the full-population strategy still awaiting approval. |
-| **9** | Fantasy scoring engine — `ScoringRule` → `FantasyPlayerScore`, Form Tracker (real fantasy production over recent rounds), the draft engine. Depends on Pass 8's real `player_match_stats` existing, which they now do (for the ingested sample). |
+| **8** | Football data system — the real ingestion pipeline (`src/lib/football-ingestion/*`, `npm run football:sync`): competitions/clubs/players/fixtures/player_match_stats, provider identity resolution, idempotency, quota discipline. Restored the full Players scouting workspace on real data. Later followed by a full Big Five population pass. |
+| **9** | Fantasy scoring + live data engine — `ELEVEN_STANDARD_V1` (`src/domain/fantasy/scoring.ts`, versioned, pure), historical backfill, a replay harness, a fixture-aware live-sync foundation, and real Players-workspace fantasy output (season PTS, Form Tracker). Landed and merged. |
+| **10** | Core fantasy game — the draft engine (`start_draft`/`make_draft_pick`/`resolve_expired_pick`, SECURITY DEFINER SQL, see `supabase/migrations/20260930024807_draft_engine.sql`), the fantasy round calendar (`src/domain/fantasy/round-calendar.ts`, an empirically-chosen Tuesday→Monday boundary — see `docs/fantasy-round-calendar-analysis.md`), per-player lineup locking, H2H round-robin scheduling, matchup scoring/finalization, standings, and a full-lifecycle simulation harness (`npm run fantasy:simulate`) proving the whole chain end to end against real stored 2026/27 data with a controlled clock. See `docs/game-rules.md` for the exact rules. **This pass.** |
 
-Pass 8 did not begin Pass 9 — no fantasy points are computed anywhere in
-the codebase.
+Pass 9 did not begin Pass 10's game engine — no draft/round/lineup/matchup
+logic existed before it. Pass 10 did not begin waivers, trades, FAAB,
+playoffs beyond basic schedule repetition, commissioner tooling,
+notifications, or a native app — see `docs/game-rules.md` "Out of scope."
