@@ -174,6 +174,47 @@ converges to the identical stored row rather than double-counting — see
 `docs/football-data-system.md`-style idempotency proof in the Pass 9
 final report.
 
+## Historical backfill (Phase 4)
+
+`npm run scoring:backfill` (`src/lib/scoring/backfill.ts`) computes and
+upserts `fantasy_player_scores` for every eligible stored performance.
+Eligibility is structural, not a separate filter list — see the
+function's doc comment for exactly why `fixtures.season = 2026 AND
+fixtures.status = 'final'` is sufficient on its own to exclude 2023
+validation fixtures, incomplete fixtures, qualifying-round UCL/UEL
+fixtures (never ingested), and non-Big-Five players (never given a
+`players` row).
+
+Run against the live 2026/27 dataset on 2026-09-29:
+
+| Metric | Value |
+|---|---|
+| Eligible performances | 11,517 |
+| Scored | 11,517 |
+| Skipped | 0 |
+| Failed | 0 |
+| Scoring rule version | `ELEVEN_STANDARD_V1` |
+| By position | GK 1,236 · DEF 3,714 · MID 4,010 · FWD 2,557 |
+| By competition | ESP 3,146 · ENG 2,000 · ITA 2,399 · FRA 1,794 · GER 1,440 · UCL 467 · UEL 271 |
+
+**Idempotency proof**: ran the backfill a second time immediately after
+the first, against unchanged source data. Result counts were identical
+(11,517 / 11,517 / 0 / 0). A full snapshot of every
+`(player_id, fixture_id, scoring_rule_version, points, breakdown)` row
+taken before the second run and compared byte-for-byte (JSON-serialized)
+against a snapshot taken after was **exactly identical**, and a
+duplicate-key scan across `(player_id, fixture_id, scoring_rule_version)`
+found zero duplicates. Recomputing from unchanged canonical raw stats
+converges to the same stored rows rather than double-counting.
+
+One accepted limitation surfaced by this backfill: `players.club_id` is
+the player's CURRENT club, not necessarily the club they represented in
+a specific historical fixture. `concededByOwnClub` (and therefore
+clean-sheet credit) is only computed when the player's current club
+matches one side of that fixture; if neither matches (a transfer since
+that match), the row is still scored but with no clean-sheet component,
+rather than guessing which side they played for.
+
 ## Known limitations
 
 - No pass-completion, duel, foul, or penalty signal (not ingested this
