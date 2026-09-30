@@ -215,6 +215,29 @@ matches one side of that fixture; if neither matches (a transfer since
 that match), the row is still scored but with no clean-sheet component,
 rather than guessing which side they played for.
 
+## Replay / simulation (Phase 5)
+
+`npm run scoring:replay -- --fixture <fixtureId>` (`src/lib/scoring/
+replay.ts`) recomputes one real fixture's scores from its current stored
+`player_match_stats` and diffs against whatever's currently in
+`fantasy_player_scores` — read-only, never writes. Run against a real
+2026/27 fixture: every player came back `changed: false`, i.e. replaying
+real historical data reproduces the exact stored result, not just in
+theory but confirmed against the live database.
+
+Scenarios the real dataset can't exercise (real football only ever gives
+Eleven a fixture's FINAL stat line — never minute-by-minute snapshots, so
+there's no genuine "provider re-polled mid-match with a different number"
+history to replay) are covered instead by `src/lib/scoring/replay.test.ts`
+using explicit, clearly-labeled SYNTHETIC test fixtures, never conflated
+with production data: fixture state progression (scheduled → live →
+final), an unchanged re-poll not double-counting, a stat correction
+(an assist retracted, a card added after the fact) recomputing by exactly
+the affected component's value, duplicate recomputation converging to one
+identical result across 5 repeated calls, and a missed polling interval
+still landing on the correct final score regardless of which intermediate
+snapshots were actually observed.
+
 ## Known limitations
 
 - No pass-completion, duel, foul, or penalty signal (not ingested this
