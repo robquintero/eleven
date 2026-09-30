@@ -326,6 +326,17 @@ declare
   v_team_id uuid;
   v_chosen_player_id uuid;
   v_gk_min int := 1; v_def_min int := 3; v_mid_min int := 3; v_fwd_min int := 1;
+  -- Soft caps for AUTO-PICKED squad depth (not a starting-XI rule — a
+  -- team may freely draft/own more than this for bench depth if a real
+  -- manager chooses to). Bounds the deterministic auto-pick specifically
+  -- so it can never produce a roster unable to field a valid XI — found
+  -- live in testing: with no cap, GK sorts first in the fallback
+  -- priority order and nothing ever stopped it from being picked
+  -- repeatedly once its MINIMUM was satisfied, producing e.g. 9 drafted
+  -- goalkeepers and too few outfield players to reach 11 starters. GK's
+  -- cap (2) allows one realistic backup; DEF/MID/FWD match
+  -- FORMATION_RULES' own starting-XI maximums (5/5/3).
+  v_gk_cap int := 2; v_def_cap int := 5; v_mid_cap int := 5; v_fwd_cap int := 3;
   v_gk_count int; v_def_count int; v_mid_count int; v_fwd_count int;
   v_deficit_position text;
 begin
@@ -381,6 +392,14 @@ begin
     when v_def_count < v_def_min then 'DEF'
     when v_mid_count < v_mid_min then 'MID'
     when v_fwd_count < v_fwd_min then 'FWD'
+    -- No unmet minimum: fill toward soft-cap depth, same GK/DEF/MID/FWD
+    -- priority order, but skipping any position already at its cap —
+    -- this is what stops GK (first in priority order) from being
+    -- auto-picked indefinitely once its minimum is already satisfied.
+    when v_gk_count < v_gk_cap then 'GK'
+    when v_def_count < v_def_cap then 'DEF'
+    when v_mid_count < v_mid_cap then 'MID'
+    when v_fwd_count < v_fwd_cap then 'FWD'
     else null
   end;
 
