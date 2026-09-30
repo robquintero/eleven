@@ -80,8 +80,14 @@ export interface Player {
   ownerTeamName?: string;
 }
 
-/** "—" means no formation has been set yet — no draft/lineup exists for this squad. */
-export type Formation = "4-3-3" | "4-4-2" | "3-5-2" | "—";
+/**
+ * A `"DEF-MID-FWD"` label (e.g. "4-4-2") derived from a real starting
+ * XI's actual position counts — any combination FORMATION_RULES allows
+ * is a valid formation name, not just the three most common ones, so
+ * this is a template literal rather than a closed enum. "—" means no
+ * formation has been set yet — no draft/lineup exists for this squad.
+ */
+export type Formation = `${number}-${number}-${number}` | "—";
 
 /** A single position on the pitch, expressed as a percentage of pitch width/height. */
 export interface LineupSlot {
@@ -92,6 +98,8 @@ export interface LineupSlot {
   /** 0 (own goal) – 100 (attacking line) */
   y: number;
   player: Player;
+  /** Whether this starter's real-world fixture has already kicked off, per `lineup_slots.locked_at` (docs/game-rules.md "Player locking") — `undefined` where lock state isn't known/relevant (e.g. a squad with no current round yet). */
+  locked?: boolean;
 }
 
 export interface Squad {

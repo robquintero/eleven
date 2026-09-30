@@ -52,3 +52,16 @@ export function isStarterCompositionValid(
     }
   );
 }
+
+/**
+ * The `"DEF-MID-FWD"` label for a real starting XI's position counts
+ * (e.g. `{DEF:4, MID:4, FWD:2}` → `"4-4-2"`) — GK is never shown, matching
+ * real football's own formation-naming convention. Any valid combination
+ * FORMATION_RULES allows gets a label, not just the handful of common
+ * named formations.
+ */
+export function deriveFormationLabel(
+  counts: Partial<Record<PlayerPosition, number>>
+): `${number}-${number}-${number}` {
+  return `${counts.DEF ?? 0}-${counts.MID ?? 0}-${counts.FWD ?? 0}`;
+}

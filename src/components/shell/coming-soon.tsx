@@ -1,13 +1,16 @@
 import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 export function ComingSoon({
   icon: Icon,
   title,
   description,
+  children,
 }: {
   icon: LucideIcon;
   title: string;
   description: string;
+  children?: ReactNode;
 }) {
   return (
     <div className="flex min-h-[60vh] flex-col items-center justify-center text-center">
@@ -20,6 +23,7 @@ export function ComingSoon({
       <p className="mt-1.5 max-w-sm text-sm text-foreground-secondary">
         {description}
       </p>
+      {children && <div className="mt-4">{children}</div>}
     </div>
   );
 }
