@@ -136,6 +136,54 @@ test("normalizePlayer's externalId is a provider id string, never an Eleven uuid
   assert.equal(typeof normalized.externalId, "string");
 });
 
+test('mapPosition recognizes "Forward" as a synonym for "Attacker" (both -> FWD)', () => {
+  assert.equal(mapPosition("Forward"), "FWD");
+  assert.equal(mapPosition("Attacker"), "FWD");
+});
+
+// ---------------------------------------------------------------------
+// Regression: Raphinha at Barcelona was silently skipped in the Pass 8
+// population because a player's `statistics` array has one entry PER
+// COMPETITION (Spanish Super Cup, UCL, La Liga — same club, different
+// league.id), and the old normalizePlayer picked whichever entry sorted
+// first by team.id alone. Raphinha's Super Cup entry happened to sort
+// first and reported position "Forward" (unrecognized at the time),
+// producing a `null` normalized player even though his La Liga entry
+// (the actual competition being synced) reported the perfectly valid
+// "Attacker" with shirt number 11. See docs/football-data-system.md
+// "Player universe integrity."
+// ---------------------------------------------------------------------
+
+test("normalizePlayer selects the statistics entry for the REQUESTED competition, not just the first team match (Raphinha regression)", () => {
+  const raphinha = players.response[3];
+  // Syncing La Liga (competitionExternalId "39" in this fixture's ids) —
+  // must pick the third entry (league.id 39), not the first (Super Cup,
+  // league.id 556, position "Forward").
+  const normalized = normalizePlayer(raphinha, "50", "39");
+  assert.ok(normalized, "Raphinha must not be skipped");
+  assert.equal(normalized.position, "FWD");
+  assert.equal(normalized.shirtNumber, 11);
+});
+
+test("normalizePlayer falls back to any recognized-position entry for the club when the exact competition entry is absent", () => {
+  const raphinha = players.response[3];
+  // No statistics entry has league.id "999" — must fall back to a
+  // recognized-position entry (UCL or La Liga, both "Attacker") rather
+  // than the unrecognized-position Super Cup entry that happens to be
+  // first in the array.
+  const normalized = normalizePlayer(raphinha, "50", "999");
+  assert.ok(normalized, "must fall back rather than picking the unrecognized-position entry");
+  assert.equal(normalized.position, "FWD");
+});
+
+test("normalizePlayer never selects a statistics entry for a different club", () => {
+  const raphinha = players.response[3];
+  const normalized = normalizePlayer(raphinha, "999-not-his-club", "39");
+  // Every entry is for club "50" — a request for a different club must
+  // not silently fall back to one of them.
+  assert.equal(normalized, null);
+});
+
 // ---------------------------------------------------------------------
 // mapFixtureStatus / normalizeFixture
 // ---------------------------------------------------------------------
