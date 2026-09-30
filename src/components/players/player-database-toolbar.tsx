@@ -79,7 +79,7 @@ export function PlayerDatabaseToolbar({
             type="text"
             value={filters.query}
             onChange={(e) => onChange({ query: e.target.value })}
-            placeholder="Search player…"
+            placeholder="Search player or club…"
             className="h-9 w-full bg-transparent pr-9 pl-8 text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
           />
           {filters.query ? (

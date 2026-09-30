@@ -306,6 +306,26 @@ not built in Pass 9 (out of scope — squad-departure detection is adjacent
 to roster-management concerns, not scoring/live-sync foundation) but the
 column is already there and already respected by every read.
 
+## Club naming / search UX (Pass 9)
+
+Three deliberately distinct concepts (`src/lib/club-display.ts`'s module
+doc comment): `club.id` (canonical identity), `club.name` (full
+human-readable name), `club.shortName` (compact operational abbreviation
+— never canonical, never guaranteed unique: see the Bayern/Leverkusen
+collision above). The Players club filter previously showed only
+`shortName` — genuinely ambiguous, since Bayern München and Bayer
+Leverkusen both display `"BAY"`. Fixed: `getClubFilters()` now returns
+`name` too, and the filter/search surfaces display `clubDisplayLabel()`
+("Bayern München · BAY") as the primary, always-unambiguous label — dense
+surfaces (the player table's CLUB column, fixture strips) are untouched
+and keep the bare abbreviation, which is correct there.
+`getPlayerDatabase()`'s search now also matches a player's club by full
+name or abbreviation (`"Barcelona"` and `"BAR"` both surface Barcelona's
+players), resolved via a separate club-id lookup rather than an
+embedded-relation `.or()` filter (not reliably supported across a
+PostgREST join). `matchesClubQuery()`/`clubDisplayLabel()` are pure and
+unit-tested, including the Bayern/Leverkusen case explicitly.
+
 ## Idempotency
 
 Running any `sync-*` command twice must never duplicate a row. Mechanisms,

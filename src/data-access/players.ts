@@ -80,7 +80,25 @@ export async function getPlayerDatabase(query: PlayerQuery = {}): Promise<Player
     )
     .eq("active", true);
 
-  if (query.query?.trim()) builder = builder.ilike("name", `%${query.query.trim()}%`);
+  const searchTerm = query.query?.trim();
+  if (searchTerm) {
+    // Matches the player's own name OR their club's full name/abbreviation
+    // (see docs/football-data-system.md "Club naming / search UX") —
+    // "Barcelona" and "BAR" both surface Barcelona's players, exactly
+    // like searching a player's own name does. Resolved as a separate
+    // club lookup rather than an embedded-relation `.or()` filter, which
+    // PostgREST doesn't reliably support across a join.
+    const { data: matchingClubs } = await supabase
+      .from("clubs")
+      .select("id")
+      .or(`name.ilike.%${searchTerm}%,short_name.ilike.%${searchTerm}%`);
+    const clubIds = (matchingClubs ?? []).map((c) => c.id);
+
+    builder =
+      clubIds.length > 0
+        ? builder.or(`name.ilike.%${searchTerm}%,club_id.in.(${clubIds.join(",")})`)
+        : builder.ilike("name", `%${searchTerm}%`);
+  }
   if (query.position) builder = builder.eq("position", query.position);
   if (query.competitionId) builder = builder.eq("competition_id", query.competitionId);
   if (query.clubId) builder = builder.eq("club_id", query.clubId);
@@ -246,18 +264,21 @@ export async function getCompetitionFilters(): Promise<CompetitionFilterOption[]
 
 export interface ClubFilterOption {
   id: string;
+  /** Full human-readable name — e.g. "Bayern München". The primary label in any search/filter/select/browse UI (see docs/football-data-system.md "Club naming"). Never assume `shortName` alone is unambiguous: the provider can supply the same abbreviation for two different real clubs. */
+  name: string;
+  /** Compact operational abbreviation — e.g. "BAY". Appropriate for dense workstation surfaces (tables, fixture strips), never as the sole identifying label in a filter/search context. */
   shortName: string;
   competitionId: string;
 }
 
-/** Real ingested clubs, optionally scoped to one competition. `[]` until `sync clubs` has run for that scope. */
+/** Real ingested clubs, optionally scoped to one competition, ordered by full name (never by the possibly-ambiguous abbreviation). `[]` until `sync clubs` has run for that scope. */
 export async function getClubFilters(competitionId?: string): Promise<ClubFilterOption[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await createClient();
-  let builder = supabase.from("clubs").select("id, short_name, competition_id").order("short_name", { ascending: true });
+  let builder = supabase.from("clubs").select("id, name, short_name, competition_id").order("name", { ascending: true });
   if (competitionId) builder = builder.eq("competition_id", competitionId);
   const { data } = await builder;
-  return (data ?? []).map((c) => ({ id: c.id, shortName: c.short_name, competitionId: c.competition_id }));
+  return (data ?? []).map((c) => ({ id: c.id, name: c.name, shortName: c.short_name, competitionId: c.competition_id }));
 }
 
 export interface RecentMatchRow {

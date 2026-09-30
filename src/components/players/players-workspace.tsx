@@ -8,6 +8,7 @@ import { PlayerInspector } from "@/components/players/player-inspector";
 import { PlayerListMobile } from "@/components/players/player-list-mobile";
 import { PlayerTable } from "@/components/players/player-table";
 import type { ClubFilterOption, CompetitionFilterOption, PlayerDatabasePage } from "@/data-access/players";
+import { clubDisplayLabel } from "@/lib/club-display";
 import { defaultFilters, filtersToSearchParams, type PlayerFilters } from "@/lib/players-filters";
 import type { Player } from "@/lib/types/fantasy";
 
@@ -172,7 +173,9 @@ export function PlayersWorkspace({
           searchInputRef={searchInputRef}
           clubOptions={[
             { value: "ALL", label: "ALL" },
-            ...clubs.filter((c) => filters.competitionId === "ALL" || c.competitionId === filters.competitionId).map((c) => ({ value: c.id, label: c.shortName })),
+            ...clubs
+              .filter((c) => filters.competitionId === "ALL" || c.competitionId === filters.competitionId)
+              .map((c) => ({ value: c.id, label: clubDisplayLabel(c) })),
           ]}
           competitionOptions={[{ value: "ALL", label: "ALL" }, ...competitions.map((c) => ({ value: c.id, label: c.code }))]}
           showOwnershipFilter={hasActiveLeague}
