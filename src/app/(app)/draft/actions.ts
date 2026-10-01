@@ -2,8 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
-import { ensureFirstRoundOpened } from "@/lib/fantasy-engine/rounds";
+import { maybeOpenFirstRound } from "@/lib/fantasy-engine/draft-completion";
 import { toDraftActionError } from "@/lib/errors/draft-action-error";
 import { DRAFT_ACTION_ERROR_COPY } from "@/lib/errors/draft-action-error-copy";
 import { getPlayerDatabase, type PlayerDatabasePage } from "@/data-access/players";
@@ -19,33 +18,16 @@ export type DraftActionState = { error?: string } | undefined;
  * authorization itself, the client never gets to claim whose turn it is
  * or that a player is free.
  *
- * `maybeOpenFirstRound` (Pass 10.5) is the one place this file needs the
- * ADMIN client: the moment a draft completes, Eleven opens the league's
- * first fantasy round immediately (rather than leaving every roster
- * bench-only until some later manual/scheduled trigger) so a manager's
- * automatically-initialized starting XI (see
- * `src/lib/fantasy-engine/lineup.ts`'s `createRoundLineupSlots`) is
- * visible right away. `openNextRound`/`fantasy_rounds`/`lineup_slots`
- * writes have no `authenticated` INSERT/UPDATE policy by design — same
- * "trusted server code only" convention as `src/app/(app)/team/actions.ts`'s
- * existing exemption for this same privileged-write reason, which this
- * file now joins.
+ * `maybeOpenFirstRound` (Pass 10.5, moved to its own module in Pass
+ * 10.5C.3 — see `src/lib/fantasy-engine/draft-completion.ts`'s own doc
+ * comment for why) is the one privileged operation either action here
+ * triggers: the moment a draft completes, Eleven opens the league's first
+ * fantasy round immediately so a manager's automatically-initialized
+ * starting XI is visible right away, using the admin client internally
+ * (no `authenticated` INSERT/UPDATE policy exists for `fantasy_rounds`/
+ * `lineup_slots` by design — same "trusted server code only" convention
+ * as `src/app/(app)/team/actions.ts`'s privileged exemption).
  */
-async function maybeOpenFirstRound(draftId: string): Promise<void> {
-  if (!isSupabaseAdminConfigured()) return;
-  const admin = createAdminClient();
-
-  const { data: draft } = await admin.from("drafts").select("league_id").eq("id", draftId).maybeSingle();
-  if (!draft) return;
-
-  // Best-effort from here (Pass 10.5C): `ensureFirstRoundOpened` itself
-  // never throws -- it logs and returns. This used to be the ONLY attempt
-  // at opening round 1, with no way to recover if it silently failed; the
-  // exact same check now also runs from the Team page's own read path, so
-  // a transient failure here self-heals the next time anyone looks at
-  // their squad instead of leaving it permanently bench-only.
-  await ensureFirstRoundOpened(admin, draft.league_id);
-}
 
 export async function startDraftAction(leagueId: string): Promise<DraftActionState> {
   const supabase = await createClient();

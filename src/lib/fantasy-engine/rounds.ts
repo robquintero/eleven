@@ -77,6 +77,24 @@ export async function openNextRound(
     .select("id")
     .single();
 
+  if (roundError?.code === "23505") {
+    // Pass 10.5C.3: two concurrent openers for the same league's next
+    // round (e.g. one manager's own pick-timer expiry racing another
+    // manager's manual final pick, both triggering `maybeOpenFirstRound`
+    // around the same moment) both pass the `previousRound` check above
+    // before either INSERT lands, then collide on
+    // `fantasy_rounds_league_id_number_key`. This is the SAME outcome as
+    // the ordinary `PREVIOUS_ROUND_STILL_OPEN` case -- someone else just
+    // opened this round -- not a genuine failure, so it must resolve the
+    // same clean, non-throwing way instead of propagating an uncaught
+    // exception that `ensureFirstRoundOpened`'s try/catch can only log
+    // and swallow (see this pass's own report on why that mattered: a
+    // thrown-and-swallowed error here is still a successfully-created
+    // round under the hood, but surfacing it as an uncaught exception
+    // made it looked like a general-purpose failure rather than this
+    // specific, harmless, race).
+    return { ok: false, error: "PREVIOUS_ROUND_STILL_OPEN" };
+  }
   if (roundError || !roundRow) throw new Error(`Failed to create fantasy_rounds row: ${roundError?.message}`);
 
   const cycle = generateRoundRobinCycle(orderedTeamIds);
@@ -125,22 +143,105 @@ export async function openNextRound(
  * touching `createRoundLineupSlots`/`chooseAutomaticStartingXi` at all,
  * which were never the broken layer. Cheap to call unconditionally: both
  * early-return checks make it a no-op in the overwhelmingly common case
- * (a round already exists).
+ * (a complete round already exists).
+ *
+ * Pass 10.5C.3: "a round already exists" used to be treated as proof the
+ * ENTIRE round was successfully initialized, which was the real gap in
+ * this self-heal's own design — `openNextRound`'s per-team loop isn't
+ * transactional, so if it ever failed partway (a genuine write error now
+ * surfaces loudly from `createRoundLineupSlots`, see its own comment; a
+ * concurrent opener race; any other transient issue), the `fantasy_rounds`
+ * row it had already inserted would permanently short-circuit every
+ * future self-heal attempt via this same early return, even though one or
+ * more teams never actually got their `lineup_slots` rows at all — stuck
+ * all-bench forever, with "a round exists" masking the real problem. Now
+ * verifies every team's roster actually HAS lineup_slots for round 1
+ * specifically (the only round this function is ever responsible for —
+ * see `repairIncompleteRoundOne`'s own comment for why checking only
+ * round 1 is sufficient) and repairs exactly the teams missing them,
+ * using the SAME `createRoundLineupSlots` round 1 already used — never a
+ * second auto-lineup implementation, and never touching a team that
+ * already has even one lineup_slots row (which would stomp any lineup
+ * edits a manager has since made).
  */
 export async function ensureFirstRoundOpened(admin: SupabaseClient<Database>, leagueId: string): Promise<void> {
   const { data: draft } = await admin.from("drafts").select("status").eq("league_id", leagueId).maybeSingle();
   if (!draft || draft.status !== "completed") return;
 
-  const { data: existingRound } = await admin.from("fantasy_rounds").select("id").eq("league_id", leagueId).limit(1).maybeSingle();
-  if (existingRound) return;
+  const { data: existingRound } = await admin
+    .from("fantasy_rounds")
+    .select("id, number")
+    .eq("league_id", leagueId)
+    .order("number", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (!existingRound) {
+    try {
+      const result = await openNextRound(admin, leagueId, new Date());
+      if (!result.ok) {
+        console.error(`ensureFirstRoundOpened: openNextRound failed for league ${leagueId}: ${result.error}`);
+      }
+    } catch (err) {
+      console.error(`ensureFirstRoundOpened: openNextRound threw for league ${leagueId}`, err);
+    }
+    return;
+  }
+
+  if (existingRound.number !== 1) return;
 
   try {
-    const result = await openNextRound(admin, leagueId, new Date());
-    if (!result.ok) {
-      console.error(`ensureFirstRoundOpened: openNextRound failed for league ${leagueId}: ${result.error}`);
-    }
+    await repairIncompleteRoundOne(admin, leagueId, existingRound.id);
   } catch (err) {
-    console.error(`ensureFirstRoundOpened: openNextRound threw for league ${leagueId}`, err);
+    console.error(`ensureFirstRoundOpened: repairIncompleteRoundOne threw for league ${leagueId}`, err);
+  }
+}
+
+/**
+ * Finds every team in the league whose active roster has ZERO
+ * `lineup_slots` rows for round 1 (meaning `createRoundLineupSlots` never
+ * ran for them at all — a prior `openNextRound` attempt that created the
+ * round itself but then failed partway through its per-team loop) and
+ * initializes exactly those teams' slots, via the SAME
+ * `createRoundLineupSlots` round 1 always uses (`previousRoundId: null`,
+ * so it gets the normal auto-generated starting XI, not a carried-forward
+ * one — correct for round 1 specifically). A team with even one existing
+ * lineup_slots row is never touched here, whether or not its count looks
+ * complete — once `createRoundLineupSlots` has run for a team, a manager
+ * may have already edited that lineup, and this must never overwrite
+ * that. Only ever called for round 1 (see `ensureFirstRoundOpened`) — by
+ * the time a league has moved on to round 2, round 1 is provably complete
+ * already, since `openNextRound`'s own `PREVIOUS_ROUND_STILL_OPEN` guard
+ * requires the previous round to already be `completed` before a new one
+ * can open at all.
+ */
+async function repairIncompleteRoundOne(admin: SupabaseClient<Database>, leagueId: string, roundId: string): Promise<void> {
+  const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at").eq("id", roundId).single();
+  if (!round) return;
+  const window: RoundWindow = { startsAt: new Date(round.starts_at), endsAt: new Date(round.ends_at) };
+
+  const { data: teams } = await admin.from("fantasy_teams").select("id").eq("league_id", leagueId);
+  if (!teams) return;
+
+  for (const team of teams) {
+    const { data: rosterEntries } = await admin
+      .from("roster_entries")
+      .select("id")
+      .eq("fantasy_team_id", team.id)
+      .eq("status", "active");
+    if (!rosterEntries || rosterEntries.length === 0) continue;
+
+    const { count } = await admin
+      .from("lineup_slots")
+      .select("*", { count: "exact", head: true })
+      .eq("fantasy_round_id", roundId)
+      .in(
+        "roster_entry_id",
+        rosterEntries.map((r) => r.id)
+      );
+    if (count && count > 0) continue;
+
+    await createRoundLineupSlots(admin, team.id, roundId, window, null);
   }
 }
 

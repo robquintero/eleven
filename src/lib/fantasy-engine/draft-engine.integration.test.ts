@@ -25,11 +25,36 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient, isSupabaseAdminConfigured } from "../supabase/admin.ts";
 import { openNextRound, refreshMatchupScores, finalizeRoundIfReady, ensureFirstRoundOpened } from "./rounds.ts";
 import { updateLineup } from "./lineup.ts";
+import { maybeOpenFirstRound } from "./draft-completion.ts";
 import { isRosterCompositionValid, type RosterCounts } from "../../domain/fantasy/roster-rules.ts";
+import { isStarterCompositionValid } from "../../domain/fantasy/constants.ts";
+import { roundWindowContaining } from "../../domain/fantasy/round-calendar.ts";
 import type { Database } from "../supabase/database.types.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
 
 const skip = !isSupabaseAdminConfigured();
+
+/**
+ * Pass 10.5C.3's fixture-gap regression test needs the CURRENT real
+ * calendar week to genuinely have zero stored fixtures (the exact
+ * current-date edge case it protects — see docs/game-rules.md "Round
+ * generation"). Checked once, live, at module load (this file already
+ * requires network/admin access for everything else) so the test can
+ * skip itself with a clear reason instead of silently passing on a false
+ * premise if this ever stops being true in some future run.
+ */
+const fixtureGapPrecheck = skip
+  ? null
+  : await (async () => {
+      const admin = createAdminClient();
+      const window = roundWindowContaining(new Date());
+      const { count } = await admin
+        .from("fixtures")
+        .select("*", { count: "exact", head: true })
+        .gte("kickoff_at", window.startsAt.toISOString())
+        .lt("kickoff_at", window.endsAt.toISOString());
+      return { window, count: count ?? 0 };
+    })();
 
 interface TestLeague {
   leagueId: string;
@@ -92,6 +117,67 @@ async function cleanupTestLeague(admin: ReturnType<typeof createAdminClient>, le
   for (const userId of league.userIds) {
     await admin.auth.admin.deleteUser(userId);
   }
+}
+
+/**
+ * Drives a draft to exactly ONE pick remaining via the real auto-pick RPC
+ * (`resolve_expired_pick` — itself genuine production code for timer
+ * expiry, not a test-only shortcut), then submits that REAL final pick
+ * explicitly through the actual drafting team's own authenticated client
+ * and `make_draft_pick` — the exact RPC a real manager's click invokes —
+ * and immediately calls the REAL, unmodified `maybeOpenFirstRound`
+ * (Pass 10.5C.3's own exported function, not a reimplementation of it;
+ * see its own module doc comment). This is the real completion path
+ * production actually uses: `submitDraftPickAction`'s entire body is
+ * `make_draft_pick` RPC + this same `maybeOpenFirstRound` call +
+ * `revalidatePath` (irrelevant to DB state, and untestable outside a
+ * Next.js request — see draft-completion.ts's own comment on why it was
+ * split out). Calling `openNextRound`/`ensureFirstRoundOpened` directly
+ * here would NOT prove anything about whether the real trigger chain
+ * actually reaches them — see this pass's own report on why isolated
+ * calls to those lower-level functions previously masked a real gap in
+ * this exact chain.
+ */
+async function draftToCompletionViaRealFinalPick(
+  admin: ReturnType<typeof createAdminClient>,
+  league: TestLeague,
+  draftId: string,
+  managers: number,
+  squadSize: number
+): Promise<void> {
+  const farFuture = new Date(Date.now() + 365 * 24 * 3600 * 1000).toISOString();
+  const totalPicks = managers * squadSize;
+  for (let i = 0; i < totalPicks - 1; i++) {
+    const { data: status } = await admin.from("drafts").select("status").eq("id", draftId).single();
+    if (status?.status === "completed") throw new Error(`draft completed early at pick ${i}, expected to stop at ${totalPicks - 1}`);
+    const { error } = await admin.rpc("resolve_expired_pick", { p_draft_id: draftId, p_as_of: farFuture });
+    if (error) throw new Error(`auto-pick ${i} failed: ${error.message}`);
+  }
+
+  const { data: ownedBefore } = await admin.from("league_player_ownership").select("player_id").eq("league_id", league.leagueId);
+  const ownedIds = new Set((ownedBefore ?? []).map((o) => o.player_id));
+
+  let submitted = false;
+  for (const position of ["GK", "DEF", "MID", "FWD"] as const) {
+    const { data: candidates } = await admin.from("players").select("id").eq("active", true).eq("position", position).order("name").limit(200);
+    const playerId = candidates?.find((c) => !ownedIds.has(c.id))?.id;
+    if (!playerId) continue;
+    for (const client of league.clients) {
+      const { error } = await client.rpc("make_draft_pick", { p_draft_id: draftId, p_player_id: playerId });
+      if (!error) {
+        submitted = true;
+        break;
+      }
+    }
+    if (submitted) break;
+  }
+  if (!submitted) throw new Error("could not submit the real final pick with any available player/position");
+
+  const { data: finalStatus } = await admin.from("drafts").select("status").eq("id", draftId).single();
+  if (finalStatus?.status !== "completed") throw new Error(`draft did not reach 'completed' after the real final pick (status: ${finalStatus?.status})`);
+
+  // === THE REAL PRODUCTION TRIGGER ===
+  await maybeOpenFirstRound(draftId);
 }
 
 async function draftToCompletion(admin: ReturnType<typeof createAdminClient>, draftId: string, managers: number, squadSize: number) {
@@ -866,6 +952,229 @@ test("the database itself rejects a manager writing another team's lineup_slots,
 
     const { data: after } = await admin.from("lineup_slots").select("starter").eq("id", victimSlot.id).single();
     assert.equal(after!.starter, before, "team 1 must not be able to change team 0's lineup_slots row at all");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+// ---------------------------------------------------------------------
+// Pass 10.5C.3: real final-pick lifecycle regression. These exercise the
+// ACTUAL production completion chain (make_draft_pick RPC -> drafts.status
+// becomes 'completed' -> maybeOpenFirstRound -> ensureFirstRoundOpened ->
+// openNextRound -> createRoundLineupSlots), never the lower-level
+// functions called in isolation -- see draftToCompletionViaRealFinalPick's
+// own comment for why that distinction is the entire point of this pass.
+// ---------------------------------------------------------------------
+
+test("real final draft pick: completes the draft, resolves canonical Round 1, and gives both teams a legal 11/5 XI -- through the actual production trigger, not a direct openNextRound call", { skip }, async () => {
+  const admin = createAdminClient();
+  const managers = 2;
+  const squadSize = 16;
+  const league = await createTestLeague(admin, managers, squadSize);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+
+    await draftToCompletionViaRealFinalPick(admin, league, draftId, managers, squadSize);
+
+    const { data: finalDraft } = await admin.from("drafts").select("status").eq("id", draftId).single();
+    assert.equal(finalDraft!.status, "completed");
+
+    const ownedPlayerIds: string[] = [];
+    for (const teamId of league.teamIds) {
+      const { data: roster } = await admin.from("roster_entries").select("player_id").eq("fantasy_team_id", teamId).eq("status", "active");
+      assert.equal(roster!.length, squadSize, `team ${teamId} must have exactly ${squadSize} roster entries`);
+      ownedPlayerIds.push(...roster!.map((r) => r.player_id));
+    }
+    assert.equal(new Set(ownedPlayerIds).size, ownedPlayerIds.length, "zero duplicate ownership across both teams");
+
+    const { data: rounds } = await admin.from("fantasy_rounds").select("id, number").eq("league_id", league.leagueId);
+    assert.equal(rounds!.length, 1, "exactly one Round 1 must exist -- no duplicates from the real completion trigger");
+    assert.equal(rounds![0].number, 1);
+    const roundId = rounds![0].id;
+
+    const { data: matchups } = await admin.from("matchups").select("id, home_fantasy_team_id, away_fantasy_team_id").eq("fantasy_round_id", roundId);
+    assert.equal(matchups!.length, 1, "a 2-manager league must get exactly one Round 1 matchup");
+    assert.deepEqual(new Set([matchups![0].home_fantasy_team_id, matchups![0].away_fantasy_team_id]), new Set(league.teamIds));
+
+    for (const teamId of league.teamIds) {
+      const { data: roster } = await admin.from("roster_entries").select("id, players(position)").eq("fantasy_team_id", teamId).eq("status", "active");
+      const rosterIds = roster!.map((r) => r.id);
+      const { data: slots } = await admin.from("lineup_slots").select("starter, roster_entry_id").eq("fantasy_round_id", roundId).in("roster_entry_id", rosterIds);
+      const starters = (slots ?? []).filter((s) => s.starter);
+      const bench = (slots ?? []).filter((s) => !s.starter);
+      assert.equal(starters.length, 11, `team ${teamId} must have exactly 11 starters, automatically, with no manual intervention`);
+      assert.equal(bench.length, 5, `team ${teamId} must have exactly 5 bench players`);
+
+      const positionById = new Map(roster!.map((r) => [r.id, (r.players as { position: string }).position]));
+      const counts: Partial<Record<PlayerPosition, number>> = {};
+      for (const s of starters) {
+        const position = positionById.get(s.roster_entry_id)! as PlayerPosition;
+        counts[position] = (counts[position] ?? 0) + 1;
+      }
+      assert.ok(isStarterCompositionValid(counts), `team ${teamId}'s auto-XI must be a legal starting composition: ${JSON.stringify(counts)}`);
+    }
+
+    // The canonical editable-round selector: the SAME "latest round by
+    // number" query getUserSquad()/fillEmptySlotsAction/changeFormationAction
+    // all use (src/data-access/roster.ts, src/app/(app)/team/actions.ts) --
+    // deliberately re-querying it here rather than asserting against
+    // `roundId` directly, so this test would fail if any of those layers
+    // ever drifted onto a different selector than the one just proven to
+    // resolve Round 1 (Phase 5's "one canonical editable-round selector").
+    const { data: canonicalRound } = await admin
+      .from("fantasy_rounds")
+      .select("id")
+      .eq("league_id", league.leagueId)
+      .order("number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    assert.equal(canonicalRound!.id, roundId, "the canonical editable-round selector must resolve the same Round 1 just created");
+
+    // Authenticated lineup write (Pass 10.5C.2A architecture, Phase 10)
+    // can target this exact round -- team 0's own session, no admin client.
+    const { data: team0Roster } = await admin.from("roster_entries").select("id, players(position)").eq("fantasy_team_id", league.teamIds[0]).eq("status", "active");
+    const bench0 = (await admin.from("lineup_slots").select("roster_entry_id").eq("fantasy_round_id", roundId).eq("starter", false).in("roster_entry_id", team0Roster!.map((r) => r.id))).data!;
+    const starter0 = (await admin.from("lineup_slots").select("roster_entry_id").eq("fantasy_round_id", roundId).eq("starter", true).in("roster_entry_id", team0Roster!.map((r) => r.id))).data![0];
+    const benchEntry = team0Roster!.find((r) => r.id === bench0[0].roster_entry_id)!;
+    const starterEntry = team0Roster!.find((r) => r.id === starter0.roster_entry_id)!;
+    // Only a like-for-like swap keeps the formation legal without
+    // recomputing the whole XI here -- this test is about round-targeting,
+    // not formation math (already covered elsewhere).
+    if ((benchEntry.players as { position: string }).position === (starterEntry.players as { position: string }).position) {
+      const swapResult = await updateLineup(
+        league.clients[0],
+        league.teamIds[0],
+        roundId,
+        [
+          { rosterEntryId: starterEntry.id, starter: false },
+          { rosterEntryId: benchEntry.id, starter: true, position: (benchEntry.players as { position: string }).position as PlayerPosition },
+        ],
+        new Date()
+      );
+      assert.deepEqual(swapResult, { ok: true }, "an authenticated lineup write must be able to target the real, freshly-opened Round 1");
+    }
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("fixture-gap case: a draft completing during a Tuesday-Monday window with zero eligible fixtures still resolves the next evidence-backed playable round, not a fabricated blank one", {
+  skip: skip || (fixtureGapPrecheck?.count ?? 0) > 0,
+}, async () => {
+  const admin = createAdminClient();
+  const managers = 2;
+  const squadSize = 16;
+  const league = await createTestLeague(admin, managers, squadSize);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+
+    await draftToCompletionViaRealFinalPick(admin, league, draftId, managers, squadSize);
+
+    const { data: rounds } = await admin.from("fantasy_rounds").select("id, starts_at, ends_at").eq("league_id", league.leagueId);
+    assert.equal(rounds!.length, 1, "no fake empty round for the current blank window -- exactly one Round 1, for the NEXT eligible window");
+    const round = rounds![0];
+
+    const blankWindow = fixtureGapPrecheck!.window;
+    assert.notEqual(
+      new Date(round.starts_at).getTime(),
+      blankWindow.startsAt.getTime(),
+      "Round 1 must NOT be the current fixture-less week"
+    );
+    assert.ok(new Date(round.starts_at).getTime() > blankWindow.startsAt.getTime(), "Round 1 must be a LATER, evidence-backed window");
+
+    const { count: eligibleFixtureCount } = await admin
+      .from("fixtures")
+      .select("*", { count: "exact", head: true })
+      .gte("kickoff_at", round.starts_at)
+      .lt("kickoff_at", round.ends_at);
+    assert.ok(eligibleFixtureCount && eligibleFixtureCount > 0, "the resolved round must actually have eligible fixtures backing it");
+
+    for (const teamId of league.teamIds) {
+      const { data: roster } = await admin.from("roster_entries").select("id").eq("fantasy_team_id", teamId).eq("status", "active");
+      const { data: slots } = await admin.from("lineup_slots").select("starter").eq("fantasy_round_id", round.id).in("roster_entry_id", roster!.map((r) => r.id));
+      assert.equal((slots ?? []).filter((s) => s.starter).length, 11, `team ${teamId} must have an automatic 11-starter XI before this round's first kickoff`);
+    }
+
+    // A manager can prepare their lineup before kickoff, now, even though
+    // the round's own start timestamp is still in the future.
+    assert.ok(new Date(round.starts_at).getTime() > Date.now(), "test premise: the resolved round's own kickoff window hasn't started yet");
+    const { data: team0Roster } = await admin.from("roster_entries").select("id, players(position)").eq("fantasy_team_id", league.teamIds[0]).eq("status", "active");
+    const slot = (await admin.from("lineup_slots").select("roster_entry_id, starter").eq("fantasy_round_id", round.id).in("roster_entry_id", team0Roster!.map((r) => r.id))).data!.find((s) => s.starter)!;
+    const entry = team0Roster!.find((r) => r.id === slot.roster_entry_id)!;
+    const noOpResult = await updateLineup(
+      league.clients[0],
+      league.teamIds[0],
+      round.id,
+      [{ rosterEntryId: entry.id, starter: true, position: (entry.players as { position: string }).position as PlayerPosition }],
+      new Date()
+    );
+    assert.deepEqual(noOpResult, { ok: true }, "lineup writes must succeed against the upcoming round before its own kickoff");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("self-heal: a round left incomplete by a prior partial failure (one team never got lineup_slots) is repaired by ensureFirstRoundOpened, idempotently, without touching the already-initialized team", { skip }, async () => {
+  const admin = createAdminClient();
+  const managers = 2;
+  const squadSize = 16;
+  const league = await createTestLeague(admin, managers, squadSize);
+  try {
+    const { data: draft } = await league.clients[0].rpc("start_draft", { p_league_id: league.leagueId });
+    const draftId = draft![0].draft_id;
+    await draftToCompletion(admin, draftId, managers, squadSize);
+
+    // Reproduce the historical broken state directly: Round 1 opened
+    // successfully (so a `fantasy_rounds` row genuinely exists -- the
+    // exact condition that used to make the OLD `ensureFirstRoundOpened`
+    // give up forever), but team 1's lineup_slots never got created --
+    // simulating `openNextRound`'s per-team loop having failed partway
+    // through for a real reason (a transient write error, a concurrent
+    // opener race -- see this pass's own report), not calling the lower-
+    // level functions as a stand-in for a real completion.
+    const openResult = await openNextRound(admin, league.leagueId, new Date());
+    assert.ok(openResult.ok);
+    if (!openResult.ok) return;
+    const roundId = openResult.roundId;
+
+    const { data: team1Roster } = await admin.from("roster_entries").select("id").eq("fantasy_team_id", league.teamIds[1]).eq("status", "active");
+    await admin.from("lineup_slots").delete().eq("fantasy_round_id", roundId).in("roster_entry_id", team1Roster!.map((r) => r.id));
+
+    const { data: team0SlotsBefore } = await admin.from("lineup_slots").select("roster_entry_id, starter, slot").eq("fantasy_round_id", roundId);
+    // Manager 0 edits their own already-initialized lineup (a real swap)
+    // -- this must survive the repair untouched, proving the repair never
+    // re-runs auto-XI generation for a team that already has slots.
+    const team0Starter = team0SlotsBefore!.find((s) => s.starter)!;
+    const team0Bench = team0SlotsBefore!.find((s) => !s.starter)!;
+    await admin.from("lineup_slots").update({ starter: false }).eq("roster_entry_id", team0Starter.roster_entry_id).eq("fantasy_round_id", roundId);
+    await admin.from("lineup_slots").update({ starter: true, slot: team0Starter.slot }).eq("roster_entry_id", team0Bench.roster_entry_id).eq("fantasy_round_id", roundId);
+
+    const { data: team1SlotsGone } = await admin.from("lineup_slots").select("id").eq("fantasy_round_id", roundId).in("roster_entry_id", team1Roster!.map((r) => r.id));
+    assert.equal(team1SlotsGone!.length, 0, "test setup: team 1 must have zero lineup_slots, simulating the historical broken state");
+
+    // === The SAME Team/server recovery path the application actually uses ===
+    await ensureFirstRoundOpened(admin, league.leagueId);
+
+    const { data: rounds } = await admin.from("fantasy_rounds").select("id").eq("league_id", league.leagueId);
+    assert.equal(rounds!.length, 1, "repair must never create a duplicate round");
+
+    const { data: team1SlotsAfter } = await admin.from("lineup_slots").select("starter").eq("fantasy_round_id", roundId).in("roster_entry_id", team1Roster!.map((r) => r.id));
+    assert.equal((team1SlotsAfter ?? []).filter((s) => s.starter).length, 11, "team 1 must be repaired to a legal 11-starter XI");
+    assert.equal((team1SlotsAfter ?? []).filter((s) => !s.starter).length, 5, "team 1 must be repaired to exactly 5 bench");
+
+    const { data: team0SlotsAfter } = await admin.from("lineup_slots").select("roster_entry_id, starter").eq("fantasy_round_id", roundId).eq("roster_entry_id", team0Bench.roster_entry_id).single();
+    assert.equal(team0SlotsAfter!.starter, true, "team 0's own manual edit must survive the repair untouched -- the repair must never re-run auto-XI for an already-initialized team");
+
+    // Idempotency: calling it again is a safe no-op -- no duplicate round, no duplicate lineup_slots, team 0's edit still intact.
+    await ensureFirstRoundOpened(admin, league.leagueId);
+    const { data: roundsAfterSecondCall } = await admin.from("fantasy_rounds").select("id").eq("league_id", league.leagueId);
+    assert.equal(roundsAfterSecondCall!.length, 1, "a second recovery call must not create a duplicate round");
+    const { data: team1SlotsAfterSecondCall } = await admin.from("lineup_slots").select("id").eq("fantasy_round_id", roundId).in("roster_entry_id", team1Roster!.map((r) => r.id));
+    assert.equal(team1SlotsAfterSecondCall!.length, 16, "a second recovery call must not create duplicate lineup_slots for team 1");
+    const { data: team0StillEdited } = await admin.from("lineup_slots").select("starter").eq("fantasy_round_id", roundId).eq("roster_entry_id", team0Bench.roster_entry_id).single();
+    assert.equal(team0StillEdited!.starter, true, "a second recovery call must still never touch team 0's own edit");
   } finally {
     await cleanupTestLeague(admin, league);
   }

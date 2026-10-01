@@ -98,7 +98,16 @@ export async function createRoundLineupSlots(
     };
   });
 
-  await admin.from("lineup_slots").upsert(rows, { onConflict: "roster_entry_id,fantasy_round_id" });
+  const { error } = await admin.from("lineup_slots").upsert(rows, { onConflict: "roster_entry_id,fantasy_round_id" });
+  // Pass 10.5C.3: this used to be fire-and-forget -- if the write ever
+  // failed for any reason, `openNextRound`'s per-team loop (rounds.ts)
+  // would silently move on as if this team's lineup had been initialized,
+  // leaving it permanently all-bench with no error anywhere to react to.
+  // Throwing surfaces it to the loop's caller instead, where
+  // `ensureFirstRoundOpened`'s per-team completeness check can detect and
+  // retry it later rather than treating "a round row exists" as proof
+  // every team's slots were actually created.
+  if (error) throw new Error(`Failed to create lineup_slots for team's roster entries: ${error.message}`);
 }
 
 export interface LineupChangeRequest {
