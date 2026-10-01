@@ -11,10 +11,11 @@ const legend = [
 
 /**
  * A starting-XI position with no player in it yet (Pass 10.5C) — the
- * pitch always renders exactly the target formation's shape (see
- * `team-workspace.tsx`'s `targetFormation`), never fewer slots than that,
- * so a manager can always see and fill what's missing rather than being
- * stuck looking at an empty pitch with no way to build an XI.
+ * pitch always renders exactly 4-4-2's fixed 11 slots (Eleven V1's one
+ * supported formation, see `src/lib/selectors/pitch-layout.ts`'s
+ * `formationSlots()`), never fewer, so a manager can always see and fill
+ * what's missing rather than being stuck looking at an empty pitch with
+ * no way to build an XI.
  */
 export interface EmptyPitchSlot {
   id: string;

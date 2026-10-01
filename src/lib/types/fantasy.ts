@@ -63,6 +63,8 @@ export interface Player {
   position: PlayerPosition;
   /** Squad/shirt number, used as the tactical fallback identifier before photography is available. */
   number?: number;
+  /** Real country name as API-Football reports it (e.g. "Spain", "England") — used for the circular flag avatar (Pass 10.5C.5, see src/lib/countries.ts). `undefined`/`null`/unrecognized falls back to the initials avatar. */
+  nationality?: string | null;
   /** Points for the active fantasy round. Eventually derived by the scoring engine. */
   fantasyPoints: number;
   /** Cumulative points for the season so far. */

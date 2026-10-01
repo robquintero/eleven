@@ -11,8 +11,8 @@
  * directory would falsely trip it even though it never actually imports
  * the admin client.)
  *
- * As of Pass 10.5C.2A, ordinary lineup editing (swap/fill/
- * formation-change) no longer depends on this at all — those writes go
+ * As of Pass 10.5C.2A, ordinary lineup editing (swap/fill) no longer
+ * depends on this at all — those writes go
  * through the authenticated request-scoped client under a real,
  * ownership-scoped RLS policy (see
  * supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql).

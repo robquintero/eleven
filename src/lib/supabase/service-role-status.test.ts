@@ -19,10 +19,10 @@ function withEnv(vars: Record<string, string | undefined>, run: () => void) {
   }
 }
 
-// Pass 10.5C.2: this is the exact shared check behind the "Lineup editing
-// isn't configured" error reported for BOTH Done (fillEmptySlotsAction)
-// and formation change (changeFormationAction) -- see team/actions.ts,
-// where all three lineup-writing actions gate on this one function.
+// As of Pass 10.5C.2A, ordinary lineup writes (swap/fill) no longer gate
+// on this at all -- see service-role-status.ts's own doc comment. The one
+// remaining caller is ensureFirstRoundOpenedAction's round-1 self-heal
+// (team/actions.ts), a genuine multi-team system operation.
 
 test("isSupabaseAdminConfigured is false with no relevant env vars at all", () => {
   withEnv(

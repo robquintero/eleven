@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, X } from "lucide-react";
 import { BenchRow } from "@/components/team/bench-row";
-import { FormationSelector } from "@/components/team/formation-selector";
 import { NextLock } from "@/components/team/next-lock";
 import { Pitch, type EmptyPitchSlot, type PitchItem } from "@/components/team/pitch";
 import { RoundIntelligence } from "@/components/team/round-intelligence";
@@ -13,9 +12,8 @@ import { PlayerInspector } from "@/components/players/player-inspector";
 import { Button } from "@/components/ui/button";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { RailModule } from "@/components/ui/rail-module";
-import { swapLineupAction, changeFormationAction, fillEmptySlotsAction } from "@/app/(app)/team/actions";
+import { swapLineupAction, fillEmptySlotsAction } from "@/app/(app)/team/actions";
 import { FORMATION_RULES } from "@/domain/fantasy/constants";
-import { SUPPORTED_FORMATIONS, type FormationName } from "@/domain/fantasy/formations";
 import { assignToSlots, formationSlots, type FormationSlot } from "@/lib/selectors/pitch-layout";
 import { pad2 } from "@/lib/team-fixture";
 import type { LineupSlot, Player, PlayerAvailability, PlayerPosition, Squad } from "@/lib/types/fantasy";
@@ -76,9 +74,19 @@ type Selection =
  *   Done: there is exactly one authoritative persistence point
  *   (`handleDoneOrEdit`), never an automatic save mid-build (Pass
  *   10.5C.1's fix, preserved here) — see that function's own comment.
- * - Starter↔bench swaps are unchanged: select an occupied slot, then a
+ * - Starter↔bench swaps: select an occupied slot, then a compatible
  *   bench player (or vice versa), persisted immediately via
- *   `swapLineupAction`, re-validated server-side exactly as before.
+ *   `swapLineupAction`, re-validated server-side. Genuinely persists as
+ *   of Pass 10.5C.5 -- the authenticated client had the RLS UPDATE policy
+ *   from 10.5C.2A but was missing the underlying `GRANT UPDATE` every
+ *   other writable table already had, so every swap/fill write was
+ *   silently failing with "permission denied" while `updateLineup()`
+ *   still reported success (see
+ *   supabase/migrations/20260930060000_grant_lineup_slots_update.sql and
+ *   that function's own comment).
+ *
+ * Eleven V1 is 4-4-2 only (Pass 10.5C.5) -- there is no formation
+ * selection; `formationSlots()` always returns the same fixed 11 slots.
  *
  * Read-only (no edit affordance at all) when there's no team, matching
  * "Interaction truthfulness" — see docs/product-state.md. Lineup writes go
@@ -114,49 +122,16 @@ export function TeamWorkspace({
   }
 
   const allPlayers = [...squad.starters.map((s) => s.player), ...squad.bench];
-  // Roster-WIDE counts (starters + bench together) -- formation
-  // feasibility is always judged against everything a manager owns, not
-  // merely whoever currently happens to be starting (Pass 10.5C).
-  const rosterCounts = allPlayers.reduce(
-    (acc, player) => {
-      acc[player.position] = (acc[player.position] ?? 0) + 1;
-      return acc;
-    },
-    {} as Partial<Record<Player["position"], number>>
-  );
-  const currentFormation: FormationName | null = (SUPPORTED_FORMATIONS as readonly string[]).includes(squad.formation)
-    ? (squad.formation as FormationName)
-    : null;
-  // The shape the pitch renders against right now -- the real current
-  // formation when the XI is already complete and matches one of the 5,
-  // else a sensible default (4-4-2 needs DEF4/MID4/FWD2, exactly
-  // ROSTER_RULES' own minimums, so every legally-drafted 16-player roster
-  // can always supply it) so an incomplete/empty XI still has a concrete
-  // 11-slot target to build toward.
-  const effectiveFormation: FormationName = currentFormation ?? "4-4-2";
 
-  const slots = formationSlots(effectiveFormation);
+  // Eleven V1 is 4-4-2 only (Pass 10.5C.5) -- one fixed set of 11 slots,
+  // no formation selection.
+  const slots = formationSlots();
   const occupancy = assignToSlots(squad.starters, slots);
   const pendingPlayerIds = new Set(Array.from(pendingAssignments.values()).map((p) => p.id));
   const visibleBench = squad.bench.filter((p) => !pendingPlayerIds.has(p.id));
   const pitchItems = buildPitchItems(slots, occupancy, pendingAssignments);
   const totalAssigned = occupancy.size + pendingAssignments.size;
   const benchFilterPosition = selected?.kind === "emptySlot" ? selected.position : null;
-
-  async function handleFormationChange(formation: FormationName) {
-    if (!fantasyTeamId || pending) return;
-    setPendingAssignments(new Map());
-    setSelected(null);
-    setPending(true);
-    setError(null);
-    const result = await changeFormationAction(leagueId, fantasyTeamId, formation);
-    setPending(false);
-    if (result?.error) {
-      setError(result.error);
-    } else {
-      router.refresh();
-    }
-  }
 
   const availabilityCounts = allPlayers.reduce(
     (acc, player) => {
@@ -353,21 +328,7 @@ export function TeamWorkspace({
 
       <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_0.5fr] lg:items-start">
         <section>
-          <ModuleHeader
-            title="STARTING_XI"
-            meta={
-              fantasyTeamId ? (
-                <FormationSelector
-                  currentFormation={currentFormation}
-                  rosterCounts={rosterCounts}
-                  disabled={pending || !canEdit}
-                  onChange={handleFormationChange}
-                />
-              ) : (
-                squad.formation
-              )
-            }
-          />
+          <ModuleHeader title="STARTING_XI" meta={squad.formation} />
           <div className="mt-3">
             <Pitch
               slots={pitchItems}

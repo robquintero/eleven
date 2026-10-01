@@ -7,7 +7,10 @@ test("a lone player in a row is centered at x=50", () => {
   assert.equal(result[0].x, 50);
 });
 
-test("a full back four spreads evenly from x=10 to x=90", () => {
+test("a full back four uses the realistic 4-4-2 preset, spanning most of the pitch width", () => {
+  // Pass 10.5C.5: there is only one preset now (4-4-2), so an exact
+  // 4-player DEF group always gets it -- not a generic even spread
+  // (that fallback is for a non-standard DEF count only, see below).
   const result = layoutStartingXi([
     { position: "DEF", value: "a" },
     { position: "DEF", value: "b" },
@@ -15,8 +18,8 @@ test("a full back four spreads evenly from x=10 to x=90", () => {
     { position: "DEF", value: "d" },
   ]);
   const xs = result.map((r) => r.x).sort((a, b) => a - b);
-  assert.equal(xs[0], 10);
-  assert.equal(xs[xs.length - 1], 90);
+  assert.equal(xs[0], 12);
+  assert.equal(xs[xs.length - 1], 88);
 });
 
 test("GK sits at the lowest y, FWD at the highest -- attacking direction is up the pitch", () => {
@@ -50,115 +53,40 @@ test("an empty starting XI produces an empty layout", () => {
 });
 
 // ---------------------------------------------------------------------
-// Pass 10.5C.1: realistic, formation-specific geometry -- presentation
-// only, never changes which/how many slots a formation has (that stays
-// entirely count-based, see src/domain/fantasy/formations.ts).
+// Pass 10.5C.1 / 10.5C.5: realistic 4-4-2 geometry -- Eleven V1 supports
+// exactly one formation (src/domain/fantasy/constants.ts's
+// FORMATION_RULES), so layoutStartingXi/formationSlots no longer take a
+// formation argument at all; there is only ever one preset.
 // ---------------------------------------------------------------------
 
-test("4-4-2: the two strikers form a central strike partnership, not spread to the touchlines", () => {
-  const result = layoutStartingXi(
-    [
-      { position: "FWD" as const, value: "a" },
-      { position: "FWD" as const, value: "b" },
-    ],
-    "4-4-2"
-  );
+test("the two strikers form a central strike partnership, not spread to the touchlines", () => {
+  const result = layoutStartingXi([
+    { position: "FWD" as const, value: "a" },
+    { position: "FWD" as const, value: "b" },
+  ]);
   const xs = result.map((r) => r.x).sort((a, b) => a - b);
   assert.ok(xs[0] > 30 && xs[0] < 50, `left striker should sit centrally, got x=${xs[0]}`);
   assert.ok(xs[1] > 50 && xs[1] < 70, `right striker should sit centrally, got x=${xs[1]}`);
   assert.ok(xs[1] - xs[0] < 30, `strikers should be close together, gap was ${xs[1] - xs[0]}`);
 });
 
-test("4-3-3: a lone central striker sits between two genuinely wider forwards", () => {
-  const result = layoutStartingXi(
-    [
-      { position: "FWD" as const, value: "left" },
-      { position: "FWD" as const, value: "center" },
-      { position: "FWD" as const, value: "right" },
-    ],
-    "4-3-3"
-  );
-  const xs = result.map((r) => r.x);
-  const centerX = xs.find((x) => x > 40 && x < 60);
-  assert.ok(centerX !== undefined, "one forward must sit centrally");
-  const wideOnes = xs.filter((x) => x !== centerX);
-  assert.ok(wideOnes.every((x) => x < 25 || x > 75), `the other two forwards must be genuinely wide, got ${wideOnes}`);
-});
-
-test("4-2-3-1: a lone striker, with the midfield five split into a compact double pivot and a wider attacking three", () => {
-  const fwd = layoutStartingXi([{ position: "FWD" as const, value: "striker" }], "4-2-3-1");
-  assert.equal(fwd.length, 1);
-  assert.ok(fwd[0].x > 40 && fwd[0].x < 60, "the lone striker should be central");
-
-  const mid = layoutStartingXi(
-    ["pivot1", "pivot2", "left-am", "cam", "right-am"].map((value) => ({ position: "MID" as const, value })),
-    "4-2-3-1"
-  );
-  assert.equal(mid.length, 5);
-  // The double pivot sits deeper (smaller y, closer to the back four) than the attacking three.
-  const ys = mid.map((m) => m.y).sort((a, b) => a - b);
-  const deepest2 = ys.slice(0, 2);
-  const advanced3 = ys.slice(2);
-  assert.ok(Math.max(...deepest2) < Math.min(...advanced3), "the double pivot must sit deeper than the attacking three");
-});
-
-test("3-5-2 and 3-4-3: the back three is compact, not spread to the touchlines like a back four", () => {
-  for (const formation of ["3-5-2", "3-4-3"] as const) {
-    const result = layoutStartingXi(
-      [
-        { position: "DEF" as const, value: "a" },
-        { position: "DEF" as const, value: "b" },
-        { position: "DEF" as const, value: "c" },
-      ],
-      formation
-    );
-    const xs = result.map((r) => r.x).sort((a, b) => a - b);
-    assert.ok(xs[0] > 10 && xs[xs.length - 1] < 90, `${formation}'s back three should be compact, got ${xs}`);
+test("the 4-4-2 preset produces exactly as many coordinates as its own DEF/MID/FWD counts, each distinct", () => {
+  const shape = { DEF: 4, MID: 4, FWD: 2 };
+  for (const position of ["DEF", "MID", "FWD"] as const) {
+    const items = Array.from({ length: shape[position] }, (_, i) => ({ position, value: i }));
+    const result = layoutStartingXi(items);
+    assert.equal(result.length, shape[position], `${position} should produce ${shape[position]} coordinates`);
+    const xs = new Set(result.map((r) => r.x));
+    assert.equal(xs.size, result.length, `${position} coordinates should be distinct`);
   }
 });
 
-test("every supported formation's preset produces exactly as many coordinates as its own DEF/MID/FWD counts", () => {
-  const shapes: Record<string, { DEF: number; MID: number; FWD: number }> = {
-    "4-4-2": { DEF: 4, MID: 4, FWD: 2 },
-    "4-3-3": { DEF: 4, MID: 3, FWD: 3 },
-    "4-2-3-1": { DEF: 4, MID: 5, FWD: 1 },
-    "3-5-2": { DEF: 3, MID: 5, FWD: 2 },
-    "3-4-3": { DEF: 3, MID: 4, FWD: 3 },
-  };
-  for (const [formation, shape] of Object.entries(shapes) as [
-    "4-4-2" | "4-3-3" | "4-2-3-1" | "3-5-2" | "3-4-3",
-    { DEF: number; MID: number; FWD: number },
-  ][]) {
-    for (const position of ["DEF", "MID", "FWD"] as const) {
-      const items = Array.from({ length: shape[position] }, (_, i) => ({ position, value: i }));
-      const result = layoutStartingXi(items, formation);
-      assert.equal(result.length, shape[position], `${formation} ${position} should produce ${shape[position]} coordinates`);
-      // Every coordinate must be a valid, distinct on-pitch position.
-      const xs = new Set(result.map((r) => r.x));
-      assert.equal(xs.size, result.length, `${formation} ${position} coordinates should be distinct`);
-    }
-  }
-});
-
-test("a non-standard composition that doesn't match any preset's exact count falls back to the generic even spread", () => {
-  // 5 forwards matches no supported formation's FWD count at all.
-  const result = layoutStartingXi(
-    Array.from({ length: 5 }, (_, i) => ({ position: "FWD" as const, value: i })),
-    "4-4-2"
-  );
+test("a non-standard composition that doesn't match the 4-4-2 preset's exact count falls back to the generic even spread", () => {
+  // 5 forwards matches no preset count at all.
+  const result = layoutStartingXi(Array.from({ length: 5 }, (_, i) => ({ position: "FWD" as const, value: i })));
   const xs = result.map((r) => r.x).sort((a, b) => a - b);
   assert.equal(xs[0], 10);
   assert.equal(xs[xs.length - 1], 90);
-});
-
-test("no formation argument at all still uses the original generic even spread (backward compatible)", () => {
-  const result = layoutStartingXi([
-    { position: "FWD" as const, value: "a" },
-    { position: "FWD" as const, value: "b" },
-  ]);
-  const xs = result.map((r) => r.x).sort((a, b) => a - b);
-  assert.equal(xs[0], 10);
-  assert.equal(xs[1], 90);
 });
 
 // ---------------------------------------------------------------------
@@ -168,31 +96,23 @@ test("no formation argument at all still uses the original generic even spread (
 // items already placed just because more get added later.
 // ---------------------------------------------------------------------
 
-test("formationSlots produces exactly 11 slots with unique, stable ids for every supported formation", () => {
-  const shapes: Record<string, { GK: number; DEF: number; MID: number; FWD: number }> = {
-    "4-4-2": { GK: 1, DEF: 4, MID: 4, FWD: 2 },
-    "4-3-3": { GK: 1, DEF: 4, MID: 3, FWD: 3 },
-    "4-2-3-1": { GK: 1, DEF: 4, MID: 5, FWD: 1 },
-    "3-5-2": { GK: 1, DEF: 3, MID: 5, FWD: 2 },
-    "3-4-3": { GK: 1, DEF: 3, MID: 4, FWD: 3 },
-  };
-  for (const [formation, shape] of Object.entries(shapes) as ["4-4-2" | "4-3-3" | "4-2-3-1" | "3-5-2" | "3-4-3", typeof shapes[string]][]) {
-    const slots = formationSlots(formation);
-    assert.equal(slots.length, 11, `${formation} must have exactly 11 slots`);
-    const ids = new Set(slots.map((s) => s.id));
-    assert.equal(ids.size, 11, `${formation}'s slot ids must all be unique`);
-    for (const position of ["GK", "DEF", "MID", "FWD"] as const) {
-      assert.equal(slots.filter((s) => s.position === position).length, shape[position], `${formation} ${position} slot count`);
-    }
+test("formationSlots produces exactly 11 slots with unique, stable ids matching 1 GK / 4 DEF / 4 MID / 2 FWD", () => {
+  const slots = formationSlots();
+  assert.equal(slots.length, 11);
+  const ids = new Set(slots.map((s) => s.id));
+  assert.equal(ids.size, 11, "slot ids must all be unique");
+  const shape = { GK: 1, DEF: 4, MID: 4, FWD: 2 };
+  for (const position of ["GK", "DEF", "MID", "FWD"] as const) {
+    assert.equal(slots.filter((s) => s.position === position).length, shape[position], `${position} slot count`);
   }
 });
 
-test("formationSlots is deterministic -- calling it twice for the same formation gives identical ids and coordinates", () => {
-  assert.deepEqual(formationSlots("4-3-3"), formationSlots("4-3-3"));
+test("formationSlots is deterministic -- calling it twice gives identical ids and coordinates", () => {
+  assert.deepEqual(formationSlots(), formationSlots());
 });
 
 test("assignToSlots: item i of a position lands on that position's i-th slot, in the given (stable) order", () => {
-  const slots = formationSlots("4-4-2");
+  const slots = formationSlots();
   const players = [
     { position: "DEF" as const, name: "leftmost" },
     { position: "DEF" as const, name: "second" },
@@ -206,8 +126,8 @@ test("assignToSlots: item i of a position lands on that position's i-th slot, in
   assert.equal(assignment.get("DEF-3")!.name, "rightmost");
 });
 
-test("4-4-2 left/right striker placement remains stable: assigning the second striker does not move the first", () => {
-  const slots = formationSlots("4-4-2");
+test("left/right striker placement remains stable: assigning the second striker does not move the first", () => {
+  const slots = formationSlots();
   // Simulates the editing sequence: striker A is already placed (e.g. via
   // a prior fill), THEN striker B gets added -- A's slot must not move.
   const afterFirst = assignToSlots([{ position: "FWD" as const, name: "A" }], slots);
@@ -225,7 +145,7 @@ test("4-4-2 left/right striker placement remains stable: assigning the second st
 });
 
 test("assigning a player to a specific slot does not move players already assigned to other slots, across mixed positions", () => {
-  const slots = formationSlots("4-3-3");
+  const slots = formationSlots();
   const before = assignToSlots(
     [
       { position: "DEF" as const, name: "def-a" },
@@ -251,7 +171,7 @@ test("assigning a player to a specific slot does not move players already assign
 });
 
 test("assignToSlots leaves unfilled slots absent from the map (never fabricates an occupant)", () => {
-  const slots = formationSlots("4-4-2");
+  const slots = formationSlots();
   const assignment = assignToSlots([{ position: "GK" as const, name: "keeper" }], slots);
   assert.equal(assignment.size, 1);
   assert.equal(assignment.has("DEF-0"), false);

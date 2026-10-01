@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Ban } from "lucide-react";
+import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { RailModule } from "@/components/ui/rail-module";
@@ -232,6 +233,7 @@ export function DraftWorkspace({
                   <span className="label-system w-9 shrink-0 rounded-md bg-muted py-1 text-center text-[11px] font-semibold text-foreground-secondary">
                     {player.position}
                   </span>
+                  <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
                   <button
                     type="button"
                     onClick={() => {

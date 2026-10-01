@@ -6,6 +6,7 @@ import { Info, Lock } from "lucide-react";
 import { FormSparkline } from "@/components/football/form-sparkline";
 import { AvailabilityStatus } from "@/components/players/availability-status";
 import { OwnershipStatus } from "@/components/players/ownership-status";
+import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Button } from "@/components/ui/button";
 import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-panel";
 import type { RecentMatchRow } from "@/data-access/players";
@@ -106,13 +107,18 @@ export function PlayerInspectorContent({
       meta={index !== undefined ? String(index + 1).padStart(3, "0") : undefined}
     >
       <TerminalPanelSection>
-        <p className="label-system text-xs text-foreground-tertiary">
-          {player.club.shortName} / {player.position}
-          {player.number !== undefined ? ` / #${String(player.number).padStart(2, "0")}` : ""}
-        </p>
-        <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-foreground">
-          {player.name}
-        </h2>
+        <div className="flex items-center gap-3">
+          <PlayerAvatar name={player.name} nationality={player.nationality} size="lg" />
+          <div className="min-w-0">
+            <p className="label-system text-xs text-foreground-tertiary">
+              {player.club.shortName} / {player.position}
+              {player.number !== undefined ? ` / #${String(player.number).padStart(2, "0")}` : ""}
+            </p>
+            <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-foreground">
+              {player.name}
+            </h2>
+          </div>
+        </div>
         <div className="mt-2.5">
           {ownership && (
             <div className="flex items-baseline justify-between py-0.5">
@@ -251,7 +257,7 @@ export function PlayerInspectorContent({
           <div className="rounded-control border border-border px-3 py-2.5 text-center">
             <p className="label-system text-xs font-semibold text-accent">ON YOUR ROSTER</p>
             <p className="mt-1 text-xs text-foreground-tertiary">
-              Manage starters and formation from the Team page.
+              Manage starters from the Team page.
             </p>
           </div>
         ) : ownership === "owned" ? (

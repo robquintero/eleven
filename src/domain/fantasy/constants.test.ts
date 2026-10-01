@@ -2,30 +2,33 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { FORMATION_RULES, isStarterCompositionValid, deriveFormationLabel } from "./constants.ts";
 
-test("a valid 4-3-3 starting XI passes", () => {
-  assert.equal(
-    isStarterCompositionValid({ GK: 1, DEF: 4, MID: 3, FWD: 3 }),
-    true
-  );
+// Pass 10.5C.5: Eleven V1 is 4-4-2 only -- `positionRange` is now a fixed
+// point (min === max for every position), not a range spanning several
+// named formations, so `isStarterCompositionValid` accepts exactly one
+// shape: 1 GK / 4 DEF / 4 MID / 2 FWD.
+
+test("the exact 4-4-2 starting XI passes", () => {
+  assert.equal(isStarterCompositionValid({ GK: 1, DEF: 4, MID: 4, FWD: 2 }), true);
 });
 
-test("a valid 3-5-2 starting XI passes", () => {
-  assert.equal(
-    isStarterCompositionValid({ GK: 1, DEF: 3, MID: 5, FWD: 2 }),
-    true
-  );
+test("a formerly-valid 4-3-3 starting XI is now rejected -- only 4-4-2 is legal", () => {
+  assert.equal(isStarterCompositionValid({ GK: 1, DEF: 4, MID: 3, FWD: 3 }), false);
+});
+
+test("a formerly-valid 3-5-2 starting XI is now rejected -- only 4-4-2 is legal", () => {
+  assert.equal(isStarterCompositionValid({ GK: 1, DEF: 3, MID: 5, FWD: 2 }), false);
 });
 
 test("zero goalkeepers is invalid", () => {
   assert.equal(
-    isStarterCompositionValid({ GK: 0, DEF: 5, MID: 3, FWD: 3 }),
+    isStarterCompositionValid({ GK: 0, DEF: 4, MID: 4, FWD: 3 }),
     false
   );
 });
 
 test("two goalkeepers is invalid", () => {
   assert.equal(
-    isStarterCompositionValid({ GK: 2, DEF: 4, MID: 3, FWD: 2 }),
+    isStarterCompositionValid({ GK: 2, DEF: 4, MID: 4, FWD: 1 }),
     false
   );
 });
@@ -37,18 +40,22 @@ test("too few starters overall is invalid", () => {
   );
 });
 
-test("a position outside its min/max range is invalid even if the total is 11", () => {
-  // 6 defenders is above the DEF max of 5, even though GK+DEF+MID+FWD = 11.
+test("a position outside its fixed count is invalid even if the total is 11", () => {
+  // 5 defenders, 1 midfielder: GK+DEF+MID+FWD still sums to 11, but DEF
+  // must be exactly 4 and MID exactly 4 now -- neither matches.
   assert.equal(
-    isStarterCompositionValid({ GK: 1, DEF: 6, MID: 3, FWD: 1 }),
+    isStarterCompositionValid({ GK: 1, DEF: 5, MID: 1, FWD: 4 }),
     false
   );
 });
 
-test("FORMATION_RULES matches the documented squad shape", () => {
+test("FORMATION_RULES is fixed to exactly 4-4-2", () => {
   assert.equal(FORMATION_RULES.startersTotal, 11);
   assert.equal(FORMATION_RULES.squadSizeApprox, 16);
   assert.deepEqual(FORMATION_RULES.positionRange.GK, { min: 1, max: 1 });
+  assert.deepEqual(FORMATION_RULES.positionRange.DEF, { min: 4, max: 4 });
+  assert.deepEqual(FORMATION_RULES.positionRange.MID, { min: 4, max: 4 });
+  assert.deepEqual(FORMATION_RULES.positionRange.FWD, { min: 2, max: 2 });
 });
 
 test("deriveFormationLabel names a formation from DEF/MID/FWD counts, GK omitted (matching real football convention)", () => {

@@ -2,10 +2,15 @@ import type { PlayerPosition } from "@/domain/football/types";
 import type { LeagueSettings } from "@/domain/fantasy/types";
 
 /**
- * Starting-XI composition rules. This is intentionally the full extent of
- * formation validation for this pass — see docs/domain-model.md "Formation
- * rules." Bench eligibility, empty-slot handling, and formation-name
- * derivation (4-3-3 vs 4-4-2 vs 3-5-2) are deferred.
+ * Starting-XI composition rules. Pass 10.5C.5: Eleven V1 supports exactly
+ * ONE formation, 4-4-2 — `positionRange` is now a single fixed point
+ * (min === max for every position) rather than a range spanning multiple
+ * named formations, so `isStarterCompositionValid` below rejects anything
+ * that isn't exactly 1 GK / 4 DEF / 4 MID / 2 FWD. This is also why
+ * `chooseAutomaticStartingXi` (auto-lineup.ts) always produces exactly
+ * 4-4-2 with no changes of its own: its minimums-first fill (GK 1, DEF 4,
+ * MID 4, FWD 2) already sums to 11, so its later "fill the rest" pass
+ * never has anything left to do.
  */
 export const FORMATION_RULES: {
   startersTotal: number;
@@ -16,9 +21,9 @@ export const FORMATION_RULES: {
   squadSizeApprox: 16,
   positionRange: {
     GK: { min: 1, max: 1 },
-    DEF: { min: 3, max: 5 },
-    MID: { min: 3, max: 5 },
-    FWD: { min: 1, max: 3 },
+    DEF: { min: 4, max: 4 },
+    MID: { min: 4, max: 4 },
+    FWD: { min: 2, max: 2 },
   },
 };
 

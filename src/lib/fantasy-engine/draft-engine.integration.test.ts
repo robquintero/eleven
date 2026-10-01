@@ -878,7 +878,7 @@ test("updateLineup: an incomplete fill (fewer than 11) is rejected -- an in-prog
 // already performs.
 // ---------------------------------------------------------------------
 
-test("updateLineup persists through the authenticated client for a manager's own team -- no service-role client involved", { skip }, async () => {
+test("a genuine starter<->bench substitution persists through the authenticated client -- Pass 10.5C.5's actual regression (the prior 'false positive' version of this test asserted only 'still 11 starters', which stayed true even while the write silently failed with permission denied)", { skip }, async () => {
   const admin = createAdminClient();
   const league = await createTestLeague(admin, 2, 16);
   try {
@@ -891,27 +891,68 @@ test("updateLineup persists through the authenticated client for a manager's own
     if (!openResult.ok) return;
 
     const teamId = league.teamIds[0];
-    const { data: roster } = await admin.from("roster_entries").select("id, players(position)").eq("fantasy_team_id", teamId).eq("status", "active");
-    const byPosition: Record<string, string[]> = { GK: [], DEF: [], MID: [], FWD: [] };
-    for (const r of roster!) byPosition[(r.players as { position: string }).position].push(r.id);
-    const validXi = [
-      ...byPosition.GK.slice(0, 1).map((id) => ({ rosterEntryId: id, starter: true as const, position: "GK" as const })),
-      ...byPosition.DEF.slice(0, 4).map((id) => ({ rosterEntryId: id, starter: true as const, position: "DEF" as const })),
-      ...byPosition.MID.slice(0, 4).map((id) => ({ rosterEntryId: id, starter: true as const, position: "MID" as const })),
-      ...byPosition.FWD.slice(0, 2).map((id) => ({ rosterEntryId: id, starter: true as const, position: "FWD" as const })),
-    ];
+    const { data: roster } = await admin.from("roster_entries").select("id, player_id, players(position)").eq("fantasy_team_id", teamId).eq("status", "active");
+    const { data: slotsBefore } = await admin
+      .from("lineup_slots")
+      .select("roster_entry_id, starter")
+      .eq("fantasy_round_id", openResult.roundId)
+      .in("roster_entry_id", roster!.map((r) => r.id));
+    assert.equal((slotsBefore ?? []).filter((s) => s.starter).length, 11, "test setup: a legal 11/5 auto-XI must already exist");
+
+    // A real, concrete DEF<->DEF substitution -- never two rows that might
+    // coincidentally already hold the target values (see this test's own
+    // name for why that distinction matters).
+    const defOut = slotsBefore!.find(
+      (s) => s.starter && (roster!.find((r) => r.id === s.roster_entry_id)!.players as { position: string }).position === "DEF"
+    )!;
+    const defIn = slotsBefore!.find(
+      (s) => !s.starter && (roster!.find((r) => r.id === s.roster_entry_id)!.players as { position: string }).position === "DEF"
+    )!;
+    assert.ok(defOut && defIn, "test setup: needs one DEF starter and one DEF bench player to swap");
 
     // league.clients[0] is a real, signed-in session for team 0's own
-    // owner -- the SAME kind of client swapLineupAction/fillEmptySlotsAction/
-    // changeFormationAction now use, deliberately NOT the admin client.
-    const result = await updateLineup(league.clients[0], teamId, openResult.roundId, validXi, new Date("2026-09-08T00:00:00Z"));
-    assert.deepEqual(result, { ok: true }, "the RLS UPDATE policy must permit an owner to write their own team's lineup_slots");
+    // owner -- the SAME kind of client swapLineupAction uses, deliberately
+    // NOT the admin client.
+    const result = await updateLineup(
+      league.clients[0],
+      teamId,
+      openResult.roundId,
+      [
+        { rosterEntryId: defOut.roster_entry_id, starter: false },
+        { rosterEntryId: defIn.roster_entry_id, starter: true, position: "DEF" },
+      ],
+      new Date("2026-09-08T00:00:00Z")
+    );
+    assert.deepEqual(result, { ok: true });
 
-    // Re-read with admin (bypasses RLS) to confirm the write actually
-    // landed, not just that no error was thrown.
-    const rosterIds = roster!.map((r) => r.id);
-    const { data: finalSlots } = await admin.from("lineup_slots").select("starter").eq("fantasy_round_id", openResult.roundId).in("roster_entry_id", rosterIds);
-    assert.equal((finalSlots ?? []).filter((s) => s.starter).length, 11, "the authenticated-client write must genuinely persist 11 starters");
+    // Re-read with admin (bypasses RLS, simulating a fresh page load/
+    // refresh) to confirm the write genuinely landed, not just that no
+    // error was thrown.
+    const { data: slotsAfter } = await admin
+      .from("lineup_slots")
+      .select("roster_entry_id, starter")
+      .eq("fantasy_round_id", openResult.roundId)
+      .in("roster_entry_id", roster!.map((r) => r.id));
+    const outAfter = slotsAfter!.find((s) => s.roster_entry_id === defOut.roster_entry_id)!;
+    const inAfter = slotsAfter!.find((s) => s.roster_entry_id === defIn.roster_entry_id)!;
+    assert.equal(outAfter.starter, false, "the old starter must genuinely be benched after refresh");
+    assert.equal(inAfter.starter, true, "the promoted bench player must genuinely be a starter after refresh");
+    assert.equal(slotsAfter!.filter((s) => s.starter).length, 11, "still exactly 11 starters");
+    assert.equal(slotsAfter!.filter((s) => !s.starter).length, 5, "still exactly 5 bench");
+
+    const positionById = new Map(roster!.map((r) => [r.id, (r.players as { position: string }).position]));
+    const counts: Record<string, number> = {};
+    for (const s of slotsAfter!.filter((s) => s.starter)) counts[positionById.get(s.roster_entry_id)!] = (counts[positionById.get(s.roster_entry_id)!] ?? 0) + 1;
+    assert.deepEqual(counts, { GK: 1, DEF: 4, MID: 4, FWD: 2 }, "still exactly the fixed 4-4-2 shape after the substitution");
+
+    // Another manager (team 1's own authenticated session) must not be
+    // able to mutate team 0's lineup_slots at all -- the base GRANT this
+    // pass added makes the table writable by `authenticated` generally,
+    // so this proves the RLS POLICY (not just the GRANT) is still the
+    // thing doing the actual per-row enforcement.
+    await league.clients[1].from("lineup_slots").update({ starter: true }).eq("roster_entry_id", defOut.roster_entry_id);
+    const { data: stillAfterCrossAttempt } = await admin.from("lineup_slots").select("starter").eq("roster_entry_id", defOut.roster_entry_id).single();
+    assert.equal(stillAfterCrossAttempt!.starter, false, "another manager's write attempt must not change team 0's lineup_slots row");
   } finally {
     await cleanupTestLeague(admin, league);
   }
@@ -1016,7 +1057,7 @@ test("real final draft pick: completes the draft, resolves canonical Round 1, an
     }
 
     // The canonical editable-round selector: the SAME "latest round by
-    // number" query getUserSquad()/fillEmptySlotsAction/changeFormationAction
+    // number" query getUserSquad()/swapLineupAction/fillEmptySlotsAction
     // all use (src/data-access/roster.ts, src/app/(app)/team/actions.ts) --
     // deliberately re-querying it here rather than asserting against
     // `roundId` directly, so this test would fail if any of those layers

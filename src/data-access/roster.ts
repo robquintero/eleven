@@ -3,7 +3,6 @@ import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 import { bigFiveLeagueFromCompetitionCode } from "@/lib/leagues";
 import { deriveFormationLabel } from "@/domain/fantasy/constants";
-import { namedFormationForCounts } from "@/domain/fantasy/formations";
 import { isLocked } from "@/domain/fantasy/lineup-lock";
 import { layoutStartingXi } from "@/lib/selectors/pitch-layout";
 import type { Player, PlayerPosition, Squad } from "@/lib/types/fantasy";
@@ -17,6 +16,7 @@ interface RosterRow {
     short_name: string;
     position: string;
     shirt_number: number | null;
+    nationality: string | null;
     availability_status: string | null;
     club_id: string;
     clubs: {
@@ -48,6 +48,7 @@ function toPlayer(row: RosterRow): Player | null {
     },
     position: player.position as PlayerPosition,
     number: player.shirt_number ?? undefined,
+    nationality: player.nationality,
     fantasyPoints: 0,
     availability: (player.availability_status as Player["availability"]) ?? "available",
     // Every player this function returns is, by construction, on the
@@ -77,7 +78,7 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
   const { data: entries, error } = await supabase
     .from("roster_entries")
     .select(
-      "id, player_id, players(id, name, short_name, position, shirt_number, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code)))"
+      "id, player_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code)))"
     )
     .eq("league_id", leagueId)
     .eq("fantasy_team_id", fantasyTeamId)
@@ -146,18 +147,7 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
   const counts: Partial<Record<PlayerPosition, number>> = {};
   for (const s of starterEntries) counts[s.player.position] = (counts[s.player.position] ?? 0) + 1;
 
-  // Computed once, reused both for the friendly formation label AND
-  // (Pass 10.5C.1) to pick realistic, formation-specific pitch
-  // coordinates instead of a generic evenly-spaced grid — `undefined`
-  // when the counts don't match one of the 5 named shapes (e.g. reached
-  // only through individual manual swaps), in which case layout falls
-  // back to the original even spread.
-  const namedFormation = namedFormationForCounts({ DEF: counts.DEF ?? 0, MID: counts.MID ?? 0, FWD: counts.FWD ?? 0 });
-
-  const laidOut = layoutStartingXi(
-    starterEntries.map((s) => ({ position: s.player.position, value: s })),
-    namedFormation ?? undefined
-  );
+  const laidOut = layoutStartingXi(starterEntries.map((s) => ({ position: s.player.position, value: s })));
 
   const starters = laidOut.map(({ value, x, y }) => ({
     id: value.rosterEntryId,
@@ -169,14 +159,11 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
   }));
 
   return {
-    // Prefers the friendly named-formation label (e.g. "4-2-3-1" for a
-    // DEF4/MID5/FWD1 XI, which `deriveFormationLabel` alone would render
-    // as the less familiar "4-5-1") whenever the current starters happen
-    // to match one of the 5 formations the Team page's selector supports
-    // — true whether that XI was reached via the selector or a manual
-    // swap. Falls back to the plain derived label for any other, less
-    // common combination FORMATION_RULES still allows.
-    formation: starterEntries.length > 0 ? (namedFormation ?? deriveFormationLabel(counts)) : "—",
+    // Pass 10.5C.5: Eleven V1 is 4-4-2 only, so this is always "4-4-2"
+    // once a round exists -- `deriveFormationLabel` (not hardcoded) so an
+    // unexpected/incomplete composition still renders an honest label
+    // instead of lying "4-4-2" when it isn't.
+    formation: starterEntries.length > 0 ? deriveFormationLabel(counts) : "—",
     starters,
     bench,
   };

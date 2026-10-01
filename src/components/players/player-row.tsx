@@ -1,4 +1,5 @@
 import { leagueLabels } from "@/lib/leagues";
+import { PlayerAvatar } from "@/components/players/player-avatar";
 import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,8 @@ export function PlayerRow({
         selected ? "border-l-accent bg-accent/10" : "hover:bg-surface"
       )}
     >
+      <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
+
       <span className="label-system flex w-9 shrink-0 items-center justify-center rounded-md bg-muted py-1 text-[11px] font-semibold text-foreground-secondary">
         {player.position}
       </span>

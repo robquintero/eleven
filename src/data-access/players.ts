@@ -104,7 +104,7 @@ export async function getPlayerDatabase(query: PlayerQuery = {}): Promise<Player
   let builder = supabase
     .from("players")
     .select(
-      "id, name, position, shirt_number, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code))",
+      "id, name, position, shirt_number, nationality, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code))",
       { count: "exact" }
     )
     .eq("active", true);
@@ -192,6 +192,7 @@ export async function getPlayerDatabase(query: PlayerQuery = {}): Promise<Player
       },
       position: row.position as Player["position"],
       number: row.shirt_number ?? undefined,
+      nationality: row.nationality,
       fantasyPoints: 0,
       totalPoints: scores?.totalPoints,
       averagePoints: scores?.averagePoints,

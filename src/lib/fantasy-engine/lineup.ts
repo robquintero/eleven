@@ -119,7 +119,7 @@ export interface LineupChangeRequest {
 
 export type LineupUpdateResult =
   | { ok: true }
-  | { ok: false; error: "ROUND_NOT_FOUND" | "SLOT_LOCKED" | "INVALID_FORMATION" | "ROSTER_ENTRY_NOT_ON_TEAM" };
+  | { ok: false; error: "ROUND_NOT_FOUND" | "SLOT_LOCKED" | "INVALID_FORMATION" | "ROSTER_ENTRY_NOT_ON_TEAM" | "WRITE_FAILED" };
 
 /**
  * Applies a batch of starter/bench changes to one team's lineup for one
@@ -176,10 +176,19 @@ export async function updateLineup(
     const existing = slotByRosterEntryId.get(change.rosterEntryId)!;
     const player = (existing.roster_entries as { players: { position: string } | null }).players;
     const slot = change.starter ? (change.position ?? player?.position ?? "BENCH") : "BENCH";
-    await admin
+    const { error } = await admin
       .from("lineup_slots")
       .update({ starter: change.starter, slot })
       .eq("id", existing.id);
+    // Pass 10.5C.5: this used to be fire-and-forget. A missing base-table
+    // GRANT (not just the RLS policy -- Postgres requires both) made every
+    // authenticated-client write silently fail with "permission denied"
+    // while this function kept returning { ok: true } regardless, which is
+    // exactly how a starter/bench swap could appear to succeed in the UI
+    // (no error shown, loading state clears) while nothing was ever
+    // persisted. Surfacing the error here means that class of failure can
+    // never be silent again, whatever its cause.
+    if (error) return { ok: false, error: "WRITE_FAILED" };
   }
 
   return { ok: true };

@@ -1,0 +1,15 @@
+-- Pass 10.5C.5: the ownership-scoped RLS UPDATE policy added for
+-- `lineup_slots` in 20260930050000_lineup_slots_owner_write_policy.sql
+-- was never paired with the base table-level GRANT every other
+-- `authenticated`-writable table already has (see
+-- 20260929150824_grant_authenticated_privileges.sql's own
+-- `grant update on public.fantasy_teams/fantasy_leagues/profiles to
+-- authenticated`). Postgres requires BOTH a GRANT and a satisfied RLS
+-- policy before a role may write a row -- an RLS policy alone is not
+-- enough. Without this grant, every authenticated lineup write
+-- (swapLineupAction/fillEmptySlotsAction/changeFormationAction) has been
+-- failing with "permission denied for table lineup_slots" (Postgres
+-- 42501) since that migration -- silently, because `updateLineup()`'s
+-- write loop didn't check its own `.update()` call's error (fixed
+-- alongside this migration in src/lib/fantasy-engine/lineup.ts).
+grant update on public.lineup_slots to authenticated;

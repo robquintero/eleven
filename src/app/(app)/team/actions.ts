@@ -1,28 +1,27 @@
 "use server";
 
-// Pass 10.5C.2A: swapLineupAction/fillEmptySlotsAction/changeFormationAction
-// below write through the request-scoped, RLS-respecting `createClient()`
-// -- see each function's own doc comment and
-// supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql.
-// Only `ensureFirstRoundOpenedAction` below still needs the privileged
-// admin client: opening a round writes EVERY team's `lineup_slots` in the
-// league at once (see `createRoundLineupSlots`), not just the caller's
-// own team, so no single manager's row-ownership -- and no per-row RLS
-// update policy -- could ever cover it.
+// Pass 10.5C.2A: swapLineupAction/fillEmptySlotsAction below write through
+// the request-scoped, RLS-respecting `createClient()` -- see each
+// function's own doc comment and
+// supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql
+// (and 20260930060000_grant_lineup_slots_update.sql's own comment on the
+// base GRANT that policy also needed). Only `ensureFirstRoundOpenedAction`
+// below still needs the privileged admin client: opening a round writes
+// EVERY team's `lineup_slots` in the league at once (see
+// `createRoundLineupSlots`), not just the caller's own team, so no single
+// manager's row-ownership -- and no per-row RLS update policy -- could
+// ever cover it.
+//
+// Pass 10.5C.5: Eleven V1 is 4-4-2 only -- `changeFormationAction` was
+// removed along with the rest of the formation-selection feature (see
+// src/domain/fantasy/constants.ts's `FORMATION_RULES`, now fixed to
+// exactly 1 GK / 4 DEF / 4 MID / 2 FWD).
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { updateLineup } from "@/lib/fantasy-engine/lineup";
 import { ensureFirstRoundOpened } from "@/lib/fantasy-engine/rounds";
-import { isLocked } from "@/domain/fantasy/lineup-lock";
-import {
-  canRosterSupplyFormation,
-  computeFormationChange,
-  type FormationName,
-  type FormationRosterPlayer,
-} from "@/domain/fantasy/formations";
-import type { RosterCounts } from "@/domain/fantasy/roster-rules";
 import type { PlayerPosition } from "@/lib/types/fantasy";
 
 export type LineupActionState = { error?: string } | undefined;
@@ -122,6 +121,7 @@ export async function swapLineupAction(
       SLOT_LOCKED: "That player's match has already started — their lineup slot is locked.",
       INVALID_FORMATION: "That swap would leave an invalid formation.",
       ROSTER_ENTRY_NOT_ON_TEAM: "Player not found on this roster.",
+      WRITE_FAILED: "Couldn't save your lineup — please try again.",
     };
     return { error: copy[result.error] ?? "Couldn't update your lineup." };
   }
@@ -138,7 +138,7 @@ export async function swapLineupAction(
  * regression this pass also fixes at its root, but this exists as a
  * general safety net regardless of how the shortfall arose). Pure
  * promotions only (no demotions) -- reuses `updateLineup()` exactly like
- * `swapLineupAction`/`changeFormationAction` above, so the SAME
+ * `swapLineupAction` above, so the SAME
  * "exactly 11, valid formation, no locked slot touched" validation is
  * still authoritative: this can only ever succeed if `fills` brings the
  * team to a complete, legal starting XI. The client is expected to queue
@@ -206,120 +206,9 @@ export async function fillEmptySlotsAction(
       SLOT_LOCKED: "That player's match has already started — their lineup slot is locked.",
       INVALID_FORMATION: "That doesn't add up to a complete, legal starting XI yet.",
       ROSTER_ENTRY_NOT_ON_TEAM: "Player not found on this roster.",
+      WRITE_FAILED: "Couldn't save your lineup — please try again.",
     };
     return { error: copy[result.error] ?? "Couldn't update your lineup." };
-  }
-
-  revalidatePath("/team");
-  return undefined;
-}
-
-/**
- * Server-authoritative formation change (Pass 10.5B) — never client-only
- * visual state. Re-derives the roster's real position counts and current
- * starter/lock state fresh from the database (never trusts anything the
- * client claims about its own roster), computes the deterministic diff via
- * `computeFormationChange` (see its own doc comment: preserves existing
- * starters where possible, promotes from bench, demotes surplus, never
- * touches a locked player), then persists it through the SAME
- * `updateLineup()` all-or-nothing primitive `swapLineupAction` above uses
- * — no new write path, no new lock-checking logic. Same authenticated,
- * RLS-respecting client throughout (Pass 10.5C.2A).
- */
-export async function changeFormationAction(
-  leagueId: string,
-  fantasyTeamId: string,
-  formation: FormationName
-): Promise<LineupActionState> {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Sign in to do that." };
-
-  const { data: team } = await supabase
-    .from("fantasy_teams")
-    .select("id")
-    .eq("id", fantasyTeamId)
-    .eq("league_id", leagueId)
-    .eq("owner_user_id", user.id)
-    .maybeSingle();
-  if (!team) return { error: "You don't own this team." };
-
-  const { data: round } = await supabase
-    .from("fantasy_rounds")
-    .select("id")
-    .eq("league_id", leagueId)
-    .order("number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!round) return { error: "No fantasy round is open yet." };
-
-  const { data: rosterEntries } = await supabase
-    .from("roster_entries")
-    .select("id, players(name, position)")
-    .eq("fantasy_team_id", fantasyTeamId)
-    .eq("status", "active");
-  if (!rosterEntries || rosterEntries.length === 0) return { error: "No roster found." };
-
-  const { data: slots } = await supabase
-    .from("lineup_slots")
-    .select("roster_entry_id, starter, locked_at")
-    .eq("fantasy_round_id", round.id)
-    .in(
-      "roster_entry_id",
-      rosterEntries.map((r) => r.id)
-    );
-  const slotByRosterEntryId = new Map((slots ?? []).map((s) => [s.roster_entry_id, s]));
-  const now = new Date();
-
-  // Stable (name-sorted) order within each position, matching
-  // computeFormationChange's own documented determinism requirement.
-  const sorted = [...rosterEntries].sort((a, b) => {
-    const nameA = (a.players as { name: string } | null)?.name ?? "";
-    const nameB = (b.players as { name: string } | null)?.name ?? "";
-    return nameA.localeCompare(nameB);
-  });
-
-  const rosterForFormation: FormationRosterPlayer[] = sorted.map((entry) => {
-    const player = entry.players as { position: string } | null;
-    const slot = slotByRosterEntryId.get(entry.id);
-    return {
-      rosterEntryId: entry.id,
-      position: player?.position as PlayerPosition,
-      isStarter: slot?.starter ?? false,
-      locked: isLocked(slot?.locked_at ? new Date(slot.locked_at) : null, now),
-    };
-  });
-
-  const rosterCounts: RosterCounts = {};
-  for (const p of rosterForFormation) rosterCounts[p.position] = (rosterCounts[p.position] ?? 0) + 1;
-  if (!canRosterSupplyFormation(rosterCounts, formation)) {
-    return { error: "Your current roster can't supply that formation." };
-  }
-
-  const changeResult = computeFormationChange(rosterForFormation, formation);
-  if (!changeResult.ok) {
-    return {
-      error:
-        changeResult.error === "LOCKED_PLAYER_CONFLICT"
-          ? "A locked player's match has already started — that formation can't be applied right now."
-          : "Your current roster can't supply that formation.",
-    };
-  }
-  if (changeResult.changes.length === 0) {
-    return undefined;
-  }
-
-  const result = await updateLineup(supabase, fantasyTeamId, round.id, changeResult.changes, now);
-  if (!result.ok) {
-    const copy: Record<string, string> = {
-      ROUND_NOT_FOUND: "No fantasy round is open yet.",
-      SLOT_LOCKED: "That player's match has already started — their lineup slot is locked.",
-      INVALID_FORMATION: "That formation isn't valid for your roster.",
-      ROSTER_ENTRY_NOT_ON_TEAM: "Player not found on this roster.",
-    };
-    return { error: copy[result.error] ?? "Couldn't change formation." };
   }
 
   revalidatePath("/team");
