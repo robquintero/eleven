@@ -62,6 +62,29 @@ test("ACTIVE once the draft has completed", () => {
   assert.equal(state, "ACTIVE");
 });
 
+test("ACTIVE when the draft has completed and the current season is still SETUP or ACTIVE", () => {
+  assert.equal(
+    deriveLeagueLifecycle({ leagueStatus: "active", memberCount: 8, maxTeams: 8, draftStatus: "completed", seasonStatus: "ACTIVE" }),
+    "ACTIVE"
+  );
+  assert.equal(
+    deriveLeagueLifecycle({ leagueStatus: "active", memberCount: 8, maxTeams: 8, draftStatus: "completed", seasonStatus: null }),
+    "ACTIVE",
+    "omitting/nulling seasonStatus must behave exactly like the pre-Pass-12A caller -- never a breaking default"
+  );
+});
+
+test("SEASON_COMPLETE (Pass 12A) once the current season finishes, distinct from the league-level COMPLETED/archived state -- the league itself is still permanent and playable", () => {
+  const state = deriveLeagueLifecycle({
+    leagueStatus: "active",
+    memberCount: 8,
+    maxTeams: 8,
+    draftStatus: "completed",
+    seasonStatus: "COMPLETED",
+  });
+  assert.equal(state, "SEASON_COMPLETE");
+});
+
 test("COMPLETED reflects a completed or archived league regardless of draft state", () => {
   assert.equal(
     deriveLeagueLifecycle({

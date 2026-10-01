@@ -482,34 +482,53 @@ export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: 
 export interface StandingsRow {
   fantasyTeamId: string;
   teamName: string;
+  played: number;
   wins: number;
   losses: number;
   draws: number;
   pointsFor: number;
   pointsAgainst: number;
+  /** Soccer-style league points: WIN=3, DRAW=1, LOSS=0 (Pass 12A) — never confused with `pointsFor`, the fantasy points actually scored. */
+  leaguePoints: number;
 }
 
 /**
- * League standings derived from completed (`status = 'final'`) matchups'
- * `matchup_scores` — never a stored win/loss column (the schema
- * deliberately has none; see supabase/migrations/…fantasy_leagues.sql).
- * Ranking/tiebreak logic lives in `@/domain/fantasy/standings`
- * (wins, then points-for, then head-to-head, then points-against
- * ascending — docs/game-rules.md "Standings") so it's pure and
- * independently tested rather than duplicated here. `[]` until at least
- * one matchup has been played.
+ * League standings for the league's CURRENT (latest) season, derived from
+ * that season's completed (`status = 'final'`) matchups' `matchup_scores`
+ * — never a stored win/loss column (the schema deliberately has none; see
+ * supabase/migrations/…fantasy_leagues.sql). `matchups` has no season_id
+ * of its own (Pass 12A deliberately avoids that duplication); scoping is
+ * done via `fantasy_rounds.season_id`. Ranking/tiebreak logic lives in
+ * `@/domain/fantasy/standings` (league points, then fantasy-point
+ * differential, then fantasy points for, then head-to-head, then team id
+ * — docs/game-rules.md "Standings") so it's pure and independently tested
+ * rather than duplicated here. `[]` until this season has a season row at
+ * all, or until at least one of its matchups has been played.
  */
 export async function getStandings(leagueId: string): Promise<StandingsRow[]> {
   if (!isSupabaseConfigured()) return [];
 
   const supabase = await resolveClient();
 
+  const { data: season } = await supabase
+    .from("seasons")
+    .select("id")
+    .eq("league_id", leagueId)
+    .order("season_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!season) return [];
+
+  const { data: rounds } = await supabase.from("fantasy_rounds").select("id").eq("season_id", season.id);
+  const roundIds = (rounds ?? []).map((r) => r.id);
+  if (roundIds.length === 0) return [];
+
   const { data: matchups } = await supabase
     .from("matchups")
     .select(
       "id, home_fantasy_team_id, away_fantasy_team_id, matchup_scores(fantasy_team_id, final_points)"
     )
-    .eq("league_id", leagueId)
+    .in("fantasy_round_id", roundIds)
     .eq("status", "final");
 
   if (!matchups || matchups.length === 0) return [];
@@ -540,11 +559,13 @@ export async function getStandings(leagueId: string): Promise<StandingsRow[]> {
   return table.map((row) => ({
     fantasyTeamId: row.fantasyTeamId,
     teamName: nameById.get(row.fantasyTeamId) ?? "—",
+    played: row.played,
     wins: row.wins,
     losses: row.losses,
     draws: row.draws,
     pointsFor: row.pointsFor,
     pointsAgainst: row.pointsAgainst,
+    leaguePoints: row.leaguePoints,
   }));
 }
 

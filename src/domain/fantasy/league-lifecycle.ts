@@ -25,6 +25,7 @@ export type LeagueLifecycleState =
   | "READY_FOR_DRAFT"
   | "DRAFTING"
   | "ACTIVE"
+  | "SEASON_COMPLETE"
   | "COMPLETED";
 
 export interface LeagueLifecycleInput {
@@ -34,21 +35,39 @@ export interface LeagueLifecycleInput {
   maxTeams: number;
   /** null when no `drafts` row exists for the league yet (the common case pre-Pass-8). */
   draftStatus: "scheduled" | "in_progress" | "completed" | null;
+  /**
+   * Pass 12A: `seasons.status` for the league's current (latest) season,
+   * or null/undefined if no season row exists yet. Optional — a caller
+   * that only needs the pre-12A distinctions (e.g. a compact nav status
+   * chip) can omit it entirely, in which case a completed season is
+   * indistinguishable from the ordinary post-draft `ACTIVE` state, exactly
+   * as it was before seasons existed. Only the League page (which actually
+   * shows season identity/champion) needs to pass the real value.
+   */
+  seasonStatus?: "SETUP" | "ACTIVE" | "COMPLETED" | null;
 }
 
 /**
  * Pure derivation — no I/O, no defaults invented beyond what the caller
  * passed in. Callers are expected to have already resolved `null`/missing
  * league data to a `NO_LEAGUE` state before ever calling this.
+ *
+ * `SEASON_COMPLETE` (Pass 12A) is deliberately distinct from `COMPLETED`:
+ * the league itself is permanent and keeps playing (a future season can
+ * start), whereas `COMPLETED` means the whole league/account state is
+ * archived. A season finishing never implies the league is done.
  */
 export function deriveLeagueLifecycle(input: LeagueLifecycleInput): LeagueLifecycleState {
-  const { leagueStatus, memberCount, draftStatus } = input;
+  const { leagueStatus, memberCount, draftStatus, seasonStatus } = input;
 
   if (leagueStatus === "completed") return "COMPLETED";
   if (leagueStatus === "archived") return "COMPLETED";
 
   if (draftStatus === "in_progress") return "DRAFTING";
-  if (draftStatus === "completed") return "ACTIVE";
+  if (draftStatus === "completed") {
+    if (seasonStatus === "COMPLETED") return "SEASON_COMPLETE";
+    return "ACTIVE";
+  }
 
   if (memberCount < MIN_MANAGERS_TO_START_DRAFT) return "WAITING_FOR_MANAGERS";
 
@@ -61,5 +80,6 @@ export const LEAGUE_LIFECYCLE_LABEL: Record<LeagueLifecycleState, string> = {
   READY_FOR_DRAFT: "READY FOR DRAFT",
   DRAFTING: "DRAFTING",
   ACTIVE: "ACTIVE",
+  SEASON_COMPLETE: "SEASON COMPLETE",
   COMPLETED: "COMPLETED",
 };

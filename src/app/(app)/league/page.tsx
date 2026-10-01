@@ -4,6 +4,7 @@ import { setActiveLeagueAction } from "@/app/(app)/actions";
 import { LeagueMatchups } from "@/components/league/league-matchups";
 import { CreateLeagueForm, JoinLeagueForm } from "@/components/league/league-forms";
 import { LeagueRecordsList } from "@/components/league/league-records";
+import { SeasonPanel } from "@/components/league/season-panel";
 import { StandingsTable } from "@/components/league/standings-table";
 import { TradeCenter } from "@/components/league/trade-center";
 import { Button } from "@/components/ui/button";
@@ -13,6 +14,7 @@ import { getDraftStatus } from "@/data-access/drafts";
 import { getLeagueDetail, getUserLeagues } from "@/data-access/leagues";
 import { getLeagueCompetitionSummary, getStandings } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
+import { getSeasonSummary } from "@/data-access/seasons";
 import { getTeamRosterPlayers, type RosterPlayerOption } from "@/data-access/roster";
 import { getLeagueTeams, getUserTeamInLeague } from "@/data-access/teams";
 import { getRecentActivity } from "@/data-access/transactions";
@@ -57,7 +59,7 @@ export default async function LeaguePage() {
   const leagues = await getUserLeagues();
   const activeLeagueId = await getActiveLeagueId(leagues);
 
-  const [activeDetail, draftStatus, standings, activity, myTeam, competition] = activeLeagueId
+  const [activeDetail, draftStatus, standings, activity, myTeam, competition, season] = activeLeagueId
     ? await Promise.all([
         getLeagueDetail(activeLeagueId),
         getDraftStatus(activeLeagueId),
@@ -65,8 +67,9 @@ export default async function LeaguePage() {
         getRecentActivity(activeLeagueId),
         getUserTeamInLeague(activeLeagueId),
         getLeagueCompetitionSummary(activeLeagueId),
+        getSeasonSummary(activeLeagueId),
       ])
-    : [null, null, [], [], null, null];
+    : [null, null, [], [], null, null, null];
 
   let tradeCenterProps: {
     myTeamId: string;
@@ -102,6 +105,7 @@ export default async function LeaguePage() {
         memberCount: activeDetail.memberCount,
         maxTeams: activeDetail.maxTeams,
         draftStatus,
+        seasonStatus: season?.status ?? null,
       })
     : null;
 
@@ -170,6 +174,8 @@ export default async function LeaguePage() {
               with) move to the secondary column. */}
           <div className="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start">
             <div className="flex flex-col gap-6">
+              <SeasonPanel season={season} leagueId={activeLeagueId!} isCommissioner={activeDetail.role === "commissioner"} />
+
               <div className="border border-border">
                 <div className="border-b border-border px-4 py-2.5">
                   <span className="label-system text-[11px] text-foreground-secondary">STANDINGS</span>

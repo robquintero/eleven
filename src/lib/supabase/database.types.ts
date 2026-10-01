@@ -394,6 +394,7 @@ export type Database = {
           id: string
           league_id: string
           number: number
+          season_id: string
           starts_at: string
           status: string
           updated_at: string
@@ -404,6 +405,7 @@ export type Database = {
           id?: string
           league_id: string
           number: number
+          season_id: string
           starts_at: string
           status?: string
           updated_at?: string
@@ -414,6 +416,7 @@ export type Database = {
           id?: string
           league_id?: string
           number?: number
+          season_id?: string
           starts_at?: string
           status?: string
           updated_at?: string
@@ -424,6 +427,13 @@ export type Database = {
             columns: ["league_id"]
             isOneToOne: false
             referencedRelation: "fantasy_leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fantasy_rounds_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
             referencedColumns: ["id"]
           },
         ]
@@ -1051,6 +1061,60 @@ export type Database = {
           },
         ]
       }
+      seasons: {
+        Row: {
+          champion_fantasy_team_id: string | null
+          completed_at: string | null
+          created_at: string
+          id: string
+          league_id: string
+          schedule_cycles: number
+          season_number: number
+          starts_at: string | null
+          status: string
+          total_rounds: number | null
+        }
+        Insert: {
+          champion_fantasy_team_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          league_id: string
+          schedule_cycles?: number
+          season_number: number
+          starts_at?: string | null
+          status?: string
+          total_rounds?: number | null
+        }
+        Update: {
+          champion_fantasy_team_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          league_id?: string
+          schedule_cycles?: number
+          season_number?: number
+          starts_at?: string | null
+          status?: string
+          total_rounds?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seasons_champion_fantasy_team_id_fkey"
+            columns: ["champion_fantasy_team_id"]
+            isOneToOne: false
+            referencedRelation: "fantasy_teams"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seasons_league_id_fkey"
+            columns: ["league_id"]
+            isOneToOne: false
+            referencedRelation: "fantasy_leagues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       trade_assets: {
         Row: {
           from_team_id: string
@@ -1354,6 +1418,10 @@ export type Database = {
           player_id: string
           round: number
         }[]
+      }
+      set_season_schedule_format: {
+        Args: { p_cycles: number; p_league_id: string }
+        Returns: undefined
       }
       shares_league_with: { Args: { p_user_id: string }; Returns: boolean }
       sign_player: {

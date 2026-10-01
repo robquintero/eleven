@@ -5,13 +5,139 @@ import { createRoundLineupSlots } from "./lineup.ts";
 import { generateRoundRobinCycle, pairingsForSeasonRound } from "../../domain/fantasy/schedule.ts";
 import { determineFixtureSyncCadence } from "../../domain/football/sync-cadence.ts";
 import { SCORING_RULE_VERSION } from "../../domain/fantasy/scoring.ts";
+import { computeTotalRounds, DEFAULT_SCHEDULE_CYCLES, type ScheduleCycles } from "../../domain/fantasy/season.ts";
 import type { RoundWindow } from "../../domain/fantasy/round-calendar.ts";
 import type { FixtureStatus } from "../../domain/football/types.ts";
 import type { Database } from "../supabase/database.types.ts";
 
 export type OpenRoundResult =
   | { ok: true; roundId: string; roundNumber: number; window: RoundWindow }
-  | { ok: false; error: "PREVIOUS_ROUND_STILL_OPEN" | "NO_ELIGIBLE_FIXTURES_FOUND" | "NOT_ENOUGH_TEAMS" };
+  | { ok: false; error: "PREVIOUS_ROUND_STILL_OPEN" | "NO_ELIGIBLE_FIXTURES_FOUND" | "NOT_ENOUGH_TEAMS" | "SEASON_COMPLETE" };
+
+export interface ActiveSeason {
+  id: string;
+  seasonNumber: number;
+  scheduleCycles: ScheduleCycles;
+  totalRounds: number;
+}
+
+/**
+ * Resolves this league's ACTIVE season, bootstrapping one if none exists
+ * yet. Lives here (not in the season-engine layer) because it is only
+ * ever called from `openNextRound` itself, as an implementation detail --
+ * this is deliberate: ~17 existing call sites across integration tests and
+ * `simulate.ts` call `openNextRound` directly, several without ever
+ * running a draft, so season creation can never be a separate step that
+ * only the draft-completion path triggers.
+ *
+ * Promotes an existing SETUP row (created by a commissioner's pre-season
+ * `set_season_schedule_format` choice) to ACTIVE if one exists; otherwise
+ * creates a fresh ACTIVE season with the default schedule (TWICE).
+ * `total_rounds` is computed ONCE here, from the real team count at this
+ * exact moment, and never recomputed afterward -- this is also the engine
+ * side of "no destructive mid-season format changes."
+ *
+ * Race-safe: the partial unique index `seasons_one_active_per_league`
+ * (one row per league with status='ACTIVE') is the actual guard, same
+ * pattern as `sign_player`'s unique_violation handling -- a concurrent
+ * create attempt converts into a harmless re-fetch of whichever season
+ * really won.
+ */
+export async function resolveOrCreateActiveSeason(
+  admin: SupabaseClient<Database>,
+  leagueId: string,
+  teamCount: number
+): Promise<ActiveSeason> {
+  const { data: active } = await admin
+    .from("seasons")
+    .select("id, season_number, schedule_cycles, total_rounds")
+    .eq("league_id", leagueId)
+    .eq("status", "ACTIVE")
+    .maybeSingle();
+
+  if (active && active.total_rounds !== null) {
+    return {
+      id: active.id,
+      seasonNumber: active.season_number,
+      scheduleCycles: active.schedule_cycles as ScheduleCycles,
+      totalRounds: active.total_rounds,
+    };
+  }
+
+  if (active) {
+    const totalRounds = computeTotalRounds(teamCount, active.schedule_cycles as ScheduleCycles);
+    await admin.from("seasons").update({ total_rounds: totalRounds }).eq("id", active.id);
+    return { id: active.id, seasonNumber: active.season_number, scheduleCycles: active.schedule_cycles as ScheduleCycles, totalRounds };
+  }
+
+  const { data: setup } = await admin
+    .from("seasons")
+    .select("id, season_number, schedule_cycles")
+    .eq("league_id", leagueId)
+    .eq("status", "SETUP")
+    .order("season_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (setup) {
+    const totalRounds = computeTotalRounds(teamCount, setup.schedule_cycles as ScheduleCycles);
+    const { error } = await admin
+      .from("seasons")
+      .update({ status: "ACTIVE", total_rounds: totalRounds, starts_at: new Date().toISOString() })
+      .eq("id", setup.id);
+    if (error?.code === "23505") return refetchActiveSeason(admin, leagueId);
+    return { id: setup.id, seasonNumber: setup.season_number, scheduleCycles: setup.schedule_cycles as ScheduleCycles, totalRounds };
+  }
+
+  const { data: maxSeason } = await admin
+    .from("seasons")
+    .select("season_number")
+    .eq("league_id", leagueId)
+    .order("season_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const seasonNumber = (maxSeason?.season_number ?? 0) + 1;
+  const totalRounds = computeTotalRounds(teamCount, DEFAULT_SCHEDULE_CYCLES);
+
+  const { data: created, error } = await admin
+    .from("seasons")
+    .insert({
+      league_id: leagueId,
+      season_number: seasonNumber,
+      status: "ACTIVE",
+      schedule_cycles: DEFAULT_SCHEDULE_CYCLES,
+      total_rounds: totalRounds,
+      starts_at: new Date().toISOString(),
+    })
+    .select("id, season_number, schedule_cycles, total_rounds")
+    .single();
+
+  if (error?.code === "23505") return refetchActiveSeason(admin, leagueId);
+  if (error || !created) throw new Error(`Failed to create season for league ${leagueId}: ${error?.message}`);
+
+  return {
+    id: created.id,
+    seasonNumber: created.season_number,
+    scheduleCycles: created.schedule_cycles as ScheduleCycles,
+    totalRounds: created.total_rounds!,
+  };
+}
+
+async function refetchActiveSeason(admin: SupabaseClient<Database>, leagueId: string): Promise<ActiveSeason> {
+  const { data: active, error } = await admin
+    .from("seasons")
+    .select("id, season_number, schedule_cycles, total_rounds")
+    .eq("league_id", leagueId)
+    .eq("status", "ACTIVE")
+    .single();
+  if (error || !active) throw new Error(`Expected an active season to exist for league ${leagueId} after a concurrent-create race`);
+  return {
+    id: active.id,
+    seasonNumber: active.season_number,
+    scheduleCycles: active.schedule_cycles as ScheduleCycles,
+    totalRounds: active.total_rounds!,
+  };
+}
 
 /**
  * Opens Eleven fantasy round N+1 for a league: finds the next eligible
@@ -26,10 +152,19 @@ export async function openNextRound(
   leagueId: string,
   now: Date
 ): Promise<OpenRoundResult> {
+  const { data: teams } = await admin
+    .from("fantasy_teams")
+    .select("id, draft_orders(position)")
+    .eq("league_id", leagueId);
+
+  if (!teams || teams.length < 2) return { ok: false, error: "NOT_ENOUGH_TEAMS" };
+
+  const season = await resolveOrCreateActiveSeason(admin, leagueId, teams.length);
+
   const { data: previousRound } = await admin
     .from("fantasy_rounds")
     .select("id, number, starts_at, ends_at, status")
-    .eq("league_id", leagueId)
+    .eq("season_id", season.id)
     .order("number", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -38,19 +173,15 @@ export async function openNextRound(
     return { ok: false, error: "PREVIOUS_ROUND_STILL_OPEN" };
   }
 
+  const roundNumber = (previousRound?.number ?? 0) + 1;
+  if (roundNumber > season.totalRounds) return { ok: false, error: "SEASON_COMPLETE" };
+
   const previousWindow: RoundWindow | null = previousRound
     ? { startsAt: new Date(previousRound.starts_at), endsAt: new Date(previousRound.ends_at) }
     : null;
 
   const window = await findNextEligibleWindow(admin, previousWindow, now);
   if (!window) return { ok: false, error: "NO_ELIGIBLE_FIXTURES_FOUND" };
-
-  const { data: teams } = await admin
-    .from("fantasy_teams")
-    .select("id, draft_orders(position)")
-    .eq("league_id", leagueId);
-
-  if (!teams || teams.length < 2) return { ok: false, error: "NOT_ENOUGH_TEAMS" };
 
   // Stable team order for schedule generation: by draft position when a
   // draft exists (it always will, by the time a league can open round 1
@@ -63,12 +194,11 @@ export async function openNextRound(
     })
     .map((t) => t.id);
 
-  const roundNumber = (previousRound?.number ?? 0) + 1;
-
   const { data: roundRow, error: roundError } = await admin
     .from("fantasy_rounds")
     .insert({
       league_id: leagueId,
+      season_id: season.id,
       number: roundNumber,
       starts_at: window.startsAt.toISOString(),
       ends_at: window.endsAt.toISOString(),
@@ -83,7 +213,7 @@ export async function openNextRound(
     // manager's manual final pick, both triggering `maybeOpenFirstRound`
     // around the same moment) both pass the `previousRound` check above
     // before either INSERT lands, then collide on
-    // `fantasy_rounds_league_id_number_key`. This is the SAME outcome as
+    // `fantasy_rounds_season_id_number_key`. This is the SAME outcome as
     // the ordinary `PREVIOUS_ROUND_STILL_OPEN` case -- someone else just
     // opened this round -- not a genuine failure, so it must resolve the
     // same clean, non-throwing way instead of propagating an uncaught
