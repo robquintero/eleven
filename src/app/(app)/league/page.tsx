@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { setActiveLeagueAction } from "@/app/(app)/actions";
+import { LeagueMatchups } from "@/components/league/league-matchups";
 import { CreateLeagueForm, JoinLeagueForm } from "@/components/league/league-forms";
+import { LeagueRecordsList } from "@/components/league/league-records";
+import { StandingsTable } from "@/components/league/standings-table";
 import { TradeCenter } from "@/components/league/trade-center";
 import { Button } from "@/components/ui/button";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getLeagueDetail, getUserLeagues } from "@/data-access/leagues";
-import { getStandings } from "@/data-access/matchups";
+import { getLeagueCompetitionSummary, getStandings } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
 import { getTeamRosterPlayers, type RosterPlayerOption } from "@/data-access/roster";
 import { getLeagueTeams, getUserTeamInLeague } from "@/data-access/teams";
@@ -54,15 +57,16 @@ export default async function LeaguePage() {
   const leagues = await getUserLeagues();
   const activeLeagueId = await getActiveLeagueId(leagues);
 
-  const [activeDetail, draftStatus, standings, activity, myTeam] = activeLeagueId
+  const [activeDetail, draftStatus, standings, activity, myTeam, competition] = activeLeagueId
     ? await Promise.all([
         getLeagueDetail(activeLeagueId),
         getDraftStatus(activeLeagueId),
         getStandings(activeLeagueId),
         getRecentActivity(activeLeagueId),
         getUserTeamInLeague(activeLeagueId),
+        getLeagueCompetitionSummary(activeLeagueId),
       ])
-    : [null, null, [], [], null];
+    : [null, null, [], [], null, null];
 
   let tradeCenterProps: {
     myTeamId: string;
@@ -159,33 +163,92 @@ export default async function LeaguePage() {
       {activeDetail && lifecycle && (
         <section>
           <ModuleHeader title="LEAGUE_STATUS" meta={LEAGUE_LIFECYCLE_LABEL[lifecycle]} />
-          <div className="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="border border-border">
-              <div className="border-b border-border px-4 py-2.5">
-                <span className="label-system text-[11px] text-foreground-secondary">
-                  MEMBERS
-                </span>
+          {/* Pass 11.5: League is now a competition center first -- standings,
+              this round's matchups, recent results, and records occupy the
+              wider primary column; membership/draft/transactions/trades
+              (still real, still reachable, just not what the page leads
+              with) move to the secondary column. */}
+          <div className="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start">
+            <div className="flex flex-col gap-6">
+              <div className="border border-border">
+                <div className="border-b border-border px-4 py-2.5">
+                  <span className="label-system text-[11px] text-foreground-secondary">STANDINGS</span>
+                </div>
+                <StandingsTable standings={standings} myTeamId={myTeam?.id ?? null} />
               </div>
-              <div className="divide-y divide-border">
-                {activeDetail.members.map((member) => (
-                  <div
-                    key={member.userId}
-                    className="flex items-center justify-between gap-3 px-4 py-2.5"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">
-                        {member.teamName ?? member.displayName}
-                      </p>
-                      <p className="label-system mt-0.5 text-[11px] text-foreground-tertiary">
-                        {member.displayName} · {member.role.toUpperCase()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+
+              <div className="border border-border">
+                <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+                  <span className="label-system text-[11px] text-foreground-secondary">CURRENT_MATCHUPS</span>
+                  {myTeam && (
+                    <Link href="/matchup" className="label-system text-[10px] text-accent hover:underline">
+                      MY MATCHUP ↗
+                    </Link>
+                  )}
+                </div>
+                <LeagueMatchups
+                  matchups={competition?.currentRoundMatchups ?? []}
+                  myTeamId={myTeam?.id ?? null}
+                  emptyLabel="NO MATCHUPS SCHEDULED YET"
+                />
+              </div>
+
+              <div className="border border-border">
+                <div className="border-b border-border px-4 py-2.5">
+                  <span className="label-system text-[11px] text-foreground-secondary">RECENT_RESULTS</span>
+                </div>
+                <LeagueMatchups
+                  matchups={competition?.recentResults ?? []}
+                  myTeamId={myTeam?.id ?? null}
+                  emptyLabel="NO RESULTS YET"
+                />
+              </div>
+
+              <div className="border border-border">
+                <div className="border-b border-border px-4 py-2.5">
+                  <span className="label-system text-[11px] text-foreground-secondary">LEAGUE_RECORDS</span>
+                </div>
+                <LeagueRecordsList
+                  records={
+                    competition?.records ?? {
+                      highestScore: null,
+                      lowestScore: null,
+                      largestMargin: null,
+                      closestMatchup: null,
+                      mostPointsFor: null,
+                      mostPointsAgainst: null,
+                    }
+                  }
+                />
               </div>
             </div>
 
             <div className="flex flex-col gap-6">
+              <div className="border border-border">
+                <div className="border-b border-border px-4 py-2.5">
+                  <span className="label-system text-[11px] text-foreground-secondary">
+                    MEMBERS
+                  </span>
+                </div>
+                <div className="divide-y divide-border">
+                  {activeDetail.members.map((member) => (
+                    <div
+                      key={member.userId}
+                      className="flex items-center justify-between gap-3 px-4 py-2.5"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {member.teamName ?? member.displayName}
+                        </p>
+                        <p className="label-system mt-0.5 text-[11px] text-foreground-tertiary">
+                          {member.displayName} · {member.role.toUpperCase()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="border border-border p-4">
                 <p className="label-system text-[11px] text-foreground-tertiary">DRAFT</p>
                 <p className="mt-1 text-sm font-medium text-foreground">
@@ -199,27 +262,6 @@ export default async function LeaguePage() {
                   <Link href="/draft" className="label-system mt-1.5 inline-block text-[11px] text-accent hover:underline">
                     OPEN DRAFT ROOM ↗
                   </Link>
-                )}
-              </div>
-
-              <div className="border border-border p-4">
-                <p className="label-system text-[11px] text-foreground-tertiary">STANDINGS</p>
-                {standings.length === 0 ? (
-                  <p className="mt-1 text-sm text-foreground-secondary">NO RESULTS YET</p>
-                ) : (
-                  <div className="mt-2 divide-y divide-border">
-                    {standings.map((row, index) => (
-                      <div key={row.fantasyTeamId} className="flex items-center gap-3 py-1.5">
-                        <span className="label-system w-4 text-xs text-foreground-tertiary">
-                          {index + 1}
-                        </span>
-                        <span className="flex-1 text-sm text-foreground">{row.teamName}</span>
-                        <span className="label-system text-xs tabular-nums text-foreground-tertiary">
-                          {row.wins}-{row.losses}-{row.draws} · {row.pointsFor.toFixed(1)} PF
-                        </span>
-                      </div>
-                    ))}
-                  </div>
                 )}
               </div>
 

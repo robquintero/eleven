@@ -547,3 +547,180 @@ export async function getStandings(leagueId: string): Promise<StandingsRow[]> {
     pointsAgainst: row.pointsAgainst,
   }));
 }
+
+export interface LeagueMatchupSummary {
+  id: string;
+  roundNumber: number;
+  status: "scheduled" | "live" | "final";
+  homeTeamId: string;
+  homeTeamName: string;
+  homePoints: number;
+  awayTeamId: string;
+  awayTeamName: string;
+  awayPoints: number;
+}
+
+export interface LeagueRecordEntry {
+  teamName: string;
+  value: number;
+  opponentName?: string;
+  roundNumber: number;
+}
+
+export interface LeagueRecords {
+  highestScore: LeagueRecordEntry | null;
+  lowestScore: LeagueRecordEntry | null;
+  largestMargin: LeagueRecordEntry | null;
+  closestMatchup: LeagueRecordEntry | null;
+  mostPointsFor: { teamName: string; value: number } | null;
+  mostPointsAgainst: { teamName: string; value: number } | null;
+}
+
+export interface LeagueCompetitionSummary {
+  /** This league's current (in-progress, else soonest upcoming) round's matchups -- every pairing, not scoped to one manager. `[]` once every round is final (season concluded) or before the draft/first round exists. */
+  currentRoundMatchups: LeagueMatchupSummary[];
+  /** Completed matchups, most recent round first. */
+  recentResults: LeagueMatchupSummary[];
+  records: LeagueRecords;
+}
+
+/**
+ * League-wide competition data for the League page's "competition
+ * center" surfaces: the current round's matchups (every pairing, not
+ * just the caller's own), recent completed results, and records derived
+ * ONLY from completed (`status = 'final'`) matchups -- never from a live
+ * or scheduled one, so nothing here can misrepresent an in-progress
+ * result as final. One shared query over `matchups`+`matchup_scores`
+ * (plus one small `fantasy_rounds`/`fantasy_teams` lookup) powers all
+ * three sections -- never a separate fetch per section.
+ */
+export async function getLeagueCompetitionSummary(leagueId: string): Promise<LeagueCompetitionSummary> {
+  if (!isSupabaseConfigured()) return emptyCompetitionSummary();
+  const supabase = await resolveClient();
+  return queryLeagueCompetitionSummary(supabase, leagueId);
+}
+
+function emptyCompetitionSummary(): LeagueCompetitionSummary {
+  return {
+    currentRoundMatchups: [],
+    recentResults: [],
+    records: {
+      highestScore: null,
+      lowestScore: null,
+      largestMargin: null,
+      closestMatchup: null,
+      mostPointsFor: null,
+      mostPointsAgainst: null,
+    },
+  };
+}
+
+/** Client-injectable core of `getLeagueCompetitionSummary` -- same reasoning as `queryPlayerDatabase`/`queryMatchupSquads`: lets the real database prove this against a real league in matchups.integration.test.ts without a live Next.js request. */
+export async function queryLeagueCompetitionSummary(
+  supabase: SupabaseClientType,
+  leagueId: string
+): Promise<LeagueCompetitionSummary> {
+  const empty = emptyCompetitionSummary();
+
+  // No `.order()` on the embedded `fantasy_rounds(number)` column --
+  // PostgREST does not order outer rows by an embedded relation's column
+  // (confirmed live elsewhere in this file, see getPlayerDatabase's own
+  // club-sort fix in src/data-access/players.ts); sorted in JS below
+  // instead, after `roundNumber` has been pulled out of the embed.
+  const { data: allMatchups } = await supabase
+    .from("matchups")
+    .select(
+      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(number), matchup_scores(fantasy_team_id, live_points, final_points)"
+    )
+    .eq("league_id", leagueId);
+
+  if (!allMatchups || allMatchups.length === 0) return empty;
+
+  const teamIds = Array.from(
+    new Set(allMatchups.flatMap((m) => [m.home_fantasy_team_id, m.away_fantasy_team_id]))
+  );
+  const { data: teams } = await supabase.from("fantasy_teams").select("id, name").in("id", teamIds);
+  const nameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
+
+  function toSummary(m: NonNullable<typeof allMatchups>[number]): LeagueMatchupSummary {
+    const scores = m.matchup_scores ?? [];
+    const home = scores.find((s) => s.fantasy_team_id === m.home_fantasy_team_id);
+    const away = scores.find((s) => s.fantasy_team_id === m.away_fantasy_team_id);
+    return {
+      id: m.id,
+      roundNumber: (m.fantasy_rounds as unknown as { number: number }).number,
+      status: m.status as LeagueMatchupSummary["status"],
+      homeTeamId: m.home_fantasy_team_id,
+      homeTeamName: nameById.get(m.home_fantasy_team_id) ?? "—",
+      homePoints: home?.final_points ?? home?.live_points ?? 0,
+      awayTeamId: m.away_fantasy_team_id,
+      awayTeamName: nameById.get(m.away_fantasy_team_id) ?? "—",
+      awayPoints: away?.final_points ?? away?.live_points ?? 0,
+    };
+  }
+
+  const summaries = allMatchups.map(toSummary).sort((a, b) => b.roundNumber - a.roundNumber);
+  const finalSummaries = summaries.filter((s) => s.status === "final");
+
+  // Current round: the lowest-numbered round that ISN'T final yet (the
+  // list is already sorted round-descending, so scan from the end) --
+  // same "in-progress, else soonest upcoming" notion `getCurrentMatchup`
+  // uses, just league-wide instead of one manager's own matchup.
+  const nonFinal = summaries.filter((s) => s.status !== "final");
+  const currentRoundNumber = nonFinal.length > 0 ? Math.min(...nonFinal.map((s) => s.roundNumber)) : null;
+  const currentRoundMatchups = currentRoundNumber !== null ? nonFinal.filter((s) => s.roundNumber === currentRoundNumber) : [];
+
+  const recentResults = finalSummaries.slice(0, 5);
+
+  const records: LeagueRecords = { ...empty.records };
+  if (finalSummaries.length > 0) {
+    let highest: LeagueRecordEntry | null = null;
+    let lowest: LeagueRecordEntry | null = null;
+    let largestMargin: LeagueRecordEntry | null = null;
+    let closest: LeagueRecordEntry | null = null;
+    const totalForByTeam = new Map<string, number>();
+    const totalAgainstByTeam = new Map<string, number>();
+
+    for (const m of finalSummaries) {
+      for (const [team, opponent, points] of [
+        [m.homeTeamName, m.awayTeamName, m.homePoints],
+        [m.awayTeamName, m.homeTeamName, m.awayPoints],
+      ] as const) {
+        if (!highest || points > highest.value) highest = { teamName: team, value: points, opponentName: opponent, roundNumber: m.roundNumber };
+        if (!lowest || points < lowest.value) lowest = { teamName: team, value: points, opponentName: opponent, roundNumber: m.roundNumber };
+      }
+      totalForByTeam.set(m.homeTeamId, (totalForByTeam.get(m.homeTeamId) ?? 0) + m.homePoints);
+      totalForByTeam.set(m.awayTeamId, (totalForByTeam.get(m.awayTeamId) ?? 0) + m.awayPoints);
+      totalAgainstByTeam.set(m.homeTeamId, (totalAgainstByTeam.get(m.homeTeamId) ?? 0) + m.awayPoints);
+      totalAgainstByTeam.set(m.awayTeamId, (totalAgainstByTeam.get(m.awayTeamId) ?? 0) + m.homePoints);
+
+      const margin = Math.round(Math.abs(m.homePoints - m.awayPoints) * 100) / 100;
+      const winner = m.homePoints >= m.awayPoints ? m.homeTeamName : m.awayTeamName;
+      const loser = m.homePoints >= m.awayPoints ? m.awayTeamName : m.homeTeamName;
+      if (!largestMargin || margin > largestMargin.value) {
+        largestMargin = { teamName: winner, value: margin, opponentName: loser, roundNumber: m.roundNumber };
+      }
+      if (!closest || margin < closest.value) {
+        closest = { teamName: winner, value: margin, opponentName: loser, roundNumber: m.roundNumber };
+      }
+    }
+
+    records.highestScore = highest;
+    records.lowestScore = lowest;
+    records.largestMargin = largestMargin;
+    records.closestMatchup = closest;
+
+    let mostFor: { teamName: string; value: number } | null = null;
+    let mostAgainst: { teamName: string; value: number } | null = null;
+    for (const [teamId, total] of totalForByTeam) {
+      if (!mostFor || total > mostFor.value) mostFor = { teamName: nameById.get(teamId) ?? "—", value: Math.round(total * 100) / 100 };
+    }
+    for (const [teamId, total] of totalAgainstByTeam) {
+      if (!mostAgainst || total > mostAgainst.value) mostAgainst = { teamName: nameById.get(teamId) ?? "—", value: Math.round(total * 100) / 100 };
+    }
+    records.mostPointsFor = mostFor;
+    records.mostPointsAgainst = mostAgainst;
+  }
+
+  return { currentRoundMatchups, recentResults, records };
+}

@@ -19,7 +19,7 @@ import assert from "node:assert/strict";
 import { createAdminClient, isSupabaseAdminConfigured } from "../lib/supabase/admin.ts";
 import { openNextRound } from "../lib/fantasy-engine/rounds.ts";
 import { createTestLeague, cleanupTestLeague } from "../lib/fantasy-engine/integration-test-helpers.ts";
-import { queryMatchupSquads, type CurrentMatchup } from "./matchups.ts";
+import { queryMatchupSquads, queryLeagueCompetitionSummary, type CurrentMatchup } from "./matchups.ts";
 
 const skip = !isSupabaseAdminConfigured();
 
@@ -170,6 +170,43 @@ test("getMatchupSquads returns a complete 4-4-2-shaped squad for a fully-rostere
     for (const player of team0Squad.bench) {
       assert.equal(typeof player.fantasyPoints, "number");
     }
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("getLeagueCompetitionSummary surfaces the real current-round matchup league-wide (not scoped to one manager), and reports no records before anything is final", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const { data: gks } = await admin.from("players").select("id").eq("active", true).eq("position", "GK").order("name").limit(2);
+    await league.clients[0].rpc("sign_player", { p_league_id: league.leagueId, p_player_id: gks![0]!.id });
+    await league.clients[1].rpc("sign_player", { p_league_id: league.leagueId, p_player_id: gks![1]!.id });
+
+    const opened = await openNextRound(admin, league.leagueId, new Date());
+    assert.ok(opened.ok);
+    if (!opened.ok) return;
+
+    const summary = await queryLeagueCompetitionSummary(admin, league.leagueId);
+
+    assert.equal(summary.currentRoundMatchups.length, 1, "the one real pairing between these two teams must appear, unscoped to either manager");
+    const matchup = summary.currentRoundMatchups[0]!;
+    assert.equal(matchup.roundNumber, 1);
+    assert.equal(matchup.status, "scheduled");
+    assert.ok([matchup.homeTeamId, matchup.awayTeamId].includes(league.teamIds[0]));
+    assert.ok([matchup.homeTeamId, matchup.awayTeamId].includes(league.teamIds[1]));
+
+    // Nothing has finished yet -- records must all be genuinely absent,
+    // never a fabricated zero/placeholder.
+    assert.equal(summary.recentResults.length, 0);
+    assert.deepEqual(summary.records, {
+      highestScore: null,
+      lowestScore: null,
+      largestMargin: null,
+      closestMatchup: null,
+      mostPointsFor: null,
+      mostPointsAgainst: null,
+    });
   } finally {
     await cleanupTestLeague(admin, league);
   }
