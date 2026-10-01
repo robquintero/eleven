@@ -19,7 +19,7 @@ export interface PlayerQuery {
   availability?: Player["availability"];
   /** Only meaningful with `activeLeagueId` — real per-league ownership, never league-agnostic. "mine" needs the caller's own team resolved too (see below), not just any ownership row. */
   ownership?: "free" | "owned" | "mine";
-  sort?: "name" | "club";
+  sort?: "points" | "name" | "club";
   sortDirection?: "asc" | "desc";
   page?: number;
   pageSize?: number;
@@ -32,6 +32,24 @@ export interface PlayerDatabasePage {
   total: number;
   page: number;
   pageSize: number;
+}
+
+/** The exact shape both query paths in `getPlayerDatabase` select -- the direct-order path and the points-sort path's final per-page fetch. */
+interface PlayerRow {
+  id: string;
+  name: string;
+  position: string;
+  shirt_number: number | null;
+  nationality: string | null;
+  availability_status: string | null;
+  club_id: string;
+  clubs: {
+    id: string;
+    name: string;
+    short_name: string;
+    competition_id: string;
+    competitions: { code: string };
+  };
 }
 
 const FIXTURE_STATUS_TO_MATCH_STATE: Record<string, PlayerMatchState> = {
@@ -101,71 +119,146 @@ export async function getPlayerDatabase(query: PlayerQuery = {}): Promise<Player
     }
   }
 
-  let builder = supabase
-    .from("players")
-    .select(
-      "id, name, position, shirt_number, nationality, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code))",
-      { count: "exact" }
-    )
-    .eq("active", true);
+  // Resolved once, up front, since both the direct-order path and the
+  // points-sort path below need the exact same "which players does this
+  // ownership filter admit" answer, including its early-`empty` cases.
+  let ownershipIdFilter: string[] | null = null;
+  let ownershipExcludeIds: string[] | null = null;
+  if (ownerTeamIdByPlayerId) {
+    const ids = Array.from(ownerTeamIdByPlayerId.keys());
+    if (query.ownership === "owned") {
+      if (ids.length === 0) return empty;
+      ownershipIdFilter = ids;
+    } else if (query.ownership === "free") {
+      if (ids.length > 0) ownershipExcludeIds = ids;
+    } else if (query.ownership === "mine") {
+      const myIds = ids.filter((id) => ownerTeamIdByPlayerId!.get(id) === myFantasyTeamId);
+      if (!myFantasyTeamId || myIds.length === 0) return empty;
+      ownershipIdFilter = myIds;
+    }
+  }
 
   const searchTerm = query.query?.trim();
+  // Accent/diacritic-insensitive (Pass 10.5B): matched against the
+  // generated `*_unaccented` columns (see
+  // supabase/migrations/20260930040000_accent_insensitive_search.sql),
+  // never the raw `name`/`short_name` — "mbappe" must find "Mbappé" and
+  // vice versa. `normalizeForSearch` strips the SAME accents from the
+  // incoming term so both sides compare equivalently; `ilike` still
+  // handles case-insensitivity as before.
+  //
+  // Matches the player's own name OR their club's full name/abbreviation
+  // (see docs/football-data-system.md "Club naming / search UX") —
+  // "Barcelona" and "BAR" both surface Barcelona's players, exactly
+  // like searching a player's own name does. Resolved as a separate club
+  // lookup rather than an embedded-relation `.or()` filter, which
+  // PostgREST doesn't reliably support across a join.
+  let matchingClubIds: string[] = [];
   if (searchTerm) {
-    // Accent/diacritic-insensitive (Pass 10.5B): matched against the
-    // generated `*_unaccented` columns (see
-    // supabase/migrations/20260930040000_accent_insensitive_search.sql),
-    // never the raw `name`/`short_name` — "mbappe" must find "Mbappé" and
-    // vice versa. `normalizeForSearch` strips the SAME accents from the
-    // incoming term so both sides compare equivalently; `ilike` still
-    // handles case-insensitivity as before.
-    //
-    // Matches the player's own name OR their club's full name/abbreviation
-    // (see docs/football-data-system.md "Club naming / search UX") —
-    // "Barcelona" and "BAR" both surface Barcelona's players, exactly
-    // like searching a player's own name does. Resolved as a separate
-    // club lookup rather than an embedded-relation `.or()` filter, which
-    // PostgREST doesn't reliably support across a join.
     const normalizedTerm = normalizeForSearch(searchTerm);
     const { data: matchingClubs } = await supabase
       .from("clubs")
       .select("id")
       .or(`name_unaccented.ilike.%${normalizedTerm}%,short_name_unaccented.ilike.%${normalizedTerm}%`);
-    const clubIds = (matchingClubs ?? []).map((c) => c.id);
-
-    builder =
-      clubIds.length > 0
-        ? builder.or(`name_unaccented.ilike.%${normalizedTerm}%,club_id.in.(${clubIds.join(",")})`)
-        : builder.ilike("name_unaccented", `%${normalizedTerm}%`);
+    matchingClubIds = (matchingClubs ?? []).map((c) => c.id);
   }
-  if (query.position) builder = builder.eq("position", query.position);
-  if (query.competitionId) builder = builder.eq("competition_id", query.competitionId);
-  if (query.clubId) builder = builder.eq("club_id", query.clubId);
-  if (query.availability) builder = builder.eq("availability_status", query.availability);
-  if (ownerTeamIdByPlayerId) {
-    const ids = Array.from(ownerTeamIdByPlayerId.keys());
-    if (query.ownership === "owned") {
-      if (ids.length === 0) return empty;
-      builder = builder.in("id", ids);
-    } else if (query.ownership === "free") {
-      if (ids.length > 0) builder = builder.not("id", "in", `(${ids.join(",")})`);
-    } else if (query.ownership === "mine") {
-      const myIds = ids.filter((id) => ownerTeamIdByPlayerId!.get(id) === myFantasyTeamId);
-      if (!myFantasyTeamId || myIds.length === 0) return empty;
-      builder = builder.in("id", myIds);
+
+  /**
+   * Every filter condition common to both query shapes below (the direct
+   * name/club order below, and the points-sort id lookup further down) —
+   * kept as one small function so the two paths can never drift out of
+   * sync, without fighting Supabase's per-`.select()`-shape builder
+   * generics (hence the loose `any`-typed parameter: every call here is
+   * a plain `.eq`/`.ilike`/`.or`/`.in`/`.not`, which exists identically
+   * on every PostgrestFilterBuilder regardless of selected columns).
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function applyCommonFilters<T extends { eq: any; ilike: any; or: any; in: any; not: any }>(b: T): T {
+    let next = b;
+    if (searchTerm) {
+      const normalizedTerm = normalizeForSearch(searchTerm);
+      next =
+        matchingClubIds.length > 0
+          ? next.or(`name_unaccented.ilike.%${normalizedTerm}%,club_id.in.(${matchingClubIds.join(",")})`)
+          : next.ilike("name_unaccented", `%${normalizedTerm}%`);
     }
-  }
-
-  if (query.sort === "club") {
-    builder = builder.order("short_name", { referencedTable: "clubs", ascending: query.sortDirection !== "desc" });
-  } else {
-    builder = builder.order("name", { ascending: query.sortDirection !== "desc" });
+    if (query.position) next = next.eq("position", query.position);
+    if (query.competitionId) next = next.eq("competition_id", query.competitionId);
+    if (query.clubId) next = next.eq("club_id", query.clubId);
+    if (query.availability) next = next.eq("availability_status", query.availability);
+    if (ownershipIdFilter) next = next.in("id", ownershipIdFilter);
+    if (ownershipExcludeIds) next = next.not("id", "in", `(${ownershipExcludeIds.join(",")})`);
+    return next;
   }
 
   const from = (page - 1) * pageSize;
-  builder = builder.range(from, from + pageSize - 1);
+  let data: PlayerRow[];
+  let count: number;
 
-  const { data, count, error } = await builder;
-  if (error || !data) return empty;
+  if (query.sort === "points") {
+    // Points aren't a column on `players` -- they're aggregated from
+    // `fantasy_player_scores` -- so sorting by them can't be a single
+    // `.order()` call. Fetch every filtered candidate's id/name (cheap:
+    // one id-only query), aggregate points for exactly that candidate
+    // set (reusing `getFantasyScoreAggregates`, never a second scoring
+    // calculation), sort+paginate in JS, then fetch the full rows for
+    // just that page's ids. Still three total queries, not N+1.
+    const idBuilder = applyCommonFilters(supabase.from("players").select("id, name").eq("active", true));
+    const { data: idRows, error: idError } = await idBuilder;
+    if (idError || !idRows) return empty;
+
+    count = idRows.length;
+    if (count === 0) return { players: [], total: 0, page, pageSize };
+
+    const scoresByCandidateId = await getFantasyScoreAggregates(
+      supabase,
+      idRows.map((r) => r.id)
+    );
+
+    const sortedIds = [...idRows]
+      .sort((a, b) => {
+        const pointsA = scoresByCandidateId.get(a.id)?.totalPoints ?? 0;
+        const pointsB = scoresByCandidateId.get(b.id)?.totalPoints ?? 0;
+        if (pointsB !== pointsA) return pointsB - pointsA;
+        return a.name.localeCompare(b.name);
+      })
+      .map((r) => r.id);
+
+    const pageIds = sortedIds.slice(from, from + pageSize);
+    if (pageIds.length === 0) return { players: [], total: count, page, pageSize };
+
+    const { data: pageRows, error: pageError } = await supabase
+      .from("players")
+      .select(
+        "id, name, position, shirt_number, nationality, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code))"
+      )
+      .in("id", pageIds);
+    if (pageError || !pageRows) return empty;
+
+    const rowById = new Map(pageRows.map((row) => [row.id, row]));
+    data = pageIds.map((id) => rowById.get(id)).filter((row): row is PlayerRow => Boolean(row));
+  } else {
+    let builder = applyCommonFilters(
+      supabase
+        .from("players")
+        .select(
+          "id, name, position, shirt_number, nationality, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code))",
+          { count: "exact" }
+        )
+        .eq("active", true)
+    );
+
+    builder =
+      query.sort === "club"
+        ? builder.order("short_name", { referencedTable: "clubs", ascending: query.sortDirection !== "desc" })
+        : builder.order("name", { ascending: query.sortDirection !== "desc" });
+    builder = builder.range(from, from + pageSize - 1);
+
+    const result = await builder;
+    if (result.error || !result.data) return empty;
+    data = result.data;
+    count = result.count ?? result.data.length;
+  }
 
   const playerIds = data.map((row) => row.id);
   const clubIds = Array.from(new Set(data.map((row) => row.club_id)));

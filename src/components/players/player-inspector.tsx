@@ -24,6 +24,7 @@ export function PlayerInspector({
   open,
   onOpenChange,
   lineupContext,
+  onRequestDrop,
 }: {
   player: Player | null;
   index?: number;
@@ -31,6 +32,7 @@ export function PlayerInspector({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   lineupContext?: LineupInspectorContext;
+  onRequestDrop?: () => void;
 }) {
   const isLgDesktop = useMediaQuery("(min-width: 1024px)", {
     defaultMatches: true,
@@ -69,6 +71,7 @@ export function PlayerInspector({
           index={index}
           recentMatches={recentMatches}
           lineupContext={lineupContext}
+          onRequestDrop={onRequestDrop}
         />
       </aside>
     );
@@ -89,6 +92,7 @@ export function PlayerInspector({
               index={index}
               recentMatches={recentMatches}
               lineupContext={lineupContext}
+              onRequestDrop={onRequestDrop}
             />
           )}
         </div>

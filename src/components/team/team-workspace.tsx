@@ -10,9 +10,18 @@ import { RoundIntelligence } from "@/components/team/round-intelligence";
 import { SquadAvailability } from "@/components/team/squad-availability";
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { RailModule } from "@/components/ui/rail-module";
 import { swapLineupAction, fillEmptySlotsAction } from "@/app/(app)/team/actions";
+import { dropPlayerAction } from "@/app/(app)/players/actions";
 import { FORMATION_RULES } from "@/domain/fantasy/constants";
 import { assignToSlots, formationSlots, type FormationSlot } from "@/lib/selectors/pitch-layout";
 import { pad2 } from "@/lib/team-fixture";
@@ -128,6 +137,15 @@ export function TeamWorkspace({
   const [substitutingSlotId, setSubstitutingSlotId] = useState<string | null>(null);
   const [isRefreshing, startRefreshTransition] = useTransition();
   const substitutionBusy = pending || isRefreshing;
+
+  // Pass 11.5: drop-from-Team, reusing the exact same `drop_player` RPC
+  // (via `dropPlayerAction`) and confirmation-dialog pattern the Players
+  // market page already uses — never a second drop implementation, and
+  // never a locally-optimistic removal: the squad only ever changes once
+  // `router.refresh()` lands the server's authoritative result.
+  const [dropTarget, setDropTarget] = useState<Player | null>(null);
+  const [dropPending, setDropPending] = useState(false);
+  const [dropError, setDropError] = useState<string | null>(null);
 
   const canEdit = Boolean(fantasyTeamId);
 
@@ -332,6 +350,27 @@ export function TeamWorkspace({
     router.refresh();
   }
 
+  function requestDrop(player: Player) {
+    setDropError(null);
+    setDropTarget(player);
+  }
+
+  async function confirmDrop() {
+    if (!leagueId || !dropTarget) return;
+    const player = dropTarget;
+    setDropError(null);
+    setDropPending(true);
+    const result = await dropPlayerAction(leagueId, player.id);
+    setDropPending(false);
+    if (result?.error) {
+      setDropError(result.error);
+      return;
+    }
+    setDropTarget(null);
+    setDetailOpen(false);
+    router.refresh();
+  }
+
   return (
     <div>
       {fantasyTeamId && (
@@ -452,7 +491,40 @@ export function TeamWorkspace({
         </div>
       </div>
 
-      <PlayerInspector player={detail} variant="overlay" open={detailOpen} onOpenChange={setDetailOpen} />
+      <PlayerInspector
+        player={detail}
+        variant="overlay"
+        open={detailOpen}
+        onOpenChange={setDetailOpen}
+        onRequestDrop={canEdit && detail ? () => requestDrop(detail) : undefined}
+      />
+
+      <Dialog
+        open={dropTarget !== null}
+        onOpenChange={(open) => {
+          if (!open && !dropPending) setDropTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>DROP {dropTarget?.name.toUpperCase()}</DialogTitle>
+            <DialogDescription>
+              This removes {dropTarget?.name} from your roster immediately and returns them to the free
+              market. Any current-round lineup points already locked in are unaffected, but you will lose
+              the player&apos;s remaining-round points if they haven&apos;t kicked off yet.
+            </DialogDescription>
+          </DialogHeader>
+          {dropError && <p className="text-xs text-destructive">{dropError}</p>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDropTarget(null)} disabled={dropPending}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDrop} disabled={dropPending}>
+              {dropPending ? "Dropping…" : "Drop Player"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

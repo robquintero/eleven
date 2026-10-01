@@ -75,7 +75,7 @@ export async function getAvailablePlayersAction(
   query: string,
   position?: PlayerPosition
 ): Promise<PlayerDatabasePage> {
-  return getPlayerDatabase({ activeLeagueId: leagueId, query, position, pageSize: 30 });
+  return getPlayerDatabase({ activeLeagueId: leagueId, query, position, sort: "points", pageSize: 30 });
 }
 
 /**

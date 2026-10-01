@@ -84,12 +84,15 @@ export function PlayerInspectorContent({
   index,
   recentMatches,
   lineupContext,
+  onRequestDrop,
 }: {
   player: Player;
   index?: number;
   /** `null` while loading, `[]` for INSUFFICIENT MATCH DATA, real rows otherwise — see src/data-access/players.ts. */
   recentMatches?: RecentMatchRow[] | null;
   lineupContext?: LineupInspectorContext;
+  /** Pass 11.5: present only from the Team page, for the caller's own roster player — opens the same drop confirmation Team/Players already share (see team-workspace.tsx). Never pre-blocked here for a locked player; `drop_player`'s own Pass 11 semantics decide what happens server-side. */
+  onRequestDrop?: () => void;
 }) {
   const router = useRouter();
   const [showNote, setShowNote] = useState(false);
@@ -259,6 +262,15 @@ export function PlayerInspectorContent({
             <p className="mt-1 text-xs text-foreground-tertiary">
               Manage starters from the Team page.
             </p>
+            {onRequestDrop && (
+              <Button
+                className="mt-2.5 w-full rounded-control"
+                variant="ghost"
+                onClick={onRequestDrop}
+              >
+                Drop player
+              </Button>
+            )}
           </div>
         ) : ownership === "owned" ? (
           <>

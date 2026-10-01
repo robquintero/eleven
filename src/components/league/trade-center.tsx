@@ -146,7 +146,8 @@ export function TradeCenter({
   );
 }
 
-function TradeList({
+/** Exported (Pass 11.5) so Home's compact trade widget can render the same incoming/outgoing cards and accept/reject/cancel actions without a second trade UI — see dashboard/trade-desk.tsx. */
+export function TradeList({
   direction,
   trades,
   myTeamId,
@@ -215,7 +216,8 @@ function TradeList({
   );
 }
 
-function ProposeTradeDialog({
+/** Exported (Pass 11.5) so Home's compact trade widget can propose a trade inline without a second implementation — see dashboard/trade-desk.tsx. */
+export function ProposeTradeDialog({
   open,
   onOpenChange,
   leagueId,

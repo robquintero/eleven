@@ -7,7 +7,7 @@ import { getUserLeagues } from "@/data-access/leagues";
 import { getUserSquad } from "@/data-access/roster";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { ROSTER_RULES } from "@/domain/fantasy/constants";
-import type { PlayerPosition } from "@/domain/football/types";
+import { rosterVacancies, type RosterCounts } from "@/domain/fantasy/roster-rules";
 import { pad2 } from "@/lib/team-fixture";
 import type { Squad } from "@/lib/types/fantasy";
 
@@ -35,17 +35,13 @@ export default async function TeamPage() {
   // Pass 11: rosters may legitimately sit below ROSTER_RULES.squadSize
   // after a drop -- no auto-fill ever happens -- so this is read as
   // intentional vacancy state, never an error, and the market is the
-  // only prescribed next action.
-  const positionCounts: Record<PlayerPosition, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
-  for (const slot of squad.starters) positionCounts[slot.player.position] += 1;
-  for (const player of squad.bench) positionCounts[player.position] += 1;
+  // only prescribed next action. Pass 11.5: `rosterVacancies` is the one
+  // shared definition of "short" (also used by Home) -- never duplicated.
+  const positionCounts: RosterCounts = {};
+  for (const slot of squad.starters) positionCounts[slot.player.position] = (positionCounts[slot.player.position] ?? 0) + 1;
+  for (const player of squad.bench) positionCounts[player.position] = (positionCounts[player.position] ?? 0) + 1;
 
-  const vacancies = (Object.keys(ROSTER_RULES.positionRange) as PlayerPosition[])
-    .map((position) => ({
-      position,
-      short: Math.max(0, ROSTER_RULES.positionRange[position].min - positionCounts[position]),
-    }))
-    .filter((v) => v.short > 0);
+  const vacancies = rosterVacancies(positionCounts);
 
   return (
     <div>

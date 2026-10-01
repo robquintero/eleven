@@ -9,7 +9,7 @@ import type { PlayerAvailability, PlayerOwnership, PlayerPosition } from "@/lib/
  * toolbar renders and turns them into URL search params.
  */
 
-export type SortKey = "name" | "club";
+export type SortKey = "points" | "name" | "club";
 
 export interface PlayerFilters {
   query: string;
@@ -28,7 +28,7 @@ export const defaultFilters: PlayerFilters = {
   clubId: "ALL",
   ownership: "ALL",
   availability: "ALL",
-  sort: "name",
+  sort: "points",
 };
 
 export const positionOptions: { value: PlayerFilters["position"]; label: string }[] = [
@@ -48,6 +48,7 @@ export const availabilityOptions: { value: PlayerFilters["availability"]; label:
 ];
 
 export const sortOptions: { value: SortKey; label: string }[] = [
+  { value: "points", label: "POINTS HIGH–LOW" },
   { value: "name", label: "NAME A–Z" },
   { value: "club", label: "CLUB A–Z" },
 ];
@@ -81,7 +82,7 @@ export function parseFiltersFromSearchParams(sp: SearchParamsInput): { filters: 
     v === "available" || v === "doubtful" || v === "injured" || v === "suspended";
   const isOwnership = (v: string | undefined): v is PlayerFilters["ownership"] =>
     v === "free" || v === "owned" || v === "mine";
-  const isSort = (v: string | undefined): v is SortKey => v === "name" || v === "club";
+  const isSort = (v: string | undefined): v is SortKey => v === "points" || v === "name" || v === "club";
 
   const positionRaw = get("pos");
   const availabilityRaw = get("avail");
@@ -98,7 +99,7 @@ export function parseFiltersFromSearchParams(sp: SearchParamsInput): { filters: 
       clubId: get("club") || "ALL",
       ownership: isOwnership(ownershipRaw) ? ownershipRaw : "ALL",
       availability: isAvailability(availabilityRaw) ? availabilityRaw : "ALL",
-      sort: isSort(sortRaw) ? sortRaw : "name",
+      sort: isSort(sortRaw) ? sortRaw : "points",
     },
     page,
   };
@@ -113,7 +114,7 @@ export function filtersToSearchParams(filters: PlayerFilters, page: number): URL
   if (filters.clubId !== "ALL") params.set("club", filters.clubId);
   if (filters.ownership !== "ALL") params.set("own", filters.ownership);
   if (filters.availability !== "ALL") params.set("avail", filters.availability);
-  if (filters.sort !== "name") params.set("sort", filters.sort);
+  if (filters.sort !== "points") params.set("sort", filters.sort);
   if (page > 1) params.set("page", String(page));
   return params;
 }

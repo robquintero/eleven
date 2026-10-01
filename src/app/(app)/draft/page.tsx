@@ -63,7 +63,9 @@ export default async function DraftPage() {
 
   // Pass 10.5C: no `ownership: "free"` filter -- drafted players stay on
   // the board (dimmed/unavailable, see draft-workspace.tsx), never vanish.
-  const initialPlayers = await getPlayerDatabase({ activeLeagueId: league.id, pageSize: 30 });
+  // Pass 11.5: defaults to fantasy points (high to low) so the best
+  // available players surface first for a decision in progress.
+  const initialPlayers = await getPlayerDatabase({ activeLeagueId: league.id, sort: "points", pageSize: 30 });
 
   return <DraftPageClient leagueId={league.id} draft={draft} hasTeam={Boolean(team)} initialPlayers={initialPlayers} />;
 }

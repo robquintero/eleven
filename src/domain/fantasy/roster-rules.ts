@@ -106,3 +106,20 @@ export function canDraftPosition(
 export function draftablePositions(counts: RosterCounts, picksRemainingIncludingThisOne: number): PlayerPosition[] {
   return POSITIONS.filter((position) => canDraftPosition(counts, position, picksRemainingIncludingThisOne));
 }
+
+/**
+ * Pass 11: a free-market roster may legitimately sit below
+ * `ROSTER_RULES.squadSize` after a drop — this reports which positions
+ * are currently short of their MINIMUM (never their maximum; a market
+ * roster is never required to be "completable" the way a draft-in-
+ * progress one is, see this module's own header comment). Used by both
+ * the Team page's vacancy banner and Home's roster-vacancy readout —
+ * kept here, not duplicated in either page, so "what counts as short"
+ * only has one definition.
+ */
+export function rosterVacancies(counts: RosterCounts): { position: PlayerPosition; short: number }[] {
+  return POSITIONS.map((position) => ({
+    position,
+    short: Math.max(0, ROSTER_RULES.positionRange[position].min - countAt(counts, position)),
+  })).filter((v) => v.short > 0);
+}

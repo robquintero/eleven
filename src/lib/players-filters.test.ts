@@ -30,10 +30,10 @@ test("parseFiltersFromSearchParams reads every recognized param", () => {
   assert.equal(page, 3);
 });
 
-test("parseFiltersFromSearchParams falls back to ALL/name for unrecognized enum values rather than throwing", () => {
-  const { filters } = parseFiltersFromSearchParams({ pos: "not-a-position", sort: "points" });
+test("parseFiltersFromSearchParams falls back to ALL/points for unrecognized enum values rather than throwing", () => {
+  const { filters } = parseFiltersFromSearchParams({ pos: "not-a-position", sort: "bogus" });
   assert.equal(filters.position, "ALL");
-  assert.equal(filters.sort, "name");
+  assert.equal(filters.sort, "points");
 });
 
 test("parseFiltersFromSearchParams clamps page to at least 1", () => {

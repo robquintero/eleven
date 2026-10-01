@@ -174,6 +174,69 @@ export function DraftWorkspace({
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_0.9fr]">
       <section>
+        {/* Pass 11.5: compact mobile-only decision strip -- on mobile the
+            full DRAFT_STATUS/SQUAD rail below sits AFTER the entire
+            player pool, which forced managers to scroll past every
+            available player just to see whose turn it is or what their
+            roster needs. This renders the same real draft/`draft`+
+            `myCounts` state ABOVE the pool instead, restrained to a few
+            lines (never a half-screen sticky header) -- the two
+            RailModules it replaces are hidden below `lg:` (see below) so
+            nothing is shown twice. */}
+        <div className="mb-3 border border-border px-3 py-2.5 lg:hidden">
+          {draft.status === "completed" ? (
+            <p className="text-xs text-foreground-secondary">Draft complete — {draft.picks.length} picks made.</p>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="label-system text-[10px] text-foreground-tertiary">ON THE CLOCK</span>
+                <span className="truncate text-xs font-semibold text-foreground">{draft.currentTeamName ?? "—"}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <span className="label-system text-[10px] text-foreground-tertiary">PICK</span>
+                <span className="label-system text-xs font-semibold tabular-nums text-foreground">
+                  {pad2(draft.currentRound)}.{pad2(draft.currentPick)}
+                </span>
+              </div>
+              <div className="mt-1 flex items-center justify-between">
+                <span className="label-system text-[10px] text-foreground-tertiary">TIME</span>
+                <span
+                  className={`label-system text-xs font-semibold tabular-nums ${remainingMs !== null && remainingMs < 10000 ? "text-destructive" : "text-foreground"}`}
+                >
+                  {remainingMs !== null ? formatCountdown(remainingMs) : "—"}
+                </span>
+              </div>
+              {draft.isMyTurn && (
+                <p className="label-system mt-1 text-[10px] font-semibold text-accent">YOUR PICK</p>
+              )}
+            </>
+          )}
+          <div className="mt-2 flex items-center justify-between border-t border-border pt-1.5">
+            <span className="label-system text-[10px] text-foreground-tertiary">SQUAD</span>
+            <span className="label-system text-xs font-semibold tabular-nums text-foreground">
+              {myPickCount} / {ROSTER_RULES.squadSize}
+            </span>
+          </div>
+          <div className="mt-1 flex items-center justify-between gap-1">
+            {(["GK", "DEF", "MID", "FWD"] as const).map((position) => {
+              const { min, max } = ROSTER_RULES.positionRange[position];
+              const count = myCounts[position] ?? 0;
+              const belowMin = count < min;
+              const atMax = count >= max;
+              return (
+                <span
+                  key={position}
+                  className={`label-system text-[10px] tabular-nums ${
+                    belowMin ? "font-semibold text-accent" : atMax ? "text-foreground-tertiary" : "text-foreground-secondary"
+                  }`}
+                >
+                  {position} {count}/{min === max ? min : `${min}+`}
+                </span>
+              );
+            })}
+          </div>
+        </div>
+
         <ModuleHeader
           title="AVAILABLE_PLAYERS"
           meta={`${availablePlayers.total} PLAYERS`}
@@ -249,6 +312,7 @@ export function DraftWorkspace({
                     </p>
                     <p className="label-system truncate text-[11px] text-foreground-tertiary">
                       {player.club.shortName}
+                      {player.totalPoints !== undefined && ` · ${player.totalPoints} PTS`}
                     </p>
                   </button>
                   {isDrafted ? (
@@ -284,7 +348,15 @@ export function DraftWorkspace({
       </section>
 
       <div className="flex flex-col divide-y divide-border border border-border">
-        <RailModule header="DRAFT_STATUS" meta={draft.status === "completed" ? "COMPLETE" : `RD ${pad2(draft.currentRound)}`}>
+        {/* Pass 11.5: redundant with the compact mobile strip above the
+            player pool now -- desktop-only here, where the rail sits
+            beside (not below) the pool and the original scroll problem
+            doesn't exist. */}
+        <RailModule
+          className="hidden lg:block"
+          header="DRAFT_STATUS"
+          meta={draft.status === "completed" ? "COMPLETE" : `RD ${pad2(draft.currentRound)}`}
+        >
           {draft.status === "completed" ? (
             <p className="text-sm text-foreground-secondary">Draft complete — {draft.picks.length} picks made.</p>
           ) : (
@@ -312,7 +384,7 @@ export function DraftWorkspace({
           )}
         </RailModule>
 
-        <RailModule header="SQUAD" meta={`${myPickCount} / ${ROSTER_RULES.squadSize}`}>
+        <RailModule className="hidden lg:block" header="SQUAD" meta={`${myPickCount} / ${ROSTER_RULES.squadSize}`}>
           <div className="space-y-1">
             {(["GK", "DEF", "MID", "FWD"] as const).map((position) => {
               const { min, max } = ROSTER_RULES.positionRange[position];
