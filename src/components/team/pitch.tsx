@@ -73,6 +73,7 @@ export function Pitch({
   selectedEmptySlotId = null,
   fillTargetPosition = null,
   onSelectEmptySlot,
+  substitutingSlotId = null,
 }: {
   slots: PitchItem[];
   formation: Formation;
@@ -83,6 +84,8 @@ export function Pitch({
   selectedEmptySlotId?: string | null;
   fillTargetPosition?: PlayerPosition | null;
   onSelectEmptySlot?: (slot: EmptyPitchSlot) => void;
+  /** Pass 10.5C.5A: the outgoing slot of an in-flight substitution, if any -- only this one node shows processing feedback, never the whole pitch. */
+  substitutingSlotId?: string | null;
 }) {
   return (
     <div className="w-full overflow-hidden border border-border bg-surface-elevated">
@@ -138,6 +141,7 @@ export function Pitch({
                 editing={editing}
                 selected={selectedSlotId === item.id}
                 swapTarget={editing && swapTargetPosition === item.position && selectedSlotId !== item.id}
+                substituting={substitutingSlotId === item.id}
                 onSelect={() => onSelectSlot(item)}
               />
             )}

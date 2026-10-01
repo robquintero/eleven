@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, X } from "lucide-react";
 import { BenchRow } from "@/components/team/bench-row";
@@ -113,6 +113,21 @@ export function TeamWorkspace({
   const [pendingAssignments, setPendingAssignments] = useState<Map<string, Player>>(new Map());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Pass 10.5C.5A: which pitch slot's authenticated write is in flight, if
+  // any (its PlayerNode shows restrained processing feedback -- see that
+  // component's own `substituting` prop). `isRefreshing` tracks the
+  // router.refresh() that follows a successful write via useTransition.
+  // `substitutionBusy` stays true across BOTH the action call (`pending`)
+  // and that follow-up refresh, so the processing state -- and the guard
+  // against a second, conflicting lineup mutation -- lasts until the NEW
+  // server-confirmed squad has actually landed, never just the instant
+  // the action call itself returns. No effect needed to "clear" anything:
+  // once both flags are false, `substitutionBusy` is false on its own,
+  // and `trySwap` overwrites `substitutingSlotId` at the start of its own
+  // next call regardless.
+  const [substitutingSlotId, setSubstitutingSlotId] = useState<string | null>(null);
+  const [isRefreshing, startRefreshTransition] = useTransition();
+  const substitutionBusy = pending || isRefreshing;
 
   const canEdit = Boolean(fantasyTeamId);
 
@@ -142,18 +157,34 @@ export function TeamWorkspace({
     Object.fromEntries(availabilityOrder.map((s) => [s, 0])) as Record<PlayerAvailability, number>
   );
 
-  async function trySwap(starterOut: string, benchIn: string) {
-    if (!fantasyTeamId || pending) return;
-    setPending(true);
+  /**
+   * Pass 10.5C.5A: immediate processing feedback for the authenticated
+   * write's real (roughly 1-2s) latency, without ever showing the
+   * replacement before the server confirms it. `outSlotId` is the
+   * OUTGOING starter's pitch slot -- the one `PlayerNode` that shows the
+   * restrained spinner/pulse treatment while this resolves. The picker
+   * (`selected`) closes immediately, before the request even starts.
+   * `substitutionBusy` (`pending || isRefreshing`) stays true until the
+   * POST-success `router.refresh()` transition itself settles, so the
+   * processing state stays visible through the full round-trip, not just
+   * the action call -- see this component's own state-declaration comment
+   * for why no effect is needed to "clear" it afterward.
+   */
+  async function trySwap(outSlotId: string, starterOut: string, benchIn: string) {
+    if (!fantasyTeamId || substitutionBusy) return;
+    setSelected(null);
     setError(null);
+    setPending(true);
+    setSubstitutingSlotId(outSlotId);
     const result = await swapLineupAction(leagueId, fantasyTeamId, starterOut, benchIn);
     setPending(false);
-    setSelected(null);
     if (result?.error) {
       setError(result.error);
-    } else {
-      router.refresh();
+      return;
     }
+    startRefreshTransition(() => {
+      router.refresh();
+    });
   }
 
   /** Queues a bench player against a SPECIFIC slot id, purely client-side — see this component's own doc comment and `handleDoneOrEdit`. */
@@ -176,13 +207,18 @@ export function TeamWorkspace({
   }
 
   function handleSelectStarterOrPending(item: LineupSlot) {
-    if (pendingAssignments.has(item.id)) {
-      if (!editing) return;
-      unqueueFill(item.id);
+    if (!editing && !substitutionBusy) {
+      openPlayer(item.player);
       return;
     }
-    if (!editing) {
-      openPlayer(item.player);
+    // Pass 10.5C.5A: a substitution write (or its follow-up refresh) is
+    // already in flight -- never a conflicting second lineup mutation
+    // while it resolves. The pitch itself isn't visually frozen (only the
+    // one node mid-substitution shows processing), this just makes every
+    // OTHER click a no-op until the authoritative result lands.
+    if (substitutionBusy) return;
+    if (pendingAssignments.has(item.id)) {
+      unqueueFill(item.id);
       return;
     }
     if (item.locked) {
@@ -190,14 +226,14 @@ export function TeamWorkspace({
       return;
     }
     if (selected?.kind === "bench") {
-      trySwap(item.player.id, selected.player.id);
+      trySwap(item.id, item.player.id, selected.player.id);
       return;
     }
     setSelected(selected?.kind === "starter" && selected.slotId === item.id ? null : { kind: "starter", slotId: item.id, player: item.player });
   }
 
   function handleSelectEmptySlot(emptySlot: EmptyPitchSlot) {
-    if (!canEdit) return;
+    if (!canEdit || substitutionBusy) return;
     // An obviously-interactive empty slot doesn't require "Edit lineup"
     // first (Pass 10.5C.2) -- clicking it activates editing directly.
     if (!editing) setEditing(true);
@@ -217,12 +253,13 @@ export function TeamWorkspace({
   }
 
   function handleSelectBench(player: Player) {
-    if (!editing) {
+    if (!editing && !substitutionBusy) {
       openPlayer(player);
       return;
     }
+    if (substitutionBusy) return;
     if (selected?.kind === "starter") {
-      trySwap(selected.player.id, player.id);
+      trySwap(selected.slotId, selected.player.id, player.id);
       return;
     }
     if (selected?.kind === "emptySlot") {
@@ -277,7 +314,7 @@ export function TeamWorkspace({
       return;
     }
 
-    if (!fantasyTeamId || pending) return;
+    if (!fantasyTeamId || substitutionBusy) return;
     setPending(true);
     setError(null);
     const fills = slots
@@ -310,11 +347,11 @@ export function TeamWorkspace({
             variant={editing ? "outline" : "default"}
             className="rounded-control"
             onClick={handleDoneOrEdit}
-            disabled={pending || (!editing && !canEdit)}
+            disabled={substitutionBusy || (!editing && !canEdit)}
           >
             {editing ? (
               <>
-                <X className="mr-1.5 size-3.5" strokeWidth={2} /> {pending ? "Saving…" : "Done"}
+                <X className="mr-1.5 size-3.5" strokeWidth={2} /> {substitutionBusy ? "Saving…" : "Done"}
               </>
             ) : (
               <>
@@ -340,6 +377,7 @@ export function TeamWorkspace({
               selectedEmptySlotId={selected?.kind === "emptySlot" ? selected.slotId : null}
               fillTargetPosition={selected?.kind === "bench" ? selected.player.position : null}
               onSelectEmptySlot={handleSelectEmptySlot}
+              substitutingSlotId={substitutingSlotId}
             />
             {!fantasyTeamId && (
               <p className="mt-3 text-center text-sm text-foreground-tertiary">
