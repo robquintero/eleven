@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { TeamWorkspace } from "@/components/team/team-workspace";
 import { ensureFirstRoundOpenedAction } from "@/app/(app)/team/actions";
@@ -5,6 +6,8 @@ import { getActiveLeagueId } from "@/data-access/active-league";
 import { getUserLeagues } from "@/data-access/leagues";
 import { getUserSquad } from "@/data-access/roster";
 import { getUserTeamInLeague } from "@/data-access/teams";
+import { ROSTER_RULES } from "@/domain/fantasy/constants";
+import type { PlayerPosition } from "@/domain/football/types";
 import { pad2 } from "@/lib/team-fixture";
 import type { Squad } from "@/lib/types/fantasy";
 
@@ -29,6 +32,21 @@ export default async function TeamPage() {
 
   const squadSize = squad.starters.length + squad.bench.length;
 
+  // Pass 11: rosters may legitimately sit below ROSTER_RULES.squadSize
+  // after a drop -- no auto-fill ever happens -- so this is read as
+  // intentional vacancy state, never an error, and the market is the
+  // only prescribed next action.
+  const positionCounts: Record<PlayerPosition, number> = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
+  for (const slot of squad.starters) positionCounts[slot.player.position] += 1;
+  for (const player of squad.bench) positionCounts[player.position] += 1;
+
+  const vacancies = (Object.keys(ROSTER_RULES.positionRange) as PlayerPosition[])
+    .map((position) => ({
+      position,
+      short: Math.max(0, ROSTER_RULES.positionRange[position].min - positionCounts[position]),
+    }))
+    .filter((v) => v.short > 0);
+
   return (
     <div>
       <div className="flex items-start justify-between gap-4">
@@ -40,7 +58,7 @@ export default async function TeamPage() {
             <span>{league.name}</span>
             <span className="text-foreground-tertiary">·</span>
             <span className="label-system text-xs text-foreground-tertiary">
-              SQUAD {pad2(squadSize)}
+              {squadSize} / {ROSTER_RULES.squadSize} PLAYERS
             </span>
           </p>
         </div>
@@ -56,6 +74,24 @@ export default async function TeamPage() {
         <p className="mt-2 text-xs text-foreground-tertiary">
           You don&apos;t have a fantasy team in this league yet.
         </p>
+      )}
+
+      {team && vacancies.length > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-accent/30 bg-accent/5 px-4 py-3">
+          <div>
+            <p className="label-system text-[11px] text-accent">ROSTER VACANCY</p>
+            <p className="mt-0.5 text-xs text-foreground-secondary">
+              Short on {vacancies.map((v) => `${v.short} ${v.position}`).join(", ")}. No auto-fill — sign
+              replacements from the free market whenever you&apos;re ready.
+            </p>
+          </div>
+          <Link
+            href="/players"
+            className="label-system shrink-0 text-[11px] text-accent hover:underline"
+          >
+            BROWSE MARKET →
+          </Link>
+        </div>
       )}
 
       <TeamWorkspace

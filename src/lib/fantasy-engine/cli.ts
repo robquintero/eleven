@@ -35,6 +35,10 @@ function parseFlags(argv: string[]): Record<string, string> {
   return flags;
 }
 
+function yesNo(value: boolean): string {
+  return value ? "yes" : "NO";
+}
+
 function printReport(result: Awaited<ReturnType<typeof runSimulation>>["result"]) {
   console.log("ELEVEN FANTASY SIMULATION");
   console.log("────────────────────────────────");
@@ -57,6 +61,18 @@ function printReport(result: Awaited<ReturnType<typeof runSimulation>>["result"]
   console.log(`Lock violations ........ ${result.invariants.lockViolations}`);
   console.log(`Scoring mismatches ..... ${result.invariants.scoringMismatches}`);
   console.log(`Standings mismatches ... ${result.invariants.standingsMismatches}`);
+  console.log(`Market violations ...... ${result.invariants.marketViolations}`);
+  console.log("");
+  console.log("MARKET & TRADES (Pass 11)");
+  console.log(`  Drop succeeded ................ ${yesNo(result.market.dropped)}`);
+  console.log(`  Dropped player became free ..... ${yesNo(result.market.droppedPlayerAvailableAfterwards)}`);
+  console.log(`  Replacement signed ............. ${yesNo(result.market.signedReplacement)}`);
+  console.log(`  Roster restored to full ........ ${yesNo(result.market.rosterRestoredTo16)}`);
+  console.log(`  Race attempted .................. ${yesNo(result.market.raceAttempted)}`);
+  console.log(`  Race: exactly one winner ........ ${yesNo(result.market.raceExactlyOneWinner)}`);
+  console.log(`  Trade proposed .................. ${yesNo(result.market.tradeProposed)}`);
+  console.log(`  Trade accepted ................... ${yesNo(result.market.tradeAccepted)}`);
+  console.log(`  Trade ownership transferred ...... ${yesNo(result.market.tradeOwnershipTransferredCorrectly)}`);
   console.log("");
   if (result.standings.length > 0) {
     console.log("STANDINGS");

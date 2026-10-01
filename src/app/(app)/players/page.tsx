@@ -2,6 +2,7 @@ import { PlayersWorkspace } from "@/components/players/players-workspace";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getUserLeagues } from "@/data-access/leagues";
 import { getClubFilters, getCompetitionFilters, getPlayerDatabase } from "@/data-access/players";
+import { getUserTeamInLeague } from "@/data-access/teams";
 import { parseFiltersFromSearchParams } from "@/lib/players-filters";
 
 export default async function PlayersPage({ searchParams }: PageProps<"/players">) {
@@ -10,6 +11,11 @@ export default async function PlayersPage({ searchParams }: PageProps<"/players"
 
   const leagues = await getUserLeagues();
   const activeLeagueId = await getActiveLeagueId(leagues);
+  // Pass 11: the Players page is the free-agent market -- ADD/DROP only
+  // ever render when the caller actually has a team in the active league
+  // (see PlayersWorkspace/MarketAction's own "never expose an action that
+  // can't succeed" rule).
+  const team = activeLeagueId ? await getUserTeamInLeague(activeLeagueId) : null;
 
   const [competitions, clubs, data] = await Promise.all([
     getCompetitionFilters(),
@@ -35,6 +41,8 @@ export default async function PlayersPage({ searchParams }: PageProps<"/players"
       competitions={competitions}
       clubs={clubs}
       hasActiveLeague={Boolean(activeLeagueId)}
+      leagueId={activeLeagueId}
+      fantasyTeamId={team?.id ?? null}
     />
   );
 }

@@ -30,6 +30,28 @@ export interface SimulationInvariants {
   lockViolations: number;
   scoringMismatches: number;
   standingsMismatches: number;
+  marketViolations: number;
+}
+
+/**
+ * Pass 11: free market (drop/sign/race) + a trade, driven through the
+ * actual RLS-gated RPCs exactly like the rest of this simulation, run
+ * once after the draft completes and before round 1 opens -- proving the
+ * market/trade engine coexists cleanly with the draft -> round ->
+ * scoring lifecycle the rest of this file already exercises, not just in
+ * isolation (that isolated coverage already exists in
+ * market-trades.integration.test.ts).
+ */
+export interface MarketSimulationSummary {
+  dropped: boolean;
+  droppedPlayerAvailableAfterwards: boolean;
+  signedReplacement: boolean;
+  rosterRestoredTo16: boolean;
+  raceAttempted: boolean;
+  raceExactlyOneWinner: boolean;
+  tradeProposed: boolean;
+  tradeAccepted: boolean;
+  tradeOwnershipTransferredCorrectly: boolean;
 }
 
 export interface SimulationResult {
@@ -45,6 +67,7 @@ export interface SimulationResult {
   invariants: SimulationInvariants;
   passed: boolean;
   standings: Array<{ fantasyTeamId: string; wins: number; losses: number; draws: number; pointsFor: number; pointsAgainst: number }>;
+  market: MarketSimulationSummary;
 }
 
 /**
@@ -126,6 +149,8 @@ export async function runSimulation(
     playersDrafted++;
   }
 
+  const market = await simulateMarketAndTrades(admin, clients, leagueId, teamIds);
+
   const roundSummaries: SimulationRoundSummary[] = [];
   let clock = new Date(startAt);
   const totalFixturesReplayed = new Set<string>();
@@ -197,7 +222,18 @@ export async function runSimulation(
     if (!finalizeResult.finalized) break; // conservative finalization declined -- stop rather than open another round on an unfinished one
   }
 
-  const invariants = await checkInvariants(admin, leagueId, teamIds, roundSummaries);
+  const marketViolations = [
+    market.dropped,
+    market.droppedPlayerAvailableAfterwards,
+    market.signedReplacement,
+    market.rosterRestoredTo16,
+    market.raceExactlyOneWinner,
+    market.tradeProposed,
+    market.tradeAccepted,
+    market.tradeOwnershipTransferredCorrectly,
+  ].filter((ok) => !ok).length;
+
+  const invariants = { ...(await checkInvariants(admin, leagueId, teamIds, roundSummaries)), marketViolations };
   const standings = await computeStandings(admin, leagueId);
 
   const passed = Object.values(invariants).every((v) => v === 0);
@@ -218,8 +254,177 @@ export async function runSimulation(
       invariants,
       passed,
       standings,
+      market,
     },
   };
+}
+
+/**
+ * Pass 11's own slice of the simulation: drop a player from team0, verify
+ * it becomes available again, sign a replacement (verifying the roster
+ * returns to 16), then have team0 and team1 race for a second, genuinely
+ * contested free agent (proving the database — not application luck —
+ * resolves it to exactly one winner), then propose and accept a 1-for-1
+ * trade between them. Runs after the draft completes and before round 1
+ * opens, through the exact same authenticated clients/RPCs a real manager
+ * uses — never the admin client for the mutations themselves.
+ */
+async function simulateMarketAndTrades(
+  admin: SupabaseClient<Database>,
+  clients: SupabaseClient<Database>[],
+  leagueId: string,
+  teamIds: string[]
+): Promise<MarketSimulationSummary> {
+  const summary: MarketSimulationSummary = {
+    dropped: false,
+    droppedPlayerAvailableAfterwards: false,
+    signedReplacement: false,
+    rosterRestoredTo16: false,
+    raceAttempted: false,
+    raceExactlyOneWinner: false,
+    tradeProposed: false,
+    tradeAccepted: false,
+    tradeOwnershipTransferredCorrectly: false,
+  };
+
+  if (teamIds.length < 2) return summary;
+
+  async function freeAgent(position: string, excludeIds: Set<string>): Promise<string | null> {
+    const { data: owned } = await admin.from("league_player_ownership").select("player_id").eq("league_id", leagueId);
+    const ownedIds = new Set((owned ?? []).map((o) => o.player_id));
+    const { data: candidates } = await admin.from("players").select("id").eq("active", true).eq("position", position).order("name").limit(400);
+    return candidates?.find((c) => !ownedIds.has(c.id) && !excludeIds.has(c.id))?.id ?? null;
+  }
+
+  // --- drop + sign replacement ---
+  const { data: team0Roster } = await admin
+    .from("roster_entries")
+    .select("id, player_id, players(position)")
+    .eq("fantasy_team_id", teamIds[0])
+    .eq("status", "active")
+    .limit(1);
+  const toDrop = team0Roster?.[0];
+  if (toDrop) {
+    const { count: countBeforeDrop } = await admin
+      .from("roster_entries")
+      .select("*", { count: "exact", head: true })
+      .eq("fantasy_team_id", teamIds[0])
+      .eq("status", "active");
+
+    const { error: dropError } = await clients[0].rpc("drop_player", { p_league_id: leagueId, p_player_id: toDrop.player_id });
+    summary.dropped = !dropError;
+
+    const { data: ownershipAfterDrop } = await admin
+      .from("league_player_ownership")
+      .select("player_id")
+      .eq("league_id", leagueId)
+      .eq("player_id", toDrop.player_id)
+      .maybeSingle();
+    summary.droppedPlayerAvailableAfterwards = !ownershipAfterDrop;
+
+    const position = (toDrop.players as { position: string } | null)?.position ?? "MID";
+    const replacementId = await freeAgent(position, new Set([toDrop.player_id]));
+    if (replacementId) {
+      const { error: signError } = await clients[0].rpc("sign_player", { p_league_id: leagueId, p_player_id: replacementId });
+      summary.signedReplacement = !signError;
+    }
+
+    const { count: countAfterResign } = await admin
+      .from("roster_entries")
+      .select("*", { count: "exact", head: true })
+      .eq("fantasy_team_id", teamIds[0])
+      .eq("status", "active");
+    summary.rosterRestoredTo16 = countAfterResign === countBeforeDrop;
+  }
+
+  // --- concurrent race between team0 and team1 for one contested free agent ---
+  // Both teams were drafted to a full roster, so a genuine ownership race
+  // needs each side to actually have room first -- drop one (arbitrary)
+  // player from each via the real drop_player RPC, exactly like a manager
+  // clearing a roster spot before jumping on a free agent.
+  async function makeRoom(client: SupabaseClient<Database>, teamId: string): Promise<void> {
+    const { data: entry } = await admin
+      .from("roster_entries")
+      .select("player_id")
+      .eq("fantasy_team_id", teamId)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle();
+    if (entry) await client.rpc("drop_player", { p_league_id: leagueId, p_player_id: entry.player_id });
+  }
+  await makeRoom(clients[0], teamIds[0]);
+  await makeRoom(clients[1], teamIds[1]);
+
+  const contested = await freeAgent("FWD", new Set());
+  if (contested) {
+    summary.raceAttempted = true;
+    const results = await Promise.all(
+      [clients[0], clients[1]].map((client) => client.rpc("sign_player", { p_league_id: leagueId, p_player_id: contested }))
+    );
+    summary.raceExactlyOneWinner = results.filter((r) => !r.error).length === 1 && results.filter((r) => r.error).length === 1;
+  }
+
+  // --- a 1-for-1 trade between team0 and team1 ---
+  // Deliberately a SAME-POSITION swap: trading a GK for a GK (etc.) never
+  // changes either team's position counts, so this can never legitimately
+  // hit ROSTER_LIMIT_EXCEEDED on its own -- isolating this step from
+  // whatever arbitrary composition the real draft/market steps above
+  // happened to produce.
+  const { data: team0ByPosition } = await admin
+    .from("roster_entries")
+    .select("player_id, players(position)")
+    .eq("fantasy_team_id", teamIds[0])
+    .eq("status", "active");
+  const { data: team1ByPosition } = await admin
+    .from("roster_entries")
+    .select("player_id, players(position)")
+    .eq("fantasy_team_id", teamIds[1])
+    .eq("status", "active");
+  const team1PositionMap = new Map(
+    (team1ByPosition ?? []).map((r) => [(r.players as { position: string } | null)?.position, r.player_id])
+  );
+  let offeredPlayerId: string | undefined;
+  let requestedPlayerId: string | undefined;
+  for (const row of team0ByPosition ?? []) {
+    const position = (row.players as { position: string } | null)?.position;
+    const match = position ? team1PositionMap.get(position) : undefined;
+    if (match) {
+      offeredPlayerId = row.player_id;
+      requestedPlayerId = match;
+      break;
+    }
+  }
+  if (offeredPlayerId && requestedPlayerId) {
+    const { data: proposed, error: proposeError } = await clients[0].rpc("propose_trade", {
+      p_league_id: leagueId,
+      p_receiving_team_id: teamIds[1],
+      p_offered_player_ids: [offeredPlayerId],
+      p_requested_player_ids: [requestedPlayerId],
+    });
+    summary.tradeProposed = !proposeError && Boolean(proposed?.[0]?.trade_id);
+
+    if (summary.tradeProposed) {
+      const { error: acceptError } = await clients[1].rpc("accept_trade", { p_trade_id: proposed![0]!.trade_id });
+      summary.tradeAccepted = !acceptError;
+
+      const { data: offeredOwnership } = await admin
+        .from("league_player_ownership")
+        .select("fantasy_team_id")
+        .eq("league_id", leagueId)
+        .eq("player_id", offeredPlayerId)
+        .maybeSingle();
+      const { data: requestedOwnership } = await admin
+        .from("league_player_ownership")
+        .select("fantasy_team_id")
+        .eq("league_id", leagueId)
+        .eq("player_id", requestedPlayerId)
+        .maybeSingle();
+      summary.tradeOwnershipTransferredCorrectly =
+        offeredOwnership?.fantasy_team_id === teamIds[1] && requestedOwnership?.fantasy_team_id === teamIds[0];
+    }
+  }
+
+  return summary;
 }
 
 async function checkInvariants(
@@ -227,7 +432,7 @@ async function checkInvariants(
   leagueId: string,
   teamIds: string[],
   rounds: SimulationRoundSummary[]
-): Promise<SimulationInvariants> {
+): Promise<Omit<SimulationInvariants, "marketViolations">> {
   let ownershipViolations = 0;
   let rosterViolations = 0;
   let formationViolations = 0;

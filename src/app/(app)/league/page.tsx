@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Trophy } from "lucide-react";
 import { setActiveLeagueAction } from "@/app/(app)/actions";
 import { CreateLeagueForm, JoinLeagueForm } from "@/components/league/league-forms";
+import { TradeCenter } from "@/components/league/trade-center";
 import { Button } from "@/components/ui/button";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { getActiveLeagueId } from "@/data-access/active-league";
@@ -9,7 +10,10 @@ import { getDraftStatus } from "@/data-access/drafts";
 import { getLeagueDetail, getUserLeagues } from "@/data-access/leagues";
 import { getStandings } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
+import { getTeamRosterPlayers, type RosterPlayerOption } from "@/data-access/roster";
+import { getLeagueTeams, getUserTeamInLeague } from "@/data-access/teams";
 import { getRecentActivity } from "@/data-access/transactions";
+import { getTeamTrades } from "@/data-access/trades";
 import {
   deriveLeagueLifecycle,
   LEAGUE_LIFECYCLE_LABEL,
@@ -50,14 +54,43 @@ export default async function LeaguePage() {
   const leagues = await getUserLeagues();
   const activeLeagueId = await getActiveLeagueId(leagues);
 
-  const [activeDetail, draftStatus, standings, activity] = activeLeagueId
+  const [activeDetail, draftStatus, standings, activity, myTeam] = activeLeagueId
     ? await Promise.all([
         getLeagueDetail(activeLeagueId),
         getDraftStatus(activeLeagueId),
         getStandings(activeLeagueId),
         getRecentActivity(activeLeagueId),
+        getUserTeamInLeague(activeLeagueId),
       ])
-    : [null, null, [], []];
+    : [null, null, [], [], null];
+
+  let tradeCenterProps: {
+    myTeamId: string;
+    myRoster: RosterPlayerOption[];
+    otherTeams: Awaited<ReturnType<typeof getLeagueTeams>>;
+    rostersByTeamId: Record<string, RosterPlayerOption[]>;
+    incoming: Awaited<ReturnType<typeof getTeamTrades>>["incoming"];
+    outgoing: Awaited<ReturnType<typeof getTeamTrades>>["outgoing"];
+  } | null = null;
+
+  if (activeLeagueId && myTeam) {
+    const allTeams = await getLeagueTeams(activeLeagueId);
+    const otherTeams = allTeams.filter((t) => t.id !== myTeam.id);
+    const [myRoster, otherRosters, trades] = await Promise.all([
+      getTeamRosterPlayers(activeLeagueId, myTeam.id),
+      Promise.all(otherTeams.map((t) => getTeamRosterPlayers(activeLeagueId, t.id))),
+      getTeamTrades(activeLeagueId, myTeam.id),
+    ]);
+    const rostersByTeamId = Object.fromEntries(otherTeams.map((t, i) => [t.id, otherRosters[i]]));
+    tradeCenterProps = {
+      myTeamId: myTeam.id,
+      myRoster,
+      otherTeams,
+      rostersByTeamId,
+      incoming: trades.incoming,
+      outgoing: trades.outgoing,
+    };
+  }
 
   const lifecycle = activeDetail
     ? deriveLeagueLifecycle({
@@ -197,13 +230,25 @@ export default async function LeaguePage() {
                 ) : (
                   <div className="mt-2 divide-y divide-border">
                     {activity.map((entry) => (
-                      <p key={entry.id} className="py-1.5 text-sm text-foreground-secondary">
-                        {entry.fantasyTeamName ?? "Commissioner"} · {entry.type}
+                      <p key={entry.id} className="label-system py-1.5 text-[11px] text-foreground-secondary">
+                        {entry.summary}
                       </p>
                     ))}
                   </div>
                 )}
               </div>
+
+              {tradeCenterProps && (
+                <TradeCenter
+                  leagueId={activeLeagueId!}
+                  myTeamId={tradeCenterProps.myTeamId}
+                  myRoster={tradeCenterProps.myRoster}
+                  otherTeams={tradeCenterProps.otherTeams}
+                  rostersByTeamId={tradeCenterProps.rostersByTeamId}
+                  incoming={tradeCenterProps.incoming}
+                  outgoing={tradeCenterProps.outgoing}
+                />
+              )}
             </div>
           </div>
         </section>

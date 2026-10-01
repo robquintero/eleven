@@ -16,7 +16,7 @@ export interface PlayerFilters {
   position: "ALL" | PlayerPosition;
   competitionId: "ALL" | string;
   clubId: "ALL" | string;
-  ownership: "ALL" | Extract<PlayerOwnership, "free" | "owned">;
+  ownership: "ALL" | Extract<PlayerOwnership, "free" | "owned" | "mine">;
   availability: "ALL" | PlayerAvailability;
   sort: SortKey;
 }
@@ -52,11 +52,18 @@ export const sortOptions: { value: SortKey; label: string }[] = [
   { value: "club", label: "CLUB A–Z" },
 ];
 
-/** Real ownership options only shown when an active league exists (see PlayersWorkspace) — no MINE/WAIVERS, since no draft/waiver engine exists to make those real. */
+/**
+ * Real ownership/market-availability options, only shown when an active
+ * league exists (see PlayersWorkspace). Pass 11: the Players page is now
+ * the free-agent market -- "FREE" means genuinely available to sign
+ * first-come-first-served, "MY PLAYERS" scopes to the caller's own
+ * roster. No WAIVERS option — waivers are out of scope for this product.
+ */
 export const ownershipOptions: { value: PlayerFilters["ownership"]; label: string }[] = [
   { value: "ALL", label: "ALL" },
-  { value: "free", label: "FREE" },
+  { value: "free", label: "AVAILABLE" },
   { value: "owned", label: "OWNED" },
+  { value: "mine", label: "MY PLAYERS" },
 ];
 
 export type SearchParamsInput = Record<string, string | string[] | undefined>;
@@ -72,7 +79,8 @@ export function parseFiltersFromSearchParams(sp: SearchParamsInput): { filters: 
     v === "GK" || v === "DEF" || v === "MID" || v === "FWD";
   const isAvailability = (v: string | undefined): v is PlayerFilters["availability"] =>
     v === "available" || v === "doubtful" || v === "injured" || v === "suspended";
-  const isOwnership = (v: string | undefined): v is PlayerFilters["ownership"] => v === "free" || v === "owned";
+  const isOwnership = (v: string | undefined): v is PlayerFilters["ownership"] =>
+    v === "free" || v === "owned" || v === "mine";
   const isSort = (v: string | undefined): v is SortKey => v === "name" || v === "club";
 
   const positionRaw = get("pos");

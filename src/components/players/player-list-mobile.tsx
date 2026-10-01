@@ -1,7 +1,7 @@
 "use client";
 
 import { AvailabilityStatus } from "@/components/players/availability-status";
-import { OwnershipStatus } from "@/components/players/ownership-status";
+import { MarketAction } from "@/components/players/market-action";
 import { leagueLabels } from "@/lib/leagues";
 import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
@@ -10,10 +10,16 @@ export function PlayerListMobile({
   players,
   selectedId,
   onSelect,
+  onAdd,
+  onDrop,
+  pendingPlayerId,
 }: {
   players: Player[];
   selectedId: string | null;
   onSelect: (player: Player) => void;
+  onAdd?: (player: Player) => void;
+  onDrop?: (player: Player) => void;
+  pendingPlayerId?: string | null;
 }) {
   return (
     <div className="divide-y divide-border">
@@ -25,12 +31,19 @@ export function PlayerListMobile({
           player.availability === "doubtful";
 
         return (
-          <button
+          <div
             key={player.id}
-            type="button"
+            role="button"
+            tabIndex={0}
             onClick={() => onSelect(player)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onSelect(player);
+              }
+            }}
             className={cn(
-              "flex w-full items-center gap-3 py-3 text-left transition-colors",
+              "flex w-full cursor-pointer items-center gap-3 py-3 text-left transition-colors",
               isSelected && "bg-accent/10"
             )}
           >
@@ -58,9 +71,9 @@ export function PlayerListMobile({
                 {player.totalPoints ?? "—"}{" "}
                 <span className="text-[10px] font-normal text-foreground-tertiary">PTS</span>
               </p>
-              <OwnershipStatus player={player} className="text-[10px]" />
+              <MarketAction player={player} onAdd={onAdd} onDrop={onDrop} pending={pendingPlayerId === player.id} />
             </div>
-          </button>
+          </div>
         );
       })}
     </div>

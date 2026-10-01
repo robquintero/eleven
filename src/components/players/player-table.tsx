@@ -2,7 +2,7 @@
 
 import { ArrowDown } from "lucide-react";
 import { AvailabilityStatus } from "@/components/players/availability-status";
-import { OwnershipStatus } from "@/components/players/ownership-status";
+import { MarketAction } from "@/components/players/market-action";
 import { leagueCode } from "@/lib/leagues";
 import type { SortKey } from "@/lib/players-filters";
 import { playerFixtureCode } from "@/lib/team-fixture";
@@ -58,6 +58,9 @@ export function PlayerTable({
   sort,
   onSort,
   onSelect,
+  onAdd,
+  onDrop,
+  pendingPlayerId,
 }: {
   players: Player[];
   selectedId: string | null;
@@ -65,6 +68,9 @@ export function PlayerTable({
   sort: SortKey;
   onSort: (key: SortKey) => void;
   onSelect: (player: Player) => void;
+  onAdd?: (player: Player) => void;
+  onDrop?: (player: Player) => void;
+  pendingPlayerId?: string | null;
 }) {
   return (
     <div className="w-full border border-border">
@@ -106,14 +112,21 @@ export function PlayerTable({
             player.availability === "doubtful";
 
           return (
-            <button
+            <div
               key={player.id}
-              type="button"
               id={`player-row-${player.id}`}
+              role="button"
+              tabIndex={0}
               onClick={() => onSelect(player)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onSelect(player);
+                }
+              }}
               className={cn(
                 rowGrid,
-                "w-full border-l-2 border-l-transparent py-2 pr-2 pl-3 text-left transition-colors",
+                "w-full cursor-pointer border-l-2 border-l-transparent py-2 pr-2 pl-3 text-left transition-colors",
                 isSelected && "border-l-accent bg-accent/10",
                 isHighlighted && "ring-1 ring-inset ring-accent/50",
                 !isSelected && !isHighlighted && "hover:bg-surface"
@@ -168,8 +181,8 @@ export function PlayerTable({
                 {player.totalPoints ?? "—"}
               </span>
 
-              <OwnershipStatus player={player} className="justify-self-end text-[11px]" />
-            </button>
+              <MarketAction player={player} onAdd={onAdd} onDrop={onDrop} pending={pendingPlayerId === player.id} />
+            </div>
           );
         })}
       </div>

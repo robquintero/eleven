@@ -168,3 +168,37 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
     bench,
   };
 }
+
+export interface RosterPlayerOption {
+  id: string;
+  name: string;
+  position: PlayerPosition;
+}
+
+/**
+ * A team's active roster as a flat, lineup-agnostic list — Pass 11's trade
+ * proposal UI only needs id/name/position for picking offered/requested
+ * assets, never the starter/bench/lock detail `getUserSquad` computes.
+ */
+export async function getTeamRosterPlayers(
+  leagueId: string,
+  fantasyTeamId: string
+): Promise<RosterPlayerOption[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("roster_entries")
+    .select("players(id, name, position)")
+    .eq("league_id", leagueId)
+    .eq("fantasy_team_id", fantasyTeamId)
+    .eq("status", "active");
+
+  if (error || !data) return [];
+
+  return data
+    .map((row) => row.players)
+    .filter((p): p is { id: string; name: string; position: string } => Boolean(p))
+    .map((p) => ({ id: p.id, name: p.name, position: p.position as PlayerPosition }));
+}

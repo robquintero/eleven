@@ -1293,6 +1293,8 @@ export type Database = {
           round: number
         }[]
       }
+      accept_trade: { Args: { p_trade_id: string }; Returns: undefined }
+      cancel_trade: { Args: { p_trade_id: string }; Returns: undefined }
       create_league: {
         Args: {
           p_name: string
@@ -1306,6 +1308,7 @@ export type Database = {
           league_id: string
         }[]
       }
+      drop_player: { Args: { p_league_id: string; p_player_id: string }; Returns: undefined }
       generate_invite_code: { Args: { p_length?: number }; Returns: string }
       immutable_unaccent: { Args: { "": string }; Returns: string }
       is_league_commissioner: {
@@ -1332,6 +1335,16 @@ export type Database = {
           round: number
         }[]
       }
+      propose_trade: {
+        Args: {
+          p_league_id: string
+          p_offered_player_ids: string[]
+          p_receiving_team_id: string
+          p_requested_player_ids: string[]
+        }
+        Returns: { trade_id: string }[]
+      }
+      reject_trade: { Args: { p_trade_id: string }; Returns: undefined }
       resolve_expired_pick: {
         Args: { p_as_of?: string; p_draft_id: string }
         Returns: {
@@ -1343,6 +1356,10 @@ export type Database = {
         }[]
       }
       shares_league_with: { Args: { p_user_id: string }; Returns: boolean }
+      sign_player: {
+        Args: { p_league_id: string; p_player_id: string }
+        Returns: { roster_entry_id: string }[]
+      }
       start_draft: {
         Args: { p_league_id: string }
         Returns: {

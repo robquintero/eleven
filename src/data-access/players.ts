@@ -17,8 +17,8 @@ export interface PlayerQuery {
   competitionId?: string;
   clubId?: string;
   availability?: Player["availability"];
-  /** Only meaningful with `activeLeagueId` — real per-league ownership, never league-agnostic. */
-  ownership?: "free" | "owned";
+  /** Only meaningful with `activeLeagueId` — real per-league ownership, never league-agnostic. "mine" needs the caller's own team resolved too (see below), not just any ownership row. */
+  ownership?: "free" | "owned" | "mine";
   sort?: "name" | "club";
   sortDirection?: "asc" | "desc";
   page?: number;
@@ -148,6 +148,10 @@ export async function getPlayerDatabase(query: PlayerQuery = {}): Promise<Player
       builder = builder.in("id", ids);
     } else if (query.ownership === "free") {
       if (ids.length > 0) builder = builder.not("id", "in", `(${ids.join(",")})`);
+    } else if (query.ownership === "mine") {
+      const myIds = ids.filter((id) => ownerTeamIdByPlayerId!.get(id) === myFantasyTeamId);
+      if (!myFantasyTeamId || myIds.length === 0) return empty;
+      builder = builder.in("id", myIds);
     }
   }
 

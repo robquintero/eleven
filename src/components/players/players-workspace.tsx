@@ -3,10 +3,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@base-ui/react/unstable-use-media-query";
+import { dropPlayerAction, signPlayerAction } from "@/app/(app)/players/actions";
 import { PlayerDatabaseToolbar } from "@/components/players/player-database-toolbar";
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { PlayerListMobile } from "@/components/players/player-list-mobile";
 import { PlayerTable } from "@/components/players/player-table";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import type { ClubFilterOption, CompetitionFilterOption, PlayerDatabasePage } from "@/data-access/players";
 import { clubDisplayLabel } from "@/lib/club-display";
 import { defaultFilters, filtersToSearchParams, type PlayerFilters } from "@/lib/players-filters";
@@ -37,6 +47,8 @@ export function PlayersWorkspace({
   competitions,
   clubs,
   hasActiveLeague,
+  leagueId,
+  fantasyTeamId,
 }: {
   data: PlayerDatabasePage;
   filters: PlayerFilters;
@@ -44,14 +56,54 @@ export function PlayersWorkspace({
   competitions: CompetitionFilterOption[];
   clubs: ClubFilterOption[];
   hasActiveLeague: boolean;
+  leagueId: string | null;
+  fantasyTeamId: string | null;
 }) {
   const router = useRouter();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [queryDraft, setQueryDraft] = useState(filters.query);
+  const [pendingPlayerId, setPendingPlayerId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<Player | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const canTransact = Boolean(leagueId && fantasyTeamId);
+
+  async function handleAdd(player: Player) {
+    if (!leagueId) return;
+    setActionError(null);
+    setPendingPlayerId(player.id);
+    const result = await signPlayerAction(leagueId, player.id);
+    setPendingPlayerId(null);
+    if (result?.error) {
+      setActionError(result.error);
+      return;
+    }
+    router.refresh();
+  }
+
+  function requestDrop(player: Player) {
+    setActionError(null);
+    setDropTarget(player);
+  }
+
+  async function confirmDrop() {
+    if (!leagueId || !dropTarget) return;
+    const player = dropTarget;
+    setActionError(null);
+    setPendingPlayerId(player.id);
+    const result = await dropPlayerAction(leagueId, player.id);
+    setPendingPlayerId(null);
+    setDropTarget(null);
+    if (result?.error) {
+      setActionError(result.error);
+      return;
+    }
+    router.refresh();
+  }
 
   const isDesktopTable = useMediaQuery("(min-width: 768px)", { defaultMatches: true });
   const isInlineInspector = useMediaQuery("(min-width: 1280px)", { defaultMatches: false });
@@ -182,6 +234,12 @@ export function PlayersWorkspace({
         />
       </div>
 
+      {actionError && (
+        <p className="label-system mt-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+          {actionError}
+        </p>
+      )}
+
       <div
         className={
           isInlineInspector && selectedPlayer
@@ -199,9 +257,19 @@ export function PlayersWorkspace({
                 sort={filters.sort}
                 onSort={(sort) => updateFilters({ sort })}
                 onSelect={selectPlayer}
+                onAdd={canTransact ? handleAdd : undefined}
+                onDrop={canTransact ? requestDrop : undefined}
+                pendingPlayerId={pendingPlayerId}
               />
             ) : (
-              <PlayerListMobile players={players} selectedId={selectedId} onSelect={selectPlayer} />
+              <PlayerListMobile
+                players={players}
+                selectedId={selectedId}
+                onSelect={selectPlayer}
+                onAdd={canTransact ? handleAdd : undefined}
+                onDrop={canTransact ? requestDrop : undefined}
+                pendingPlayerId={pendingPlayerId}
+              />
             )
           ) : (
             <div className="flex flex-col items-center justify-center gap-2 py-20 text-center">
@@ -264,6 +332,32 @@ export function PlayersWorkspace({
           onOpenChange={setInspectorOpen}
         />
       )}
+
+      <Dialog
+        open={dropTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setDropTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>DROP {dropTarget?.name.toUpperCase()}</DialogTitle>
+            <DialogDescription>
+              This removes {dropTarget?.name} from your roster immediately and returns them to the free
+              market. Any current-round lineup points already locked in are unaffected, but you will lose
+              the player&apos;s remaining-round points if they haven&apos;t kicked off yet.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDropTarget(null)} disabled={pendingPlayerId !== null}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDrop} disabled={pendingPlayerId !== null}>
+              {pendingPlayerId !== null ? "Dropping…" : "Drop Player"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

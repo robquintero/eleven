@@ -5,15 +5,23 @@ import { createClient } from "@/lib/supabase/server";
 export interface ActivityEntry {
   id: string;
   type: string;
-  fantasyTeamName: string | null;
+  summary: string;
   createdAt: string;
 }
 
+const TRANSACTION_TYPE_LABEL: Record<string, string> = {
+  draft_pick: "DRAFTED",
+  free_agent_add: "SIGNED",
+  drop: "DROPPED",
+  trade: "TRADE",
+};
+
 /**
  * The league's most recent auditable transactions (`draft_pick`,
- * `waiver_add`, `trade`, etc. — see `public.transactions`). `[]` until a
- * draft/waiver/trade engine actually writes one, which none do yet
- * (Pass 8+) — every league today truthfully has zero transactions.
+ * `free_agent_add`, `drop`, `trade`, etc. — see `public.transactions`).
+ * Pass 11's market/trade RPCs stamp `metadata.playerId` (add/drop) or
+ * `metadata.proposingTeamId`/`receivingTeamId` (trade), so this resolves
+ * those into real names rather than surfacing the raw transaction type.
  */
 export async function getRecentActivity(leagueId: string, limit = 10): Promise<ActivityEntry[]> {
   if (!isSupabaseConfigured()) return [];
@@ -22,23 +30,62 @@ export async function getRecentActivity(leagueId: string, limit = 10): Promise<A
 
   const { data, error } = await supabase
     .from("transactions")
-    .select("id, type, fantasy_team_id, created_at")
+    .select("id, type, fantasy_team_id, metadata, created_at")
     .eq("league_id", leagueId)
     .order("created_at", { ascending: false })
     .limit(limit);
 
   if (error || !data || data.length === 0) return [];
 
-  const teamIds = Array.from(new Set(data.map((t) => t.fantasy_team_id).filter(Boolean))) as string[];
-  const { data: teams } = teamIds.length
-    ? await supabase.from("fantasy_teams").select("id, name").in("id", teamIds)
-    : { data: [] as { id: string; name: string }[] };
-  const nameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
+  const teamIds = new Set<string>();
+  const playerIds = new Set<string>();
+  for (const row of data) {
+    if (row.fantasy_team_id) teamIds.add(row.fantasy_team_id);
+    const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+    if (typeof metadata.playerId === "string") playerIds.add(metadata.playerId);
+    if (typeof metadata.proposingTeamId === "string") teamIds.add(metadata.proposingTeamId);
+    if (typeof metadata.receivingTeamId === "string") teamIds.add(metadata.receivingTeamId);
+  }
 
-  return data.map((row) => ({
-    id: row.id,
-    type: row.type,
-    fantasyTeamName: row.fantasy_team_id ? (nameById.get(row.fantasy_team_id) ?? null) : null,
-    createdAt: row.created_at,
-  }));
+  const [{ data: teams }, { data: players }] = await Promise.all([
+    teamIds.size
+      ? supabase.from("fantasy_teams").select("id, name").in("id", Array.from(teamIds))
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    playerIds.size
+      ? supabase.from("players").select("id, name").in("id", Array.from(playerIds))
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+  ]);
+  const teamNameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
+  const playerNameById = new Map((players ?? []).map((p) => [p.id, p.name]));
+
+  return data.map((row) => {
+    const metadata = (row.metadata ?? {}) as Record<string, unknown>;
+    const teamName = row.fantasy_team_id ? (teamNameById.get(row.fantasy_team_id) ?? "A team") : "Commissioner";
+
+    let summary: string;
+    if (row.type === "free_agent_add" && typeof metadata.playerId === "string") {
+      const playerName = playerNameById.get(metadata.playerId) ?? "a player";
+      summary = `${teamName.toUpperCase()} ADDED ${playerName.toUpperCase()}`;
+    } else if (row.type === "drop" && typeof metadata.playerId === "string") {
+      const playerName = playerNameById.get(metadata.playerId) ?? "a player";
+      summary = `${teamName.toUpperCase()} DROPPED ${playerName.toUpperCase()}`;
+    } else if (
+      row.type === "trade" &&
+      typeof metadata.proposingTeamId === "string" &&
+      typeof metadata.receivingTeamId === "string"
+    ) {
+      const proposing = teamNameById.get(metadata.proposingTeamId) ?? "A team";
+      const receiving = teamNameById.get(metadata.receivingTeamId) ?? "a team";
+      summary = `TRADE COMPLETED: ${proposing.toUpperCase()} ↔ ${receiving.toUpperCase()}`;
+    } else {
+      summary = `${teamName.toUpperCase()} · ${TRANSACTION_TYPE_LABEL[row.type] ?? row.type.toUpperCase()}`;
+    }
+
+    return {
+      id: row.id,
+      type: row.type,
+      summary,
+      createdAt: row.created_at,
+    };
+  });
 }
