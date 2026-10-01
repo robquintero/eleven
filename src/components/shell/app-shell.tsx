@@ -29,7 +29,12 @@ export async function AppShell({ children }: { children: ReactNode }) {
   return (
     <NavigationTransitionProvider>
       <div className="mx-auto min-h-dvh max-w-[1920px] lg:grid lg:grid-cols-[240px_1fr]">
-        <aside className="hidden lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col lg:gap-8 lg:border-r lg:border-border lg:px-5 lg:py-7">
+        {/* z-30 (matching the header) -- MICRO FIX: now that
+            CommandTransitionOverlay is viewport-fixed (covers the whole
+            screen, not just the content pane), this sidebar needs an
+            explicit stacking order to stay visually un-dimmed above it,
+            same as the header/MobileNav already have. */}
+        <aside className="hidden lg:sticky lg:top-0 lg:z-30 lg:flex lg:h-dvh lg:flex-col lg:gap-8 lg:border-r lg:border-border lg:px-5 lg:py-7">
           <Wordmark />
           <div className="border-t border-border" />
           <DesktopNav />
@@ -66,17 +71,16 @@ export async function AppShell({ children }: { children: ReactNode }) {
             <StatusBar />
           </header>
 
-          {/* Pass 11.1: `relative` so CommandTransitionOverlay (an absolutely
-              positioned sibling of `<main>`) can dim/blur exactly this
-              workspace pane during a perceptibly slow navigation, while
-              leaving the sidebar/header above fully interactive. */}
-          <div className="relative flex-1">
-            <main id="main-content" className="px-4 pt-6 pb-28 sm:px-6 lg:px-8 lg:pb-12">
-              {children}
-            </main>
-            <CommandTransitionOverlay />
-          </div>
+          <main id="main-content" className="flex-1 px-4 pt-6 pb-28 sm:px-6 lg:px-8 lg:pb-12">
+            {children}
+          </main>
         </div>
+
+        {/* MICRO FIX: CommandTransitionOverlay is `fixed inset-0` (viewport-
+            anchored, not anchored to <main> or any scroll container) --
+            rendered here as a plain sibling since its position no longer
+            depends on where it sits in the DOM tree. */}
+        <CommandTransitionOverlay />
 
         <MobileNav />
       </div>
