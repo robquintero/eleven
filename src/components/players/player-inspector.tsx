@@ -79,12 +79,23 @@ export function PlayerInspector({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side={isLgDesktop ? "right" : "bottom"} className="overflow-y-auto">
+      {/* Pass 11.5: SheetContent itself is now a fixed-height (dvh-capped)
+          flex column (see sheet.tsx's own comment) -- the sr-only header
+          stays outside the scroll region (negligible height either way),
+          and `min-h-0` on the scrollable body is required for a flex
+          child to actually shrink and scroll rather than growing past its
+          container. This is the "stable header, scrollable body" split
+          the late-loading recent-match history needs: PlayerInspectorContent's
+          own PLAYER_RECORD header becomes `sticky top-0` WITHIN this
+          scroll region (via `stickyHeader`), so it — and the close button
+          now rendered inside it — stay reachable no matter how much the
+          body grows underneath. */}
+      <SheetContent side={isLgDesktop ? "right" : "bottom"} showCloseButton={false}>
         <SheetHeader className="sr-only">
           <SheetTitle>{player?.name ?? "Player"}</SheetTitle>
           <SheetDescription>Player inspector</SheetDescription>
         </SheetHeader>
-        <div className="px-4 pb-6">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
           {player && (
             <PlayerInspectorContent
               key={player.id}
@@ -93,6 +104,8 @@ export function PlayerInspector({
               recentMatches={recentMatches}
               lineupContext={lineupContext}
               onRequestDrop={onRequestDrop}
+              onClose={() => onOpenChange(false)}
+              stickyHeader
             />
           )}
         </div>

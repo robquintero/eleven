@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { Info, Lock } from "lucide-react";
+import { Info, Lock, X } from "lucide-react";
 import { FormSparkline } from "@/components/football/form-sparkline";
 import { AvailabilityStatus } from "@/components/players/availability-status";
 import { OwnershipStatus } from "@/components/players/ownership-status";
@@ -85,6 +85,8 @@ export function PlayerInspectorContent({
   recentMatches,
   lineupContext,
   onRequestDrop,
+  onClose,
+  stickyHeader = false,
 }: {
   player: Player;
   index?: number;
@@ -93,6 +95,10 @@ export function PlayerInspectorContent({
   lineupContext?: LineupInspectorContext;
   /** Pass 11.5: present only from the Team page, for the caller's own roster player — opens the same drop confirmation Team/Players already share (see team-workspace.tsx). Never pre-blocked here for a locked player; `drop_player`'s own Pass 11 semantics decide what happens server-side. */
   onRequestDrop?: () => void;
+  /** Pass 11.5: present only for the overlay (Sheet) variant — renders a close control integrated into this component's own "PLAYER_RECORD" header row (via TerminalPanel's `meta` slot) rather than a separate button floating at the viewport edge. Omitted entirely for the `inline` variant, which has no overlay to close. */
+  onClose?: () => void;
+  /** Pass 11.5: forwarded to TerminalPanel — true only when this is rendered inside the overlay's own scrollable body, so the header (and the close button inside it) stay reachable no matter how far the body scrolls. */
+  stickyHeader?: boolean;
 }) {
   const router = useRouter();
   const [showNote, setShowNote] = useState(false);
@@ -107,7 +113,25 @@ export function PlayerInspectorContent({
   return (
     <TerminalPanel
       header="PLAYER_RECORD"
-      meta={index !== undefined ? String(index + 1).padStart(3, "0") : undefined}
+      stickyHeader={stickyHeader}
+      meta={
+        index !== undefined || onClose ? (
+          <>
+            {index !== undefined && String(index + 1).padStart(3, "0")}
+            {onClose && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                onClick={onClose}
+                aria-label="Close player record"
+                className="-m-1"
+              >
+                <X className="size-4" strokeWidth={2} />
+              </Button>
+            )}
+          </>
+        ) : undefined
+      }
     >
       <TerminalPanelSection>
         <div className="flex items-center gap-3">
