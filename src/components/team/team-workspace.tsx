@@ -114,17 +114,17 @@ export function TeamWorkspace({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Pass 10.5C.5A: which pitch slot's authenticated write is in flight, if
-  // any (its PlayerNode shows restrained processing feedback -- see that
-  // component's own `substituting` prop). `isRefreshing` tracks the
-  // router.refresh() that follows a successful write via useTransition.
-  // `substitutionBusy` stays true across BOTH the action call (`pending`)
-  // and that follow-up refresh, so the processing state -- and the guard
-  // against a second, conflicting lineup mutation -- lasts until the NEW
-  // server-confirmed squad has actually landed, never just the instant
-  // the action call itself returns. No effect needed to "clear" anything:
-  // once both flags are false, `substitutionBusy` is false on its own,
-  // and `trySwap` overwrites `substitutingSlotId` at the start of its own
-  // next call regardless.
+  // any -- NEVER reset back to null (trySwap only ever overwrites it at
+  // the start of its next call), so wherever this is rendered it must be
+  // gated by `substitutionBusy` below, not read raw (see the <Pitch>
+  // usage's own comment -- Pass 10.5C.5B fixed a bug where it wasn't).
+  // `isRefreshing` tracks the router.refresh() that follows a successful
+  // write via useTransition. `substitutionBusy` stays true across BOTH
+  // the action call (`pending`) and that follow-up refresh, so the
+  // processing state -- and the guard against a second, conflicting
+  // lineup mutation -- lasts until the NEW server-confirmed squad has
+  // actually landed, never just the instant the action call itself
+  // returns.
   const [substitutingSlotId, setSubstitutingSlotId] = useState<string | null>(null);
   const [isRefreshing, startRefreshTransition] = useTransition();
   const substitutionBusy = pending || isRefreshing;
@@ -377,7 +377,19 @@ export function TeamWorkspace({
               selectedEmptySlotId={selected?.kind === "emptySlot" ? selected.slotId : null}
               fillTargetPosition={selected?.kind === "bench" ? selected.player.position : null}
               onSelectEmptySlot={handleSelectEmptySlot}
-              substitutingSlotId={substitutingSlotId}
+              // Gated by substitutionBusy, not the raw state: `substitutingSlotId`
+              // itself is never reset to null anywhere (see its own
+              // declaration comment -- trySwap overwrites it the next
+              // time it runs, nothing clears it after success). Passing
+              // it unconditionally to Pitch left the just-substituted
+              // slot showing the processing animation forever once
+              // substitutionBusy went false. This is the actual
+              // authoritative-success boundary: the moment pending AND
+              // isRefreshing are both false, the refreshed squad prop has
+              // already landed (startRefreshTransition keeps isRefreshing
+              // true until that commit), so clearing the DISPLAYED value
+              // here is correct without any extra effect/cleanup.
+              substitutingSlotId={substitutionBusy ? substitutingSlotId : null}
             />
             {!fantasyTeamId && (
               <p className="mt-3 text-center text-sm text-foreground-tertiary">
