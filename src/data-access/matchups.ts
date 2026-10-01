@@ -303,10 +303,23 @@ async function buildMatchupTeamSquad(
   for (const row of slotRows as MatchupSlotRow[]) {
     const player = toPlayer(row);
     if (row.starter) {
+      const locked = isLocked(row.locked_at ? new Date(row.locked_at) : null, now);
+      // `PlayerNode`/`BenchRow`/`starterBuckets` (src/lib/team-fixture.ts)
+      // read "locked" directly off `player.fixture.state`, which the raw
+      // fixture-status mapping above never produces on its own (a lock is
+      // a LINEUP concept, not a real-world match state). Only overridden
+      // when the real fixture is STILL "upcoming" -- i.e. kickoff has
+      // technically passed (locked_at <= now) but the stored fixture data
+      // hasn't caught up to "live" yet, a brief sync-lag window. Once the
+      // real fixture state is already "live" or "final", that is strictly
+      // MORE informative than a generic "locked" label on a live-scoring
+      // page (unlike the Team page, nothing here is being edited), so it
+      // is never suppressed.
+      const shouldShowLocked = locked && player.fixture?.state === "upcoming";
       starterEntries.push({
         rosterEntryId: row.roster_entry_id,
-        player,
-        locked: isLocked(row.locked_at ? new Date(row.locked_at) : null, now),
+        player: shouldShowLocked ? { ...player, fixture: { ...player.fixture!, state: "locked" } } : player,
+        locked,
       });
     } else {
       bench.push(player);

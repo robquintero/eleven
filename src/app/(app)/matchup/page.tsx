@@ -2,10 +2,12 @@ import { Swords } from "lucide-react";
 import { ComingSoon } from "@/components/shell/coming-soon";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { MatchupCommand } from "@/components/dashboard/matchup-command";
+import { MatchupLineups } from "@/components/matchup/matchup-lineups";
+import { MatchupPlayerCounts } from "@/components/matchup/matchup-player-counts";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
-import { getCurrentMatchup } from "@/data-access/matchups";
+import { getCurrentMatchup, getMatchupSquads } from "@/data-access/matchups";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
 
@@ -40,6 +42,7 @@ export default async function MatchupPage() {
   }
 
   const matchup = team ? await getCurrentMatchup(league.id, team.id) : null;
+  const squads = matchup ? await getMatchupSquads(matchup) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -49,7 +52,27 @@ export default async function MatchupPage() {
         </h1>
         <p className="mt-1.5 text-sm text-foreground-secondary">{league.name}</p>
       </div>
+
       <MatchupCommand matchup={matchup} hasLeague />
+
+      {matchup && squads && (
+        <>
+          <MatchupPlayerCounts
+            myTeamName={matchup.isUserHome ? matchup.homeTeamName : matchup.awayTeamName}
+            opponentTeamName={matchup.isUserHome ? matchup.awayTeamName : matchup.homeTeamName}
+            mySquad={matchup.isUserHome ? squads.home : squads.away}
+            opponentSquad={matchup.isUserHome ? squads.away : squads.home}
+          />
+
+          <MatchupLineups
+            homeTeamName={matchup.homeTeamName}
+            awayTeamName={matchup.awayTeamName}
+            isUserHome={matchup.isUserHome}
+            homeSquad={squads.home}
+            awaySquad={squads.away}
+          />
+        </>
+      )}
     </div>
   );
 }
