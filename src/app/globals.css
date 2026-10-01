@@ -229,6 +229,23 @@
     letter-spacing: 0.04em;
     text-transform: uppercase;
   }
+
+  /* Pass 11.1: the thin scan-line under CommandTransitionOverlay's label —
+     collapses to a static bar under the global prefers-reduced-motion
+     rule above (animation-duration: 0.01ms), which still reads as "in
+     progress" without the sweep. */
+  .animate-command-scan {
+    animation: command-scan 1.1s ease-in-out infinite;
+  }
+
+  @keyframes command-scan {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(400%);
+    }
+  }
 }
 
 /* Pass 10C accessibility foundation: respects the OS-level "reduce

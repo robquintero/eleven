@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isPlainLeftClick, useNavigationTransition } from "@/components/shell/navigation-transition";
 import { primaryNav } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 export function MobileNav() {
   const pathname = usePathname();
+  const { begin } = useNavigationTransition();
 
   return (
     <nav
@@ -26,7 +28,10 @@ export function MobileNav() {
               <Link
                 href={item.href}
                 aria-current={isActive ? "page" : undefined}
-                className="flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium"
+                onClick={(event) => {
+                  if (!isActive && isPlainLeftClick(event)) begin(item.href, item.label);
+                }}
+                className="flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors active:bg-surface"
               >
                 <Icon
                   className={cn(
