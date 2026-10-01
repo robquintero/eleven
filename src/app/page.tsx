@@ -1,16 +1,15 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Wordmark } from "@/components/shell/wordmark";
+import { SiteFooter } from "@/components/shell/site-footer";
 import { Button } from "@/components/ui/button";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = {
-  title: "Eleven — Fantasy Football",
-  description:
-    "Draft-style fantasy football across the Premier League, La Liga, Bundesliga, Serie A and Ligue 1.",
-};
+// Pass 10C: no page-specific metadata needed -- the root layout's own
+// default title/description/canonical/OG/Twitter metadata (src/lib/site-config.ts)
+// already describes the landing page exactly; a duplicate export here
+// would just be a second copy to keep in sync. See docs/SEO.md.
 
 const pillars = [
   {
@@ -62,7 +61,7 @@ export default async function LandingPage() {
         </nav>
       </header>
 
-      <main className="mx-auto flex max-w-3xl flex-col items-start px-4 py-16 sm:px-8 sm:py-24">
+      <main id="main-content" className="mx-auto flex max-w-3xl flex-col items-start px-4 py-16 sm:px-8 sm:py-24">
         <span className="label-system text-[11px] text-foreground-tertiary">
           FANTASY FOOTBALL / BIG FIVE
         </span>
@@ -103,6 +102,8 @@ export default async function LandingPage() {
           actually happened in your league.
         </p>
       </main>
+
+      <SiteFooter />
     </div>
   );
 }

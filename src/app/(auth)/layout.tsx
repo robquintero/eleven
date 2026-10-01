@@ -10,7 +10,9 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center gap-10 px-4 py-12">
       <Wordmark />
-      <div className="w-full max-w-sm">{children}</div>
+      <main id="main-content" className="w-full max-w-sm">
+        {children}
+      </main>
     </div>
   );
 }

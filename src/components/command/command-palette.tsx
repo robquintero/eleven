@@ -83,10 +83,11 @@ export function CommandPalette() {
       <button
         type="button"
         onClick={() => handleOpenChange(true)}
+        aria-label="Search"
         className="label-system flex items-center gap-2 rounded-control border border-border bg-surface px-2.5 py-1.5 text-xs text-foreground-secondary transition-colors hover:bg-surface-elevated"
       >
-        <Search className="size-3.5" strokeWidth={2} />
-        <span className="hidden sm:inline">Search</span>
+        <Search className="size-3.5" strokeWidth={2} aria-hidden="true" />
+        <span className="hidden sm:inline" aria-hidden="true">Search</span>
         <span className="hidden rounded border border-border px-1 py-0.5 text-[10px] text-foreground-tertiary sm:inline">
           ⌘K
         </span>

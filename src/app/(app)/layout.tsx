@@ -1,8 +1,21 @@
+import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/shell/app-shell";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+
+/**
+ * Pass 10C: the whole authenticated application is noindex,nofollow, set
+ * ONCE here rather than on every page under `(app)` — see docs/SEO.md's
+ * index/noindex strategy. These are real per-user fantasy workspaces
+ * (Home, Team, Draft, League, Matchup, Players), never public SEO landing
+ * surfaces, and a crawler has no session to render anything meaningful
+ * here anyway.
+ */
+export const metadata: Metadata = {
+  robots: { index: false, follow: false },
+};
 
 /**
  * The auth boundary for the whole authenticated application (Home, Team,

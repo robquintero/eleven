@@ -230,3 +230,21 @@
     text-transform: uppercase;
   }
 }
+
+/* Pass 10C accessibility foundation: respects the OS-level "reduce
+   motion" preference globally, rather than only on components someone
+   remembers to special-case — covers every current use of Tailwind's
+   animate-spin/animate-ping/animate-pulse (live indicators, processing
+   spinners) and any transition/transform duration, without removing the
+   underlying state change itself (a spinner still conveys "in progress"
+   at a glance, it just doesn't spin). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

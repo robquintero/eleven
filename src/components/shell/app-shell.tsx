@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { CommandPalette } from "@/components/command/command-palette";
 import { DesktopNav } from "@/components/shell/desktop-nav";
 import { MobileNav } from "@/components/shell/mobile-nav";
@@ -9,6 +10,7 @@ import { Wordmark } from "@/components/shell/wordmark";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getUserLeagues } from "@/data-access/leagues";
 import { getCurrentProfile } from "@/data-access/profiles";
+import { ATTRIBUTION_LINE, PRODUCT_STATUS, SITE_NAME } from "@/lib/site-config";
 
 /**
  * The authenticated workstation chrome. Every value here is real: the
@@ -28,6 +30,20 @@ export async function AppShell({ children }: { children: ReactNode }) {
         <Wordmark />
         <div className="border-t border-border" />
         <DesktopNav />
+
+        {/* Pass 10C: understated, permanent attribution -- one place, not
+            repeated per component (see docs/LEGAL-COMPLIANCE.md). */}
+        <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-4">
+          <span className="label-system w-fit rounded-full border border-border px-2 py-0.5 text-[9px] text-foreground-tertiary">
+            {SITE_NAME.toUpperCase()} · {PRODUCT_STATUS.toUpperCase()}
+          </span>
+          <Link
+            href="/about"
+            className="text-[10px] text-foreground-tertiary transition-colors hover:text-foreground-secondary"
+          >
+            {ATTRIBUTION_LINE}
+          </Link>
+        </div>
       </aside>
 
       <div className="flex min-h-dvh flex-col">
@@ -47,7 +63,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
           <StatusBar />
         </header>
 
-        <main className="flex-1 px-4 pt-6 pb-28 sm:px-6 lg:px-8 lg:pb-12">
+        <main id="main-content" className="flex-1 px-4 pt-6 pb-28 sm:px-6 lg:px-8 lg:pb-12">
           {children}
         </main>
       </div>
