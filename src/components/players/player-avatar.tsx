@@ -8,10 +8,12 @@ const SIZE_CLASSES = {
   sm: "size-6 text-[9px]",
   md: "size-8 text-[11px]",
   lg: "size-12 text-sm",
-  // Matches the Team pitch's own prior circle dimensions exactly
-  // (src/components/team/player-node.tsx, Pass 10.5C.5A) so adopting the
-  // shared avatar there changed nothing about the pitch's layout/geometry.
-  pitch: "size-10 text-[13px] sm:size-12 sm:text-[15px]",
+  // Pass 13 (§7): slightly smaller than the original size-10/sm:size-12
+  // (Pass 10.5C.5A) -- the audit found the flag carrying more visual
+  // weight than the player's own name below it; this plus the matching
+  // name-emphasis bump in player-node.tsx rebalances that without
+  // touching the pitch's own layout/geometry.
+  pitch: "size-9 text-[12px] sm:size-11 sm:text-[14px]",
 } as const;
 
 /**

@@ -3,12 +3,6 @@ import { PlayerNode } from "@/components/team/player-node";
 import type { Formation, LineupSlot, PlayerPosition } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
-const legend = [
-  { key: "live", label: "LIVE", dotClassName: "bg-live" },
-  { key: "locked", label: "LOCKED", dotClassName: "bg-foreground-tertiary" },
-  { key: "flag", label: "INJ / SUSP", dotClassName: "bg-destructive" },
-] as const;
-
 /**
  * A starting-XI position with no player in it yet (Pass 10.5C) — the
  * pitch always renders exactly 4-4-2's fixed 11 slots (Eleven V1's one
@@ -52,7 +46,7 @@ function EmptySlotNode({
         fillTarget && !selected && "ring-2 ring-accent/40"
       )}
     >
-      <span className="flex size-10 shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed border-foreground/20 bg-foreground/3 sm:size-12">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed border-foreground/20 bg-foreground/3 sm:size-11">
         <Plus className="size-4 text-foreground-tertiary" strokeWidth={2} />
       </span>
       <span className="label-system w-full truncate text-[11px] font-semibold text-foreground-tertiary sm:text-xs">
@@ -89,21 +83,16 @@ export function Pitch({
 }) {
   return (
     <div className="w-full overflow-hidden border border-border bg-surface-elevated">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+      {/* Pass 13 (§7): the LIVE/LOCKED/INJ·SUSP legend that used to live
+          here was pure vocabulary restatement -- every marker already
+          carries its own unambiguous status (icon + color + text, never
+          color alone), so a manager never actually needed to look up here
+          to decode one. Removed rather than redesigned, per the brief's
+          "reduce reliance on legend lookup." */}
+      <div className="border-b border-border px-4 py-2.5">
         <span className="label-system text-[10px] text-foreground-secondary">
           {formation}
         </span>
-        <div className="flex items-center gap-3">
-          {legend.map((item) => (
-            <span
-              key={item.key}
-              className="label-system flex items-center gap-1.5 text-[9px] text-foreground-tertiary"
-            >
-              <span className={`size-1.5 rounded-full ${item.dotClassName}`} />
-              {item.label}
-            </span>
-          ))}
-        </div>
       </div>
 
       {/* Pass 10.5B: flatter on desktop (lg:) specifically — the original

@@ -111,7 +111,7 @@ export function PlayerNode({
         )}
       </span>
 
-      <span className="w-full truncate text-[11px] font-semibold text-foreground sm:text-xs">
+      <span className="w-full truncate text-xs font-semibold text-foreground sm:text-sm">
         {surnameFor(player.name)}
       </span>
 
