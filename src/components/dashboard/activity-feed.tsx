@@ -35,7 +35,9 @@ export function ActivityFeed({ items }: { items: ActivityEntry[] }) {
             <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full bg-muted text-foreground-secondary">
               <Icon className="size-4" strokeWidth={1.75} />
             </span>
-            <p className="label-system min-w-0 flex-1 text-[11px] text-foreground-secondary">
+            {/* Pass 13: human-register prose (team/player names), never
+                `.label-system` -- that would force-uppercase real names. */}
+            <p className="min-w-0 flex-1 text-sm text-foreground-secondary">
               {item.summary}
             </p>
             <span className="label-system shrink-0 text-[11px] text-foreground-tertiary">

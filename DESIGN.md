@@ -1089,11 +1089,13 @@ passes don't reintroduce them.
   control: six bare native `<select>` elements with default browser
   chrome inside an otherwise bespoke bordered strip. New
   `ui/select-trigger.tsx` (`SelectTrigger`, a styled `<select>` wrapper:
-  `rounded-control` border, a `.label-system` current-value label, and a
-  fixed Lucide `ChevronDown`) replaces all six — same native `<select>`
-  underneath for zero-JS-cost accessibility and keyboard behavior, fully
-  restyled chrome. This is now the one control to reach for anywhere
-  Eleven needs a dropdown trigger (§17 inventory).
+  `appearance-none`, a `.label-system` current-value label, a fixed
+  Lucide `ChevronDown` — borderless by default since its cell already
+  sits inside the strip's own border, `className` adds a border for a
+  standalone usage) replaces all six — same native `<select>` underneath
+  for zero-JS-cost accessibility and keyboard behavior, fully restyled
+  chrome. This is now the one control to reach for anywhere Eleven needs
+  a dropdown trigger (§17 inventory).
 
 **Formalized control grammar (§17 addition):** `SelectTrigger`
 (`ui/select-trigger.tsx`) joins `Button`/`Input`/`TerminalPanel` as a

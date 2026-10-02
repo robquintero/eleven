@@ -62,13 +62,17 @@ export async function getRecentActivity(leagueId: string, limit = 10): Promise<A
     const metadata = (row.metadata ?? {}) as Record<string, unknown>;
     const teamName = row.fantasy_team_id ? (teamNameById.get(row.fantasy_team_id) ?? "A team") : "Commissioner";
 
+    // Pass 13: natural casing on team/player names -- these are human-
+    // register content (§2) and render in sans/prose type, never
+    // `.label-system`. Only the fallback's trailing transaction-type code
+    // stays uppercase, same "Name · CODE" pattern as club · league (§10).
     let summary: string;
     if (row.type === "free_agent_add" && typeof metadata.playerId === "string") {
       const playerName = playerNameById.get(metadata.playerId) ?? "a player";
-      summary = `${teamName.toUpperCase()} ADDED ${playerName.toUpperCase()}`;
+      summary = `${teamName} added ${playerName}`;
     } else if (row.type === "drop" && typeof metadata.playerId === "string") {
       const playerName = playerNameById.get(metadata.playerId) ?? "a player";
-      summary = `${teamName.toUpperCase()} DROPPED ${playerName.toUpperCase()}`;
+      summary = `${teamName} dropped ${playerName}`;
     } else if (
       row.type === "trade" &&
       typeof metadata.proposingTeamId === "string" &&
@@ -76,9 +80,9 @@ export async function getRecentActivity(leagueId: string, limit = 10): Promise<A
     ) {
       const proposing = teamNameById.get(metadata.proposingTeamId) ?? "A team";
       const receiving = teamNameById.get(metadata.receivingTeamId) ?? "a team";
-      summary = `TRADE COMPLETED: ${proposing.toUpperCase()} ↔ ${receiving.toUpperCase()}`;
+      summary = `Trade completed: ${proposing} ↔ ${receiving}`;
     } else {
-      summary = `${teamName.toUpperCase()} · ${TRANSACTION_TYPE_LABEL[row.type] ?? row.type.toUpperCase()}`;
+      summary = `${teamName} · ${TRANSACTION_TYPE_LABEL[row.type] ?? row.type.toUpperCase()}`;
     }
 
     return {

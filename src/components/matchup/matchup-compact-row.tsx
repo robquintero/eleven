@@ -1,3 +1,4 @@
+import { Lock } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { playerStatusLabel } from "@/lib/team-fixture";
 import type { Player, PlayerPosition } from "@/lib/types/fantasy";
@@ -35,7 +36,8 @@ export function MatchupCompactRow({ player, onSelect }: { player: Player; onSele
   // The full status string ("LIVE 12.5", "FT · 12.5") is too wide for a
   // ~140px column — shown in full via the accessible label, but visually
   // only the number (or a compact fallback) renders in the row itself.
-  const compactStatus = isLive || status.text.startsWith("FT") ? (player.fantasyPoints ?? 0).toFixed(1) : status.tone === "neutral" && status.text === "LOCKED" ? "🔒" : "–";
+  const isLocked = status.tone === "neutral" && status.text === "LOCKED";
+  const compactStatus = isLive || status.text.startsWith("FT") ? (player.fantasyPoints ?? 0).toFixed(1) : isLocked ? null : "–";
 
   return (
     <button
@@ -60,7 +62,7 @@ export function MatchupCompactRow({ player, onSelect }: { player: Player; onSele
             <span className="relative inline-flex size-1 rounded-full bg-live" />
           </span>
         )}
-        {compactStatus}
+        {isLocked ? <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" /> : compactStatus}
       </span>
     </button>
   );

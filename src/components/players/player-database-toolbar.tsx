@@ -2,6 +2,7 @@
 
 import type { RefObject } from "react";
 import { Search, X } from "lucide-react";
+import { SelectTrigger } from "@/components/ui/select-trigger";
 import {
   availabilityOptions,
   isFiltersActive,
@@ -25,17 +26,7 @@ function FilterCell<T extends string>({
   return (
     <label className="flex shrink-0 items-center gap-1.5 px-2.5 py-1.5">
       <span className="label-system text-[10px] text-foreground-tertiary">{label}</span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value as T)}
-        className="label-system bg-transparent text-[11px] text-foreground-secondary outline-none"
-      >
-        {options.map((opt) => (
-          <option key={opt.value} value={opt.value} className="bg-surface-elevated">
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      <SelectTrigger value={value} options={options} onChange={onChange} ariaLabel={label} />
     </label>
   );
 }

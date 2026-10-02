@@ -42,10 +42,13 @@ export function BenchRow({
       disabled={disabled}
       aria-label={disabled ? `${player.name} (wrong position for the selected slot)` : undefined}
       className={cn(
-        "grid w-full grid-cols-[1.25rem_1.5rem_2.25rem_1fr_auto] items-center gap-2 rounded-lg py-2 pr-2 pl-1 text-left transition-colors sm:grid-cols-[1.25rem_1.5rem_2rem_1fr_2.25rem_4.25rem]",
+        "grid w-full grid-cols-[1.25rem_1.5rem_2.25rem_1fr_auto] items-center gap-2 border-l-2 border-l-transparent py-2 pr-2 pl-1 text-left transition-colors sm:grid-cols-[1.25rem_1.5rem_2rem_1fr_2.25rem_4.25rem]",
         editing && !disabled && "cursor-pointer",
-        selected && "bg-accent/10 ring-1 ring-accent",
-        swapTarget && !selected && !disabled && "bg-accent/5 ring-1 ring-accent/30",
+        // Pass 13 (DESIGN.md §20): selection is a left-edge indicator, the
+        // same pattern player-table.tsx/standings-table.tsx use -- never a
+        // rounded ring highlight.
+        selected && "border-l-accent bg-accent/10",
+        swapTarget && !selected && !disabled && "border-l-accent/30 bg-accent/5",
         disabled && "cursor-not-allowed opacity-40"
       )}
     >

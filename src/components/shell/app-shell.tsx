@@ -42,7 +42,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
           {/* Pass 10C: understated, permanent attribution -- one place, not
               repeated per component (see docs/LEGAL-COMPLIANCE.md). */}
           <div className="mt-auto flex flex-col gap-1.5 border-t border-border pt-4">
-            <span className="label-system w-fit rounded-full border border-border px-2 py-0.5 text-[9px] text-foreground-tertiary">
+            <span className="label-system text-[9px] text-foreground-tertiary">
               {SITE_NAME.toUpperCase()} · {PRODUCT_STATUS.toUpperCase()}
             </span>
             <Link

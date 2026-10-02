@@ -298,7 +298,7 @@ export default async function LeaguePage() {
                 ) : (
                   <div className="mt-2 divide-y divide-border">
                     {activity.map((entry) => (
-                      <p key={entry.id} className="label-system py-1.5 text-[11px] text-foreground-secondary">
+                      <p key={entry.id} className="py-1.5 text-sm text-foreground-secondary">
                         {entry.summary}
                       </p>
                     ))}
