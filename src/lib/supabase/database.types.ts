@@ -499,6 +499,7 @@ export type Database = {
           home_score: number | null
           id: string
           kickoff_at: string
+          last_live_sync_at: string | null
           season: number
           status: string
           updated_at: string
@@ -512,6 +513,7 @@ export type Database = {
           home_score?: number | null
           id?: string
           kickoff_at: string
+          last_live_sync_at?: string | null
           season: number
           status?: string
           updated_at?: string
@@ -525,6 +527,7 @@ export type Database = {
           home_score?: number | null
           id?: string
           kickoff_at?: string
+          last_live_sync_at?: string | null
           season?: number
           status?: string
           updated_at?: string
