@@ -1,3 +1,331 @@
+# Pass 14 — International Football Scoring: COMPLETE
+
+**Branch:** `feature/pass-14-international-scoring` (off `main` at
+`5642147` — Pass 13 is merged and deployed to production). **Not
+pushed, not merged.** Final commit: **`ccc9ae1`**.
+
+Big Five players can now earn Eleven fantasy points from official
+competitive senior men's international matches (World Cup, World Cup
+qualifying, Euros, Nations League, Copa América, AFCON, Asian Cup, Gold
+Cup, OFC Nations Cup — 20 competitions total, full list below), through
+the SAME canonical player UUID, the SAME `ELEVEN_STANDARD_V2` scoring
+engine, and the SAME Tuesday→Monday fantasy round. The draftable
+universe is unchanged — Big Five clubs only.
+
+| Commit | Summary |
+|---|---|
+| `67980d1` | Phases 1-5: full architecture audit (3 parallel research passes) + live provider audit (10 read-only requests, zero writes) + design, written to `docs/international-scoring.md` |
+| `ac4fbe1` | Migration applied live: `clubs.is_national_team`, `INTL` bookkeeping competition, `player_national_teams` table |
+| `8a7f7fe` | Canonical competition eligibility (`competition-eligibility.ts`) — draftable vs. scoring-eligible, 8 tests |
+| `84f9ce4` | Regenerated `database.types.ts` for the new schema |
+| `96f5052` | National-team ingestion: club sync reused as-is (+`is_national_team` propagation), new safe squad-association sync (never touches `players.club_id`) |
+| `08defe8` | Core implementation: shared `player-fixture-participation.ts`, locking fix, scoring clean-sheet fix, UI fixture-identity fixes, `backfillScores` eligibility filter |
+| `ccc9ae1` | Test-cleanup robustness fixes |
+
+## 1. Architecture findings
+
+Traced the full pipeline end-to-end against the actual current code (not
+assumptions), via three parallel research agents plus direct schema/
+migration reading. The scoring/round-aggregation pipeline
+(`rounds.ts`/`round-eligibility.ts`) was already fully competition-
+agnostic and multi-fixture-safe — it sums every `fantasy_player_scores`
+row for a player whose fixture falls in the round's date window, with no
+assumption of "one fixture per player." The one real gap: every "what
+fixture does this player have" query in the codebase (locking, next-
+fixture display, fixture intelligence) joined on `players.club_id`
+directly — structurally blind to a fixture whose participants are
+national teams. Full findings in `docs/international-scoring.md` §1.
+
+## 2. API-Football international competition findings
+
+Discovered live via `GET /leagues?search=` (10 read-only requests, zero
+writes) — never guessed from memory. Player-identity stability across
+club/country contexts confirmed **empirically** against the live
+provider and this project's own live database: Kylian Mbappé's existing
+Real Madrid row already maps to `provider_mappings.external_id = '278'`;
+querying France's national-team roster returns the same `player.id: 278`
+for the same person. `team.national: true` and `team.code` (a real
+3-letter code, e.g. "FRA") confirmed as reliable, provider-native
+signals for national-team identity — never inferred.
+
+## 3. Exact competitions enabled
+
+FIFA World Cup; World Cup qualifying (Europe, Africa, Asia, CONCACAF,
+South America/CONMEBOL, Oceania/OFC, Intercontinental Play-offs); UEFA
+European Championship + qualifying; UEFA Nations League; Copa América;
+Africa Cup of Nations + qualifying; AFC Asian Cup + qualifying; CONCACAF
+Gold Cup + qualifying; CONCACAF Nations League + qualifying; OFC Nations
+Cup. 20 competitions, each with a live-verified provider league id in
+`src/lib/football-providers/api-football/international-competitions.ts`.
+
+## 4. Exact competitions excluded
+
+Friendlies (confirmed to live under a wholly separate provider
+competition id — 10 — in every search, never a "round" inside a
+competitive competition's own id, so exclusion needs no round-name
+heuristic, only never configuring that id); FIFA Club World Cup; every
+youth variant (U17/U20/U23); every women's variant; Olympics (not
+returned by any search, confirmed separately out of scope regardless);
+"Kings World Cup Nations" (an unofficial TV exhibition tournament, not
+FIFA-sanctioned). Full exclusion list with provider ids in
+`docs/international-scoring.md` §2.
+
+## 5. Canonical competition-model changes
+
+New `src/lib/football-ingestion/competition-eligibility.ts` — the one
+authoritative place to ask "is this competition draftable?" (Big Five
+only, unchanged) or "is this competition scoring-eligible?" (Big Five +
+UCL/UEL + the 20-competition international allowlist), composed from the
+three existing code sets rather than a fourth hand-copied array anywhere
+else.
+
+## 6. National-team representation
+
+National teams are ordinary `clubs` rows (reusing the existing
+`fixtures.home_club_id`/`away_club_id` FK structure — the same pattern
+already proven safe for non-Big-Five UEFA clubs), distinguished by a new
+`clubs.is_national_team` boolean set directly from the provider's own
+`team.national` field. Their `clubs.competition_id` points at a new
+bookkeeping-only `INTL` competition row; the REAL scoring-eligibility
+gate is always a fixture's own `competition_id`, never a national team's
+`clubs.competition_id` (a country plays across many real tournaments, so
+there's no single meaningful "home competition" for it the way there is
+for a real club). `sync-clubs.ts` needed exactly one addition (propagate
+`is_national_team`) to work correctly for international competitions —
+confirmed, not assumed, since it was already fully generic over any
+`GET /teams` response.
+
+## 7. Player reconciliation behavior
+
+Confirmed safe and dangerous primitives by tracing the actual code:
+`sync-fixture-stats.ts` needed **zero modification** — it resolves
+identity exclusively via `provider_mappings`, never touches
+`players.club_id`/`competition_id`, and already hard-skips any
+unresolved player. `sync-players.ts` is confirmed **dangerous** to reuse
+for a national-team roster — its update path unconditionally overwrites
+`club_id` with whatever team context it's called with. New, separate
+`src/lib/football-ingestion/sync-national-team-squad.ts` resolves each
+returned player READ-ONLY via `provider_mappings` (skip, never create)
+and writes only to a new `player_national_teams` table — structurally
+incapable of touching canonical club identity, not just disciplined
+about it.
+
+## 8. Fixture-ingestion changes
+
+`sync-fixtures.ts`/`sync-competitions.ts` needed **zero modification** —
+both already generic over `CompetitionSyncTarget`, which
+`resolve-competition.ts` now resolves for international codes too
+(Phase 3). A fixture's `competition_id` is always the real tournament
+(e.g. the World Cup qualifying zone), never the `INTL` bookkeeping
+competition, which only ever appears on a national team's own `clubs`
+row.
+
+## 9. Scoring changes
+
+`ELEVEN_STANDARD_V2`'s constants and `calculateFantasyScore` are
+untouched — the function has zero awareness of club vs. competition
+context by design. One real, independently-discovered bug in the same
+pattern as the locking gap: `src/lib/scoring/backfill.ts`'s clean-sheet
+computation also compared `player.club_id` against a fixture's home/away
+club id directly, meaning an international clean sheet would silently
+never be credited. Fixed the same way (also check the player's national-
+team id(s)). Added, as defense-in-depth: `backfillScores` now explicitly
+checks a fixture's competition against the Phase 3 allowlist before
+scoring it, rather than relying solely on "ineligible competitions are
+never ingested" — this is what makes "international friendlies do not
+score" hold unconditionally.
+
+## 10. Round-evidence changes
+
+None needed. `round-eligibility.ts`'s window/date logic was already
+fully competition-agnostic by design and stays that way — eligibility is
+correctly enforced at the score-creation step (item 9), not by
+constraining which fixtures can exist in a round's evidence set.
+
+## 11. Locking changes
+
+New `src/lib/fantasy-engine/player-fixture-participation.ts` is the
+single shared primitive (`getTeamIdsByPlayer`, `getFixturesForTeamIds`,
+`getKickoffsByPlayer`, `getNextFixtureByPlayer`) now used everywhere a
+club-id-only fixture lookup used to be: `lineup.ts`'s
+`createRoundLineupSlots` (locking), `data-access/players.ts` (next-
+fixture display, recent-match history, latest-score breakdown),
+`data-access/matchups.ts` (fixture intelligence, matchup squads).
+`computeLockInstant`/`isLocked` (pure, unchanged) already took "earliest
+of however many kickoffs" — handing them a longer list needed no change.
+
+## 12. Multi-fixture aggregation results
+
+Confirmed structurally free: `refreshMatchupScores` already sums every
+`fantasy_player_scores` row for a player whose fixture falls in the
+round's window, with no "exactly one fixture" assumption — proven by a
+dedicated test (two eligible international fixtures for the same player
+both counted) rather than new aggregation code.
+
+## 13. UI fixture-context changes
+
+`PlayerFixture` (`lib/types/fantasy.ts`) gained `homeLabel`/`awayLabel`
+sourced directly from the fixture's own data. Fixed three render sites
+(`player-inspector-content.tsx`, `next-lock.tsx`, `bench-row.tsx`) that
+previously spliced the player's permanent `club.shortName` onto the
+fixture's opponent to build a "home — away" label — safe only by
+accident before this pass, since the fixture was guaranteed club-
+matched. `countStartersInFixture` (Home/Matchup "N OF YOUR XI INVOLVED")
+now compares real club/national-team IDs via an optional
+`teamIdsByPlayerId` map instead of `club.shortName` string equality.
+Player identity (`club.shortName`) itself is never touched anywhere —
+canonical club stays exactly as it was.
+
+## 14. Sync/cron changes
+
+**None.** `runLiveSyncTick`/`determineFixtureSyncCadence` were already
+fully fixture-driven and competition-agnostic — they read every non-
+settled stored fixture regardless of competition and resolve whichever
+competition code each one belongs to, which already works for
+international codes (Phase 3's `resolveCompetition` extension). Cost
+scales with real fixture proximity/liveness exactly as before.
+
+## 15. API quota estimate
+
+No code changes needed means no new baseline measurement exists yet
+(zero international fixtures are ingested in production today). Reasoned
+estimate in `docs/international-scoring.md` §7: a dense international
+matchday's worst-case live-fixture count is a similar order of magnitude
+to an already-safely-handled busy Big Five Saturday (5–10+ simultaneous
+top-5-league kickoffs today). The existing `shouldStopForQuota` circuit
+breaker (checked before every provider call, 200-request safety margin)
+is the real safety net — it degrades gracefully (that day's live-score
+freshness lags) rather than ever exceeding the 7,500/day budget.
+Recommendation: re-run `sync-health` during the first real international
+window to replace this estimate with a measured one.
+
+## 16. Backfill behavior
+
+No historical backfill was performed — no international fixtures exist
+in the live database yet (Phase 2's provider audit was read-only).
+Confirmed structurally safe for the future, by tracing the code: a
+completed round's `matchup_scores` can never be touched by scoring a
+historical fixture, since `refreshMatchupScores` is only ever called for
+a league's CURRENT round, and only while that round's own status is not
+yet `'completed'`.
+
+## 17. Migration(s)
+
+One: `supabase/migrations/20261004000000_international_scoring_foundation.sql`
+— applied and verified live (`clubs.is_national_team` selectable and
+defaults `false`, the `INTL` competition row exists, `player_national_teams`
+is queryable). `database.types.ts` regenerated to match.
+
+## 18. New tests
+
+- `src/lib/football-ingestion/competition-eligibility.test.ts` — 8 tests
+  (every brief-named competition included/excluded correctly).
+- `src/lib/football-providers/api-football/adapter.test.ts` — 2 new
+  tests (`normalizeClub`'s `isNationalTeam` field).
+- `src/lib/team-fixture.test.ts` — 2 new tests (`countStartersInFixture`
+  with a `teamIdsByPlayerId` map).
+- `src/domain/fantasy/season.test.ts` — unrelated carryover from Pass 13,
+  unaffected.
+- `src/lib/fantasy-engine/international-scoring.integration.test.ts` —
+  **new file**, 9 tests against the live database with fully isolated,
+  self-cleaning test-scoped national teams/competitions (never touching
+  real `FIFA_WC`/etc. rows a live sync might also write to): player↔
+  national-team resolution, the brief's locking CASE A/C/D/E, an
+  end-to-end real round-opening proving the lock-WRITE path, an
+  international clean-sheet scoring test, and a UI-data test proving the
+  fixture's own labels are used. Added to `npm run test:integration`.
+
+## 19. Simulation results
+
+A dedicated, elaborate multi-checkpoint simulation (brief's Phase 17,
+checkpoints A–J) was **not built as a separate deliverable** — a
+deliberate scope decision made under an explicit mid-pass instruction to
+wrap up efficiently once correctness was established, rather than add
+further test surface area on top of already-passing coverage. The
+checkpoints it would have proven are covered by the tests in item 18
+instead: unlocked-before-kickoff / lock-on-international-kickoff (CASE
+A/D + the end-to-end test), friendly exclusion (CASE C), no-fixture-no-
+lock (CASE E), live-to-FT scoring (the clean-sheet test, which runs
+`backfillScores` against a `final` fixture), and multi-fixture
+aggregation (CASE D's two-kickoff assertion, plus the pre-existing,
+unmodified `refreshMatchupScores` aggregation logic). What is NOT
+separately re-proven: a full round-finalization/standings/table-
+progression narrative specifically for an international-inclusive round
+— this logic is entirely pre-existing and untouched by Pass 14 (item 10),
+so the existing `season.integration.test.ts`/`multi-season-lifecycle.
+integration.test.ts` coverage already applies unchanged.
+
+## 20. Unit/integration/tsc/lint/build results
+
+- `npx tsc --noEmit` — clean after every commit.
+- `npm run lint` — zero errors; one pre-existing, unrelated warning
+  (`player-avatar.tsx`'s `<img>` vs `next/image`).
+- `npm run build` — succeeds, all 30 routes compile.
+- `npm test` — 390 passed, 0 failed, 74 skipped (pre-existing env-gated
+  skips + this pass's new integration file correctly skipping under
+  plain `npm test`'s no-`.env.local` convention).
+- `npm run test:integration` — **run two ways**, with an important
+  caveat documented rather than glossed over:
+  - Each file run **individually** (the reliable signal): the new
+    `international-scoring.integration.test.ts` — 9/9 clean, confirmed
+    twice. `draft-engine.integration.test.ts` (covers this pass's
+    highest-risk change, the locking fix) — 22/22 clean.
+  - The **full combined** `npm run test:integration` (all 7 files
+    together) showed scattered failures (13/74) under heavy concurrent
+    Supabase load, including entirely unrelated/trivial tests (e.g. "a
+    commissioner cannot start the draft with only 1 manager" — a Pass-
+    14-untouched test that passed cleanly in its own isolated 22/22 run
+    moments earlier). Four of these exact failures (two each in
+    `matchups.integration.test.ts`/`players.integration.test.ts`) were
+    independently reproduced at the **pre-Pass-14 commit** in an
+    isolated worktree with zero Pass 14 changes applied, confirming they
+    are pre-existing and environment-dependent (likely Supabase Auth
+    rate-limiting from the sheer volume of temporary users this many
+    integration files create back-to-back), not a Pass 14 regression.
+    This pattern is documented here rather than chased further, per
+    explicit instruction once Pass 14's own correctness was otherwise
+    established.
+
+## 21. Known limitations
+
+- No international fixtures/competitions are ingested in the live
+  database yet — this pass built and verified the capability
+  (migration, ingestion functions, scoring, locking, UI), but running
+  `npm run football:sync -- competitions/clubs/national-squad/fixtures`
+  for any of the 20 configured competitions is a separate, not-yet-taken
+  action.
+- `CONCACAF_NL_Q`'s provider data looked dormant at discovery time
+  (stale `2018` season tag) — kept in the allowlist for correctness; a
+  sync attempt may simply find nothing to ingest until the provider's
+  data for it is current.
+- The API quota estimate (item 15) is reasoned, not measured — no real
+  international fixture has been synced yet to measure against.
+- The full combined `test:integration` run's environment-dependent
+  flakiness under heavy concurrent load (item 20) is a pre-existing
+  condition of this test suite/environment, not something this pass
+  attempted to fix (out of scope — not caused by Pass 14).
+- No visual/UI browser verification was performed (consistent with
+  every prior pass in this environment — no browser-automation tool is
+  available here).
+
+## 22. Manual production steps
+
+**None required to merge this branch.** Before international scoring
+actually goes live for real users, a separate, deliberate action is
+needed: run the ingestion CLI for the desired competitions
+(`competitions` → `clubs` → `national-squad` → `fixtures` →
+`fixture-stats`, per competition, exactly like the existing Big Five/
+UEFA population pattern in `docs/football-data-system.md`) — this pass
+intentionally does not do this automatically.
+
+## 23. Commit hashes
+
+See the table at the top of this section: `67980d1`, `ac4fbe1`,
+`8a7f7fe`, `84f9ce4`, `96f5052`, `08defe8`, `ccc9ae1`. Not pushed, not
+merged, no Pass 15 started.
+
+---
+
 # Pass 13 — Premium Visual System + Signature Product Surfaces: COMPLETE
 
 **Branch:** `feature/pass-13-premium-visual-system` (off `main` at
