@@ -1,15 +1,28 @@
-# Pass 12F — Beta Readiness + Product Polish: IN PROGRESS (safe-stop checkpoint)
+# Pass 12F — Beta Readiness + Product Polish: COMPLETE
 
 **Branch:** `feature/pass-12f-beta-readiness` (off `main` at `011bb3b` —
-Pass 12 is merged and deployed to production). Not pushed. Latest commit:
-**`1cdd8bb`**.
+Pass 12 is merged and deployed to production). **Not pushed, not merged.**
+Latest commit: **`ddf42ce`**.
 
-**Stopped at a context-budget safe-stop, mid-pass, NOT mid-edit.** Every
-commit on this branch compiles clean (`tsc`/`lint`/`build` all pass as of
-`1cdd8bb`). Phases 1–5 of the 11-phase Pass 12F brief are done; Phases
-6–11 have not been started at all.
+All 11 phases of the brief are done and checkpointed as separate commits
+on this branch:
 
-## What's done (commits `6ad6b75`, `1cdd8bb`)
+| Phase | Commit | Summary |
+|---|---|---|
+| 1–4 | `6ad6b75` | Production account cleanup, confirmed-email auth, password recovery, Account page hardening |
+| 5 | `1cdd8bb` | Mobile Matchup always side-by-side |
+| (safe-stop) | `e508f3d` | Mid-pass HANDOFF checkpoint (superseded by this section) |
+| 6 | `61a75a3` | Real Search baseline, no more fake "SOON" placeholders |
+| 7 | `733b579` | Authoritative equal-player-count rule for trades (new migration) |
+| 8 | `fa12db2` | Trade player picker matches Eleven's design language |
+| 9 | `f3ddc59` | Universal navigation-transition coverage |
+| 10 | `ddf42ce` | Targeted responsive audit (Search, Trades, Account/Auth, nav, Matchup) |
+| 11 | (this commit) | Final validation sweep + this HANDOFF update |
+
+`tsc --noEmit`, `npm run lint`, and `npm run build` are clean as of every
+commit above. Full validation sweep for Phase 11 (see below) also passes.
+
+## What's done — Phases 1–5 (commits `6ad6b75`, `1cdd8bb`)
 
 **Phase 1 (production action, not code) — fake account cleanup.**
 Audited every `public.*` → `auth.users` relationship directly via
@@ -83,46 +96,133 @@ width/overflow accounting. **This is a known verification gap** worth
 closing with real width-at-375px browser/device testing before shipping
 to real beta users.
 
-## What's NOT done — Phases 6–11 (none started)
+## What's done — Phases 6–11 (commits `61a75a3`, `733b579`, `fa12db2`, `f3ddc59`, `ddf42ce`)
 
-- **Phase 6 — Search baseline.** Audit the existing Search UI; three
-  actions currently show "SOON" placeholders — remove them and build
-  real basic search (Players, League/app destinations) that actually
-  navigates. Not investigated at all yet this pass — don't assume
-  anything about its current file locations without reading them fresh.
-- **Phase 7 — Trade rule: equal player counts only.** Needs a new
-  migration enforcing this AUTHORITATIVELY in `propose_trade`/
-  `accept_trade` (not just the UI), plus tests (1-for-1, 2-for-2 accepted;
-  2-for-1, 3-for-2 rejected; backend rejection even if the client is
-  bypassed). Not started.
-- **Phase 8 — Trade UI polish.** Depends conceptually on Phase 7's new
-  constraint being in place first (so the UI can show "YOUR SIDE 2 / THEIR
-  SIDE 1 / ADD 1 PLAYER" feedback against a real rule). Not started.
-- **Phase 9 — Universal navigation-transition coverage.** Audit
-  `NavigationTransitionProvider` (or whatever the actual current
-  implementation is called — re-verify, don't trust this name blindly)
-  and every contextual in-page link (League → My Matchup is the brief's
-  own named example) to confirm they all trigger the same transition
-  primary nav already does. Not started/investigated.
-- **Phase 10 — Responsive/consistency audit** of Matchup, Search, Trade
-  proposal, Account/Auth states, contextual navigation. Partially covered
-  incidentally by Phase 5's Matchup work; Search/Trade/nav pieces not
-  touched.
-- **Phase 11 — Final testing + validation sweep** (`npm test`,
-  `npm run test:integration`, `tsc`, `lint`, `build`) once Phases 6–10 are
-  actually done — don't run this prematurely and call the pass complete;
-  it hasn't reached that point.
+**Phase 6 — Search baseline.** The command palette (⌘K) had three
+"SOON" actions (Waivers, Propose Trade, Transactions) that went nowhere.
+"Waivers" was removed outright — Eleven has no waiver system and none is
+planned, so a command for a feature that will never exist is worse than
+no command. "Propose Trade" → `/league`, "Transactions" → `/home`, both
+real navigations now. Player search is real: `searchPlayersAction`
+(`src/app/(app)/players/actions.ts`) wraps the existing
+`getPlayerDatabase` — the exact same accent-insensitive search the
+Players workspace itself uses, never a second implementation — debounced
+200ms with out-of-order-response guarding. The minimum-query-length gate
+(`shouldSearchPlayers`, `src/lib/search/player-search.ts`) is a pure,
+tested function (4 cases).
+
+**Phase 7 — trades must contain equal player counts.** New migration
+(`supabase/migrations/20261003000100_trade_equal_player_counts.sql`,
+applied and verified against the live project) adds a `UNEVEN_TRADE`
+check to `propose_trade` itself — the sole write path into
+`trades`/`trade_assets` (neither table has an INSERT policy for
+`authenticated`), so this is authoritative at the database layer, not
+just the UI; `accept_trade` needs no extra check since it only ever
+operates on already-validated rows. Verified before writing the migration
+that zero existing trades were already uneven. New `UNEVEN_TRADE` error
+code/copy; the Review button now correctly disables on an uneven
+selection; a `TradeCountHint` shows YOUR SIDE / THEIR SIDE counts and
+"ADD N PLAYER(S) FROM …" while picking. 4 new integration tests (2-for-2
+valid, 2-for-1 rejected, 3-for-2 rejected, authoritative RPC-bypass
+rejection) plus 6 pre-existing tests updated where their setup relied on
+now-illegal uneven trades as scaffolding for unrelated behavior.
+
+**Phase 8 — trade player picker redesign.** The propose-trade dialog's
+YOU SEND / YOU RECEIVE lists used raw `<input type="checkbox">` elements
+— generic browser controls. Replaced with `TradePlayerRow`
+(`src/components/league/trade-center.tsx`): a button-based row
+(`role="checkbox"`, `aria-checked`) with the same position badge used on
+the DRAFT board and the same accent border/background + Check-icon
+selected state used by the league switcher — no new visual vocabulary.
+**Not visually verified in a live browser** — this environment has no
+browser-automation tool available; verified by `tsc`/`lint`/build
+compiling clean and by matching the exact classes/structure of two
+already-shipped, visually-confirmed patterns elsewhere in the app. Worth
+a real click-through before shipping to beta users.
+
+**Phase 9 — universal navigation-transition coverage.** `DesktopNav` and
+`MobileNav` were the only two call sites that ever called
+`NavigationTransitionProvider`'s `begin()`. Every contextual in-page link
+(League → My Matchup, League → Season Archive, League → Draft,
+Players/Account/Team navigation, the wordmark, several dashboard
+shortcuts) rendered a bare `next/link` `Link` and never triggered the
+"ELEVEN / <LABEL>" loading overlay. New `TransitionLink`
+(`src/components/shell/transition-link.tsx`) is the single centralized
+interception point — swapped in at every contextual navigation call site
+found in this audit (16 files), including through `Button`'s `render`
+prop. The Command Palette's `router.push()` calls (item selection and its
+"G + letter" keyboard shortcuts) now call `begin()` directly before
+navigating. No automated test: this wiring is pure client-side DOM click
+handling in `src/components/*`, which `npm test`'s glob
+(`src/domain`/`src/lib`/`src/data-access`) doesn't execute, and this
+codebase has no existing component-render test harness to extend
+proportionately for this pass.
+
+**Phase 10 — targeted responsive/consistency audit.** Found and fixed one
+real issue: the trade dialog's player-selection grid was a fixed
+`grid-cols-2` even on phone widths, cramping names inside the dialog's
+~310px content area — now `grid-cols-1` below `sm:`, two columns above.
+Search (command palette popup sizing), Account/Auth (already
+`max-w-sm` + safe `px-4` gutter), and the Phase 9 navigation wiring
+(`TransitionLink` is a transparent passthrough — same DOM output as the
+`Link` it replaced) were reviewed and found sound, no changes needed.
+Re-verified via `git diff` against the Phase 5 checkpoint commit that no
+later phase touched the mobile Matchup files — that fix is intact.
+
+**Phase 11 — final validation.** See the results below. `HANDOFF.md`
+(this file) updated with full Pass 12F status.
+
+## Final validation sweep results (Phase 11)
+
+- `npm test` — **365 passed, 0 failed, 65 skipped** (pre-existing,
+  env-gated), 430 total.
+- `npm run test:integration` — **65 passed, 0 failed** (draft engine,
+  market/trades — 26 of the 65, including this pass's new/updated trade
+  tests — season lifecycle, multi-season lifecycle, players, matchups).
+- `npx tsc --noEmit` — clean, zero errors.
+- `npm run lint` — zero errors; one pre-existing warning
+  (`player-avatar.tsx`'s `<img>` vs `next/image`, unrelated to this pass,
+  not introduced by it).
+- `npm run build` — succeeds, all 30 routes compile.
+
+## Migrations applied this pass
+
+One: `supabase/migrations/20261003000100_trade_equal_player_counts.sql`
+(Phase 7, detailed above). Applied to the live Supabase project and
+verified against it before being written into the migration file (a
+live query confirmed zero existing trades were already uneven, so this
+is a pure forward-looking constraint with no historical-data
+implications).
+
+## Known beta limitations (carried forward, not fixed this pass)
+
+- **Phase 8's trade UI was not visually verified in a live browser** — no
+  browser-automation tool is available in this environment. Recommend a
+  real click-through (ideally at a real 375px-wide device) before beta
+  users rely on it.
+- **Phase 5's mobile Matchup fix was also never browser-verified**,
+  carried forward from the original Phase 5 checkpoint — same
+  recommendation applies.
+- Commissioner-transfer-on-deletion is explicitly out of scope (Phase 1)
+  — an account that created a league cannot currently self-delete; it
+  gets a clear `HAS_LEAGUES` refusal instead. A real transfer flow is a
+  separate product decision.
+- The Supabase dashboard's Authentication → URL Configuration (Site
+  URL / Redirect URLs) was never independently re-verified against the
+  live project in this environment (no dashboard access) — see "Exact
+  remaining manual Supabase step" below, carried forward unchanged from
+  Phase 3.
 
 ## Production state (already executed, do not repeat)
 
 - 20 fake leagues + 71 fake accounts deleted from the LIVE Supabase
   project (Phase 1) — this is done, verified, and irreversible. Do not
   attempt it again or assume it still needs doing.
-- No new migration was applied this pass (Phases 1–5 needed none — Phase
-  7's equal-trade-count rule WILL need one).
+- One migration applied this pass (Phase 7, see above). Phases 1–6 and
+  8–10 needed none.
 - `main` already has Pass 12 (A–E) merged and deployed to production
   (Vercel Pro). This branch (`feature/pass-12f-beta-readiness`) is based
-  on that current `main`.
+  on that current `main`. **This branch has not been pushed or merged.**
 
 ## Exact remaining manual Supabase step (from Pass 12F Phase 3)
 
@@ -137,26 +237,6 @@ was not independently re-verified against the live dashboard this pass
 `SITE_URL` already being correct in code. Confirm this manually before
 relying on real confirmation/recovery emails working end-to-end in
 production.
-
-## Continuation prompt for a fresh Claude session
-
-> Continue Pass 12F (Beta Readiness + Product Polish) on branch
-> `feature/pass-12f-beta-readiness` (latest commit `1cdd8bb`). Read
-> `HANDOFF.md`'s "Pass 12F" section first — Phases 1–5 are complete and
-> committed (production fake-account cleanup, confirmed-email auth +
-> password recovery, Account page Change Password/Delete Account, mobile
-> Matchup now always side-by-side). Do NOT redo those. Start Phase 6
-> (Search baseline) next, then work through Phases 7–11 in order exactly
-> as originally specified (equal-player-count trade rule enforced
-> authoritatively in the backend, trade UI polish, universal
-> navigation-transition coverage — audit every contextual link including
-> League → My Matchup — responsive/consistency audit, then the full
-> final validation sweep and completion report). Audit each surface fresh
-> before changing it; don't assume anything about current file locations
-> or names beyond what HANDOFF.md says. Keep the same scope discipline as
-> the original brief: no scoring/season/draft/lineup/sync changes, no
-> broad redesign, proportional changes only. Commit checkpoints per phase
-> on this same branch. Do not push, do not merge, do not start a Pass 13.
 
 ---
 
