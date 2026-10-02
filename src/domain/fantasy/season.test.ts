@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeCycleLength, computeTotalRounds, isValidScheduleCycles } from "./season.ts";
+import { computeCycleLength, computeTotalRounds, isValidScheduleCycles, leagueSeasonIdentityLabel } from "./season.ts";
 import { generateRoundRobinCycle, pairingsForSeasonRound } from "./schedule.ts";
 
 test("computeCycleLength: even manager counts need N-1 rounds for one cycle", () => {
@@ -28,6 +28,49 @@ test("isValidScheduleCycles accepts only 1, 2, or 3", () => {
   assert.equal(isValidScheduleCycles(3), true);
   assert.equal(isValidScheduleCycles(0), false);
   assert.equal(isValidScheduleCycles(4), false);
+});
+
+test("leagueSeasonIdentityLabel: null season is a truthful pre-season label, never a fabricated round", () => {
+  assert.equal(leagueSeasonIdentityLabel(null), "SEASON NOT STARTED");
+});
+
+test("leagueSeasonIdentityLabel: an in-progress season shows ROUND X / Y", () => {
+  assert.equal(
+    leagueSeasonIdentityLabel({
+      seasonNumber: 2,
+      scheduleCycles: 2,
+      totalRounds: 14,
+      currentRoundNumber: 3,
+      status: "ACTIVE",
+    }),
+    "SEASON 2 · TWICE · ROUND 3 / 14 · ACTIVE"
+  );
+});
+
+test("leagueSeasonIdentityLabel: scheduled-but-not-yet-opened shows the total without a current round", () => {
+  assert.equal(
+    leagueSeasonIdentityLabel({
+      seasonNumber: 1,
+      scheduleCycles: 1,
+      totalRounds: 9,
+      currentRoundNumber: null,
+      status: "SETUP",
+    }),
+    "SEASON 1 · ONCE · 9 ROUNDS SCHEDULED · SETUP"
+  );
+});
+
+test("leagueSeasonIdentityLabel: neither total nor current round known yet is SCHEDULE PENDING", () => {
+  assert.equal(
+    leagueSeasonIdentityLabel({
+      seasonNumber: 1,
+      scheduleCycles: 2,
+      totalRounds: null,
+      currentRoundNumber: null,
+      status: "SETUP",
+    }),
+    "SEASON 1 · TWICE · SCHEDULE PENDING · SETUP"
+  );
 });
 
 /**

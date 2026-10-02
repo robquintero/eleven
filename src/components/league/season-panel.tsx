@@ -6,23 +6,24 @@ import { setSeasonScheduleFormatAction, startNextSeasonAction, type SeasonSchedu
 import { SCHEDULE_CYCLES_LABEL, type ScheduleCycles } from "@/domain/fantasy/season";
 import type { RosterMode, SeasonSummary } from "@/data-access/seasons";
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
 
 const CYCLE_OPTIONS: ScheduleCycles[] = [1, 2, 3];
 
 /**
- * Pass 12A/12B's minimum season-identity surface for the League page:
- * season number/status, schedule format, "round X of Y," a champion
- * banner once COMPLETED, and (Pass 12B) the commissioner's "Start Next
- * Season" control once that happens. Deliberately NOT a season archive/
- * history UI (that's `SeasonArchiveList`, a separate component) — just
- * enough to see and operate the engine.
- *
- * The ONCE/TWICE/THREE TIMES pre-season control only appears before this
- * league has a season row at all (commissioner only); "Start Next
- * Season" only appears once the current season is COMPLETED (commissioner
- * only). Neither control is ever shown to a non-commissioner, and neither
- * is shown when it would just fail server-side anyway.
+ * Pass 12A/12B's season-ACTION surface for the League page: the
+ * commissioner's pre-season format picker, a champion banner once
+ * COMPLETED, and the commissioner's "Start Next Season" control once that
+ * happens. Deliberately NOT a season archive/history UI (that's
+ * `SeasonArchiveList`) and, since Pass 13, deliberately NOT the season's
+ * read-only identity display either (SEASON N / ROUND X of Y / ACTIVE) —
+ * that now lives directly in the League page's own lightweight header
+ * strip (`leagueSeasonIdentityLabel`, `@/domain/fantasy/season`), so this
+ * component renders nothing at all for the common "a season is running,
+ * nothing to do" case rather than a bordered box that exists only to
+ * repeat state shown one scroll away. It renders a box only when there's
+ * a genuine action or milestone: the pre-season format choice, or a
+ * just-completed season's champion (+ Start Next Season, commissioner
+ * only).
  */
 export function SeasonPanel({
   season,
@@ -36,7 +37,7 @@ export function SeasonPanel({
   if (!season) {
     if (!isCommissioner) return null;
     return (
-      <div className="border border-border p-4">
+      <div className="mt-4 border border-border p-4">
         <p className="label-system text-[11px] text-foreground-tertiary">SEASON_FORMAT</p>
         <p className="mt-1 text-sm text-foreground-secondary">
           Choose how many times each manager plays every other manager before this league&apos;s first season begins.
@@ -46,39 +47,20 @@ export function SeasonPanel({
     );
   }
 
-  const roundLabel =
-    season.totalRounds !== null && season.currentRoundNumber !== null
-      ? `ROUND ${season.currentRoundNumber} / ${season.totalRounds}`
-      : season.totalRounds !== null
-        ? `${season.totalRounds} ROUNDS SCHEDULED`
-        : "SCHEDULE PENDING";
+  if (season.status !== "COMPLETED") return null;
 
   return (
-    <div className="border border-border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="label-system text-[11px] text-foreground-tertiary">
-          SEASON {season.seasonNumber} · {SCHEDULE_CYCLES_LABEL[season.scheduleCycles]}
-        </p>
-        <span
-          className={cn(
-            "label-system text-[10px]",
-            season.status === "COMPLETED" ? "text-accent" : season.status === "ACTIVE" ? "text-live" : "text-foreground-tertiary"
-          )}
-        >
-          {season.status}
-        </span>
-      </div>
-
-      {season.status === "COMPLETED" && season.championTeamName ? (
-        <div className="mt-2 flex items-center gap-2">
+    <div className="mt-4 border border-border p-4">
+      {season.championTeamName ? (
+        <div className="flex items-center gap-2">
           <Trophy className="size-4 text-accent" strokeWidth={1.75} />
           <p className="text-sm font-medium text-foreground">{season.championTeamName} — Season {season.seasonNumber} Champion</p>
         </div>
       ) : (
-        <p className="mt-1 text-sm font-medium text-foreground">{roundLabel}</p>
+        <p className="label-system text-[11px] text-foreground-tertiary">SEASON {season.seasonNumber} COMPLETED</p>
       )}
 
-      {season.status === "COMPLETED" && isCommissioner && (
+      {isCommissioner && (
         <div className="mt-3 border-t border-border pt-3">
           <p className="label-system text-[11px] text-foreground-tertiary">START_NEXT_SEASON</p>
           <StartNextSeasonForm leagueId={leagueId} defaultCycles={season.scheduleCycles} />

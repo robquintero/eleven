@@ -25,6 +25,7 @@ import {
   deriveLeagueLifecycle,
   LEAGUE_LIFECYCLE_LABEL,
 } from "@/domain/fantasy/league-lifecycle";
+import { leagueSeasonIdentityLabel } from "@/domain/fantasy/season";
 
 export default async function LeaguePage() {
   const profile = await getCurrentProfile();
@@ -169,26 +170,47 @@ export default async function LeaguePage() {
 
       {activeDetail && lifecycle && (
         <section>
-          <ModuleHeader title="LEAGUE_STATUS" meta={LEAGUE_LIFECYCLE_LABEL[lifecycle]} />
-          {/* Pass 11.5: League is now a competition center first -- standings,
-              this round's matchups, recent results, and records occupy the
-              wider primary column; membership/draft/transactions/trades
-              (still real, still reachable, just not what the page leads
-              with) move to the secondary column. */}
-          <div className="mt-3 grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start">
-            <div className="flex flex-col gap-6">
-              <SeasonPanel season={season} leagueId={activeLeagueId!} isCommissioner={activeDetail.role === "commissioner"} />
+          {/* Pass 13: league identity as a light header strip, not a box --
+              "your league is permanent, your seasons aren't" (DESIGN.md
+              §23/brief §6). The season's own read-only state (SEASON N /
+              ROUND X of Y / status) lives here as one line; SeasonPanel
+              below only ever renders when there's a genuine action or
+              milestone (pre-season format choice, a just-completed
+              season's champion). */}
+          <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3">
+            <div>
+              <p className="text-xl font-semibold tracking-tight text-foreground">{activeDetail.name}</p>
+              <p className="label-system mt-1 text-[11px] text-foreground-tertiary">
+                {leagueSeasonIdentityLabel(season)}
+              </p>
+            </div>
+            <span className="label-system text-[11px] text-accent">{LEAGUE_LIFECYCLE_LABEL[lifecycle]}</span>
+          </div>
 
-              <div className="border border-border">
+          <SeasonPanel season={season} leagueId={activeLeagueId!} isCommissioner={activeDetail.role === "commissioner"} />
+
+          {/* Standings is the page's one focal/hero surface (DESIGN.md §21
+              "Focus surface") -- a professional football table is the thing
+              a manager actually comes to this page to look at, so it's the
+              only module promoted to an elevated surface. Everything else
+              below is Module-level (bordered) or bare Workspace-level,
+              never competing with it for attention. */}
+          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[1.3fr_1fr] lg:items-start">
+            <div className="flex flex-col gap-6">
+              <div className="border border-border bg-surface-elevated">
                 <div className="border-b border-border px-4 py-2.5">
                   <span className="label-system text-[11px] text-foreground-secondary">STANDINGS</span>
                 </div>
                 <StandingsTable standings={standings} myTeamId={myTeam?.id ?? null} />
               </div>
 
+              {/* Current round + recent results merged into one module
+                  (was two identically-weighted boxes) -- they're the same
+                  kind of information (a round's results), just at
+                  different points in time. */}
               <div className="border border-border">
                 <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
-                  <span className="label-system text-[11px] text-foreground-secondary">CURRENT_MATCHUPS</span>
+                  <span className="label-system text-[11px] text-foreground-secondary">MATCHUPS</span>
                   {myTeam && (
                     <TransitionLink
                       href="/matchup"
@@ -199,28 +221,28 @@ export default async function LeaguePage() {
                     </TransitionLink>
                   )}
                 </div>
-                <LeagueMatchups
-                  matchups={competition?.currentRoundMatchups ?? []}
-                  myTeamId={myTeam?.id ?? null}
-                  emptyLabel="NO MATCHUPS SCHEDULED YET"
-                />
+                <div>
+                  <p className="label-system px-4 pt-3 text-[10px] text-foreground-tertiary">THIS ROUND</p>
+                  <LeagueMatchups
+                    matchups={competition?.currentRoundMatchups ?? []}
+                    myTeamId={myTeam?.id ?? null}
+                    emptyLabel="NO MATCHUPS SCHEDULED YET"
+                  />
+                </div>
+                <div className="border-t border-border">
+                  <p className="label-system px-4 pt-3 text-[10px] text-foreground-tertiary">RECENT RESULTS</p>
+                  <LeagueMatchups
+                    matchups={competition?.recentResults ?? []}
+                    myTeamId={myTeam?.id ?? null}
+                    emptyLabel="NO RESULTS YET"
+                  />
+                </div>
               </div>
 
-              <div className="border border-border">
-                <div className="border-b border-border px-4 py-2.5">
-                  <span className="label-system text-[11px] text-foreground-secondary">RECENT_RESULTS</span>
-                </div>
-                <LeagueMatchups
-                  matchups={competition?.recentResults ?? []}
-                  myTeamId={myTeam?.id ?? null}
-                  emptyLabel="NO RESULTS YET"
-                />
-              </div>
-
-              <div className="border border-border">
-                <div className="border-b border-border px-4 py-2.5">
-                  <span className="label-system text-[11px] text-foreground-secondary">LEAGUE_RECORDS</span>
-                </div>
+              {/* Bare workspace region, no border -- a handful of stat
+                  lines doesn't need its own frame (DESIGN.md §5). */}
+              <div>
+                <ModuleHeader title="LEAGUE_RECORDS" />
                 <LeagueRecordsList
                   records={
                     competition?.records ?? {
@@ -271,39 +293,46 @@ export default async function LeaguePage() {
                 </div>
               )}
 
-              <div className="border border-border p-4">
-                <p className="label-system text-[11px] text-foreground-tertiary">DRAFT</p>
-                <p className="mt-1 text-sm font-medium text-foreground">
-                  {draftStatus === "in_progress"
-                    ? "In progress"
-                    : draftStatus === "completed"
-                      ? "Completed"
-                      : "Not yet available"}
-                </p>
-                {draftStatus && (
-                  <TransitionLink
-                    href="/draft"
-                    label="Draft"
-                    className="label-system mt-1.5 inline-block text-[11px] text-accent hover:underline"
-                  >
-                    OPEN DRAFT ROOM ↗
-                  </TransitionLink>
-                )}
-              </div>
-
-              <div className="border border-border p-4">
-                <p className="label-system text-[11px] text-foreground-tertiary">TRANSACTIONS</p>
-                {activity.length === 0 ? (
-                  <p className="mt-1 text-sm text-foreground-secondary">NO TRANSACTIONS YET</p>
-                ) : (
-                  <div className="mt-2 divide-y divide-border">
-                    {activity.map((entry) => (
-                      <p key={entry.id} className="py-1.5 text-sm text-foreground-secondary">
-                        {entry.summary}
-                      </p>
-                    ))}
-                  </div>
-                )}
+              {/* Draft status + transactions merged into one OPERATIONS
+                  module (was two separate boxes) -- both are small,
+                  secondary operational readouts, not primary content. */}
+              <div className="border border-border">
+                <div className="border-b border-border px-4 py-2.5">
+                  <span className="label-system text-[11px] text-foreground-secondary">OPERATIONS</span>
+                </div>
+                <div className="px-4 py-3">
+                  <p className="label-system text-[10px] text-foreground-tertiary">DRAFT</p>
+                  <p className="mt-0.5 text-sm font-medium text-foreground">
+                    {draftStatus === "in_progress"
+                      ? "In progress"
+                      : draftStatus === "completed"
+                        ? "Completed"
+                        : "Not yet available"}
+                  </p>
+                  {draftStatus && (
+                    <TransitionLink
+                      href="/draft"
+                      label="Draft"
+                      className="label-system mt-1.5 inline-block text-[11px] text-accent hover:underline"
+                    >
+                      OPEN DRAFT ROOM ↗
+                    </TransitionLink>
+                  )}
+                </div>
+                <div className="border-t border-border px-4 py-3">
+                  <p className="label-system text-[10px] text-foreground-tertiary">TRANSACTIONS</p>
+                  {activity.length === 0 ? (
+                    <p className="mt-1 text-sm text-foreground-secondary">NO TRANSACTIONS YET</p>
+                  ) : (
+                    <div className="mt-2 divide-y divide-border">
+                      {activity.map((entry) => (
+                        <p key={entry.id} className="py-1.5 text-sm text-foreground-secondary">
+                          {entry.summary}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {tradeCenterProps && (

@@ -38,3 +38,33 @@ export function computeCycleLength(teamCount: number): number {
 export function computeTotalRounds(teamCount: number, scheduleCycles: ScheduleCycles): number {
   return computeCycleLength(teamCount) * scheduleCycles;
 }
+
+export type SeasonLifecycleStatus = "SETUP" | "ACTIVE" | "COMPLETED";
+
+/**
+ * Pass 13: the read-only "SEASON 2 · TWICE · ROUND 3 / 14 · ACTIVE"
+ * identity line — the League page's lightweight header-strip replacement
+ * for the old always-boxed season status panel (see DESIGN.md §23/§6 —
+ * "make current season/round state feel important without giant cards").
+ * Takes plain primitives rather than a `SeasonSummary` (data-access) so
+ * this stays a dependency-free domain function; `null` renders a truthful
+ * pre-season label rather than fabricating a round.
+ */
+export function leagueSeasonIdentityLabel(
+  season: {
+    seasonNumber: number;
+    scheduleCycles: ScheduleCycles;
+    totalRounds: number | null;
+    currentRoundNumber: number | null;
+    status: SeasonLifecycleStatus;
+  } | null
+): string {
+  if (!season) return "SEASON NOT STARTED";
+  const roundLabel =
+    season.totalRounds !== null && season.currentRoundNumber !== null
+      ? `ROUND ${season.currentRoundNumber} / ${season.totalRounds}`
+      : season.totalRounds !== null
+        ? `${season.totalRounds} ROUNDS SCHEDULED`
+        : "SCHEDULE PENDING";
+  return `SEASON ${season.seasonNumber} · ${SCHEDULE_CYCLES_LABEL[season.scheduleCycles]} · ${roundLabel} · ${season.status}`;
+}
