@@ -105,6 +105,7 @@ export function normalizeClub(item: ApiFootballTeamItem, competitionExternalId: 
     name: item.team.name,
     shortName,
     code: shortName,
+    isNationalTeam: item.team.national === true,
   };
 }
 

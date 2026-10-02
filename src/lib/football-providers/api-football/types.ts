@@ -80,6 +80,8 @@ export interface ApiFootballTeamItem {
     id: number;
     name: string;
     code: string | null;
+    /** Pass 14: true for a national team, false/absent for a real club — provider-native, never inferred. See docs/international-scoring.md. */
+    national?: boolean;
   };
 }
 

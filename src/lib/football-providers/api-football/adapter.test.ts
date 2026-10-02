@@ -73,6 +73,7 @@ test("normalizeClub maps team fields and carries the competition's externalId th
     name: "Manchester City",
     shortName: "MCI",
     code: "MCI",
+    isNationalTeam: false,
   });
 });
 
@@ -80,6 +81,19 @@ test("normalizeClub falls back to a derived short code when the provider omits o
   const noCode = { team: { id: 999, name: "Nocodeford United", code: null } };
   const normalized = normalizeClub(noCode, "39");
   assert.equal(normalized.shortName, "NOC");
+});
+
+test("normalizeClub: a real club (team.national absent or false) is never flagged as a national team", () => {
+  assert.equal(normalizeClub(teams.response[0], "39").isNationalTeam, false);
+  const explicitlyFalse = { team: { id: 1, name: "Some Club", code: "SOM", national: false } };
+  assert.equal(normalizeClub(explicitlyFalse, "39").isNationalTeam, false);
+});
+
+test("normalizeClub: team.national true (Pass 14) sets isNationalTeam -- the only signal this ever uses, never inferred from name/country", () => {
+  const france = { team: { id: 2, name: "France", code: "FRA", national: true } };
+  const normalized = normalizeClub(france, "1");
+  assert.equal(normalized.isNationalTeam, true);
+  assert.equal(normalized.shortName, "FRA");
 });
 
 test("normalizeClub never carries an Eleven-style 'id' field", () => {
