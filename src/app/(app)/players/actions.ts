@@ -2,11 +2,34 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getPlayerRecentMatches, getPlayerLatestScoreBreakdown, type RecentMatchRow, type PlayerScoreBreakdown } from "@/data-access/players";
+import { getPlayerDatabase, getPlayerRecentMatches, getPlayerLatestScoreBreakdown, type RecentMatchRow, type PlayerScoreBreakdown } from "@/data-access/players";
 import { toMarketActionError } from "@/lib/errors/market-action-error";
 import { MARKET_ACTION_ERROR_COPY } from "@/lib/errors/market-action-error-copy";
+import { shouldSearchPlayers } from "@/lib/search/player-search";
 
 export type MarketActionState = { error?: string } | undefined;
+
+export interface PlayerSearchResult {
+  id: string;
+  name: string;
+  position: string;
+  clubShortName: string;
+}
+
+/**
+ * Pass 12F: powers the command palette's Players group — the exact same
+ * accent-insensitive `getPlayerDatabase` search the Players workspace
+ * itself uses (never a second search implementation), trimmed to a small
+ * page and the handful of fields a compact result row needs. Not
+ * league-scoped (no ownership annotation) — this is a global "find this
+ * player" lookup, not a market action.
+ */
+export async function searchPlayersAction(query: string): Promise<PlayerSearchResult[]> {
+  if (!shouldSearchPlayers(query)) return [];
+
+  const { players } = await getPlayerDatabase({ query: query.trim(), sort: "points", pageSize: 6 });
+  return players.map((p) => ({ id: p.id, name: p.name, position: p.position, clubShortName: p.club.shortName }));
+}
 
 /** Thin server-action wrapper so the client-side Player Inspector can fetch one player's real recent matches on demand, without ever calling Supabase directly. */
 export async function getPlayerRecentMatchesAction(playerId: string): Promise<RecentMatchRow[]> {
