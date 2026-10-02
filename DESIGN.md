@@ -1157,6 +1157,61 @@ with reasons):
 
 ---
 
+## 24. Pass 13 — Event-State Design Language
+
+A survey of every "consequential event" the brief named, and the actual
+treatment each one gets today, before touching anything further.
+
+**Already has a real, restrained treatment (no changes needed):**
+
+- **Player goes LIVE** — a pulsing `animate-ping` dot + `text-live`, on
+  the pitch marker (`player-node.tsx`), bench row, matchup compact row,
+  and `MatchupCommand`'s header, all from the same `fixture.state ===
+  "live"` source of truth. Steady-state, not a one-shot animation — the
+  correct call, since every one of these renders fresh on each page
+  load/navigation, never mid-session.
+- **Player locks** — a `Lock` icon + `LOCKED` label (`NodeStatus`,
+  `bench-row.tsx`), static, uncolored (per §10's vocabulary table —
+  locked is intentionally neutral, not a state to draw the eye to).
+- **Fixture reaches FT** — `FT · {points}`, static.
+- **Trade accepted** — the proposer's own action already gets a
+  `PROCESSING…` state (`trade-center.tsx`) and a `router.refresh()` on
+  success; the new state renders on the very next paint. No flash
+  needed on an action the viewer just triggered themselves.
+- **Round final / season champion** — `SeasonPanel`'s champion banner
+  (Trophy icon + name, Pass 13 §6) is static and correct; a completed
+  round's results simply appear in MATCHUPS/STANDINGS on next load.
+
+**Deliberately NOT animated this pass, with the real reason why:**
+
+- **Score changes, lead changes** — `MatchupCommand` is a **server
+  component** rendered on Home and `/matchup`, and neither page has any
+  client-side polling/refresh mechanism today (confirmed: no
+  `setInterval`/`router.refresh()` anywhere in either page's tree — the
+  score only ever changes across a full navigation or manual reload,
+  never within a live session). A "flash when the score changes"
+  treatment has nothing to compare against in the current architecture
+  — building one now would be speculative CSS with no code path that
+  could ever trigger it, which is worse than not building it. **Motion
+  hook for the eventual live-matchday pass**: once Home/Matchup poll for
+  fresh data client-side (the same pattern `draft-page-client.tsx`
+  already uses — `setInterval(() => router.refresh(), …)`), reuse this
+  codebase's own established "compare current vs. a `useState`-tracked
+  previous value during render" pattern (see `command-palette.tsx`'s
+  query-reset effect for the canonical example) to detect a changed
+  score and apply a single `bg-live/10` background flash that fades via
+  a ~400–600ms transition — opacity/background only, no transform,
+  consistent with §8's motion rules. The same comparison drives a lead-
+  change detection (which side's `homeShare` crossed 50%).
+- **Table movement (standings rank arrows)** — would require storing
+  each team's rank as of the *previous* completed round, which nothing
+  in the schema currently computes or persists. This is a data gap, not
+  a styling one — §6's own rule ("only show fields that actually exist
+  reliably... do not create fake stats") means this waits for that data
+  to exist, not for a motion treatment to be designed ahead of it.
+
+---
+
 ## Quality Check
 
 Before shipping any new screen or component, ask:
