@@ -38,6 +38,8 @@ export interface NormalizedClub {
   name: string;
   shortName: string;
   code: string;
+  /** Pass 14: provider-native team.national, never inferred — see docs/international-scoring.md "National-team / fixture representation." */
+  isNationalTeam: boolean;
 }
 
 export interface NormalizedPlayer {

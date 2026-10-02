@@ -10,12 +10,16 @@
  *   players --code ENG --club MCI [--page 1]   sync one page of one club's players
  *   fixtures --code ENG [--from YYYY-MM-DD] [--to YYYY-MM-DD] [--page 1] [--exclude-qualifying]   sync one page of one competition's fixtures; --exclude-qualifying drops qualifying-round/play-off fixtures (UEFA competitions only — see rounds.ts)
  *
- * --code accepts either a Big Five domestic code (ENG/ESP/GER/ITA/FRA) or
- * a UEFA competition code (UCL/UEL) — see big-five-competitions.ts and
- * uefa-competitions.ts. Only Big Five membership gates Eleven's draftable
- * player pool; UEFA competitions are ingested for fixture/stat history
- * only (see docs/football-data-system.md).
+ * --code accepts a Big Five domestic code (ENG/ESP/GER/ITA/FRA), a UEFA
+ * competition code (UCL/UEL), or (Pass 14) an international competition
+ * code (FIFA_WC, UEFA_EURO, COPA_AMERICA, etc.) — see
+ * big-five-competitions.ts, uefa-competitions.ts, and
+ * international-competitions.ts. Only Big Five membership gates Eleven's
+ * draftable player pool; UEFA and international competitions are
+ * ingested for fixture/stat/scoring history only, never draftability
+ * (see docs/football-data-system.md, docs/international-scoring.md).
  *   fixture-stats --fixture <providerFixtureId>   sync one fixture's player stats
+ *   national-squad --code FRA --season 2026   Pass 14: associates existing Eleven players (resolved read-only via provider_mappings, never created) with a national team ("clubs --code <international competition>" must have created the national-team club row first) — never touches players.club_id/competition_id
  *   audit                                 zero-request DB-integrity report (see audit.ts) — safe to run anytime
  *   audit-squad --code ENG --club ARS     ONE live request: compares a club's real provider squad against Eleven, reporting any missing players by name/id
  *   live-tick                             ONE bounded live-sync pass (see live-sync.ts) — fixture-aware, quota-conscious; request count varies with how many fixtures are actually near kickoff/live/recently final (zero on a quiet day)
@@ -37,6 +41,7 @@ import { syncClubs } from "./sync-clubs.ts";
 import { syncPlayersForClub } from "./sync-players.ts";
 import { syncFixtures } from "./sync-fixtures.ts";
 import { syncFixtureStats } from "./sync-fixture-stats.ts";
+import { syncNationalTeamSquad } from "./sync-national-team-squad.ts";
 import { recordSyncEvent } from "./record-sync-event.ts";
 import { shouldStopForQuota } from "./quota.ts";
 import { compareProviderSquadToEleven, getDatabaseIntegrityReport } from "./audit.ts";
@@ -83,7 +88,7 @@ async function main() {
   const flags = parseFlags(rest);
 
   if (!operation) {
-    console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|audit|audit-squad|live-tick|sync-health> [flags]");
+    console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|national-squad|audit|audit-squad|live-tick|sync-health> [flags]");
     process.exitCode = 1;
     return;
   }
@@ -168,6 +173,14 @@ async function main() {
         break;
       }
 
+      case "national-squad": {
+        if (!flags.code || !flags.season) {
+          throw new Error('national-squad requires --code and --season, e.g. "national-squad --code FRA --season 2026"');
+        }
+        await run(syncNationalTeamSquad(admin, flags.code, Number(flags.season)));
+        break;
+      }
+
       case "audit": {
         // No provider request — safe to run anytime, as often as useful.
         const report = await getDatabaseIntegrityReport(admin);
@@ -201,7 +214,7 @@ async function main() {
 
       default:
         console.log(`Unknown operation "${operation}".`);
-        console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|audit|audit-squad|live-tick|sync-health> [flags]");
+        console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|national-squad|audit|audit-squad|live-tick|sync-health> [flags]");
         process.exitCode = 1;
         return;
     }
