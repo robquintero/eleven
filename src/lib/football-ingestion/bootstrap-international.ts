@@ -8,6 +8,7 @@ import { syncFixtureStats } from "./sync-fixture-stats.ts";
 import { syncNationalTeamSquadByClubId } from "./sync-national-team-squad.ts";
 import { hasMorePages, shouldStopForQuota } from "./quota.ts";
 import { INTERNATIONAL_SCORING_EPOCH } from "./competition-eligibility.ts";
+import { reconcileFantasyStateForFixtures } from "../fantasy-engine/reconciliation.ts";
 import { PROVIDER } from "./identity.ts";
 import type { SyncResult } from "./types.ts";
 import type { Database } from "../supabase/database.types.ts";
@@ -236,6 +237,41 @@ export async function bootstrapInternationalCompetitions(
         log(`[fixture-stats] fixture ${mapping.internal_entity_id}`);
         if (recordStep(await syncFixtureStats(admin, mapping.external_id))) break;
       }
+    }
+  }
+
+  // Step 6 (Pass 14.1): reconcile fantasy state for every international
+  // fixture this bootstrap knows about -- not just the ones whose stats
+  // were just (re)fetched. This is specifically what closes the "late
+  // fixture discovery" gap: a brand-new fixture this run just created as
+  // METADATA (step 4), with no stats yet, still needs its kickoff
+  // considered for LOCKING in whichever fantasy round's window contains
+  // it -- reconcileFantasyRound never needs player_match_stats to derive
+  // a lock. Pure database work (reconcileFantasyStateForFixtures itself
+  // makes no provider calls), run once per catalog-refresh cycle, never
+  // per-minute -- see that function's own doc comment for why this scales
+  // independent of league/user count.
+  {
+    const allCompetitionIds = (
+      await admin
+        .from("competitions")
+        .select("id")
+        .in(
+          "code",
+          enabled.map((c) => c.code)
+        )
+    ).data?.map((c) => c.id) ?? [];
+
+    if (allCompetitionIds.length > 0) {
+      let allFixtureIds: string[] = [];
+      let from = 0;
+      for (;;) {
+        const { data } = await admin.from("fixtures").select("id").in("competition_id", allCompetitionIds).range(from, from + 999);
+        allFixtureIds = allFixtureIds.concat((data ?? []).map((f) => f.id));
+        if (!data || data.length < 1000) break;
+        from += 1000;
+      }
+      await reconcileFantasyStateForFixtures(admin, allFixtureIds);
     }
   }
 

@@ -9,6 +9,7 @@ import { recordSyncEvent } from "./record-sync-event.ts";
 import { shouldStopForQuota } from "./quota.ts";
 import { PROVIDER } from "./identity.ts";
 import { backfillScores } from "../scoring/backfill.ts";
+import { reconcileFantasyStateForFixtures } from "../fantasy-engine/reconciliation.ts";
 import type { Database } from "../supabase/database.types.ts";
 import type { ProviderQuota } from "../football-providers/types.ts";
 
@@ -19,6 +20,8 @@ export interface LiveSyncTickResult {
   competitionsTouched: string[];
   fixtureStatsSynced: number;
   scoresRecomputed: number;
+  /** Pass 14.1: fantasy rounds (any league) whose locks/scores were reconciled because one of their fixtures just got fresh stats this tick. */
+  roundsReconciled: number;
   requestsUsed: number;
   stoppedForQuota: boolean;
   errors: string[];
@@ -106,6 +109,7 @@ export async function runLiveSyncTick(
           competitionsTouched: [],
           fixtureStatsSynced: 0,
           scoresRecomputed: 0,
+          roundsReconciled: 0,
           requestsUsed: 0,
           stoppedForQuota: false,
           errors: [`Failed to load candidate fixtures: ${error.message}`],
@@ -216,6 +220,7 @@ export async function runLiveSyncTick(
   }
 
   let scoresRecomputed = 0;
+  let roundsReconciled = 0;
   if (touchedFixtureIds.length > 0) {
     const backfillResult = await backfillScores(admin, { fixtureIds: touchedFixtureIds });
     scoresRecomputed = backfillResult.scored;
@@ -228,6 +233,14 @@ export async function runLiveSyncTick(
     // which is the actual fix for the quota overage this Gate 1 finding
     // describes.
     await admin.from("fixtures").update({ last_live_sync_at: now.toISOString() }).in("id", touchedFixtureIds);
+
+    // Pass 14.1: "fixture data changes -> identify affected fixture/
+    // player/round, reconcile only affected fantasy state" -- bounded to
+    // exactly the fixtures this tick actually refreshed stats for (the
+    // same set already used above), never a blind full-league scan.
+    // Database work only, no extra provider calls.
+    const reconcileResult = await reconcileFantasyStateForFixtures(admin, touchedFixtureIds);
+    roundsReconciled = reconcileResult.roundIds.length;
   }
 
   const result: LiveSyncTickResult = {
@@ -237,6 +250,7 @@ export async function runLiveSyncTick(
     competitionsTouched: competitionCodes,
     fixtureStatsSynced,
     scoresRecomputed,
+    roundsReconciled,
     requestsUsed,
     stoppedForQuota,
     errors,

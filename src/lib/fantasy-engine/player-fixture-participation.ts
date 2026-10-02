@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "../supabase/database.types.ts";
-import { isScoringEligibleCompetitionCode } from "../football-ingestion/competition-eligibility.ts";
+import { isEligibleFixtureKickoff, isScoringEligibleCompetitionCode } from "../football-ingestion/competition-eligibility.ts";
 import type { RoundWindow } from "../../domain/fantasy/round-calendar.ts";
 
 /**
@@ -102,7 +102,19 @@ export async function getFixturesForTeamIds(
       status: f.status,
       competitionCode: (f.competitions as { code: string } | null)?.code ?? "",
     }))
-    .filter((f) => isScoringEligibleCompetitionCode(f.competitionCode));
+    .filter(
+      (f) =>
+        isScoringEligibleCompetitionCode(f.competitionCode) &&
+        // Pass 14.1: this was previously missing -- a pre-epoch
+        // international fixture (competition-eligible but before
+        // INTERNATIONAL_SCORING_EPOCH) could still LOCK a player here,
+        // even though backfillScores already refused to ever SCORE it.
+        // "Pre-epoch internationals must never affect fantasy locks or
+        // fantasy scoring" requires both halves to agree; this is the
+        // shared primitive both locking (getKickoffsByPlayer) and
+        // next-fixture display build on, so fixing it here covers both.
+        isEligibleFixtureKickoff(f.competitionCode, f.kickoffAt)
+    );
 }
 
 /**
