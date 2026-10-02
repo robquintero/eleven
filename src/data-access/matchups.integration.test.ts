@@ -78,6 +78,7 @@ test("a historical round's matchup lineup reflects that round's real lineup_slot
       homeFinalPoints: null,
       awayFinalPoints: null,
       isUserHome: true,
+      scoresUpdatedAt: null,
     };
 
     // Drop the player AFTER the round has locked -- current ownership no
@@ -155,6 +156,7 @@ test("getMatchupSquads returns a complete 4-4-2-shaped squad for a fully-rostere
       homeFinalPoints: null,
       awayFinalPoints: null,
       isUserHome: true,
+      scoresUpdatedAt: null,
     };
 
     const squads = await queryMatchupSquads(admin, matchup);

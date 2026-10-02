@@ -574,29 +574,61 @@ quota-conscious, and safe to invoke as often as needed. Three new pieces:
    ingestion layer" architecture guard, because it isn't reachable by any
    page load — it's the job entry point itself.
 
-### Live sync — activating the cron (the exact remaining step)
+### Production cron activation (Pass 12D)
 
-Nothing calls `/api/cron/football-live-tick` automatically yet. No
-`vercel.json` exists in this repo, and none was added this pass —
-per the brief ("do not silently create expensive polling... document the
-exact remaining step rather than inventing configuration"), activating it
-is a deliberate, separate decision:
+Pass 9 deliberately stopped short of activating this cron ("do not
+silently create expensive polling... document the exact remaining step
+rather than inventing configuration") without first knowing the real
+account quota. Pass 12D did the audit that was missing:
 
-1. In the Vercel project's environment variables, set `CRON_SECRET` to a
-   generated random value (e.g. `openssl rand -hex 32`) for the Production
-   environment.
-2. Add a `vercel.json` at the repo root with a `crons` entry, e.g.:
+**Real quota, confirmed live** via `npm run football:check` (one request,
+no secrets printed) on 2026-10-01 — the account's `/status` response
+didn't include subscription/plan metadata this time (the script only
+prints it when present; nothing was omitted), but the quota headers were
+reported directly:
+
+```
+provider: api-football
+status: connected
+request successful: yes
+quota remaining (daily, from headers): 7500 / 7500
+quota remaining (per-minute, from headers): 299 / 300
+```
+
+7,500 requests/day and 300/minute is comfortably enough for minute-level
+live refreshes, given `runLiveSyncTick`'s own already-proven behavior
+(zero requests when nothing is live or near kickoff; cost scales only
+with actual competitions/fixtures needing attention — see "Live sync
+foundation" above). This pass therefore:
+
+1. Tightened `LIVE_INTERVAL_MINUTES` (`src/domain/football/sync-cadence.ts`)
+   from 10 to **1** — the advisory value Pass 9 itself flagged as "the one
+   constant to change when moving toward 5/2/1-minute cadence later."
+2. Raised `DEFAULT_QUOTA_SAFETY_MARGIN` (`src/lib/football-ingestion/quota.ts`)
+   from 1 to **200** — a margin of 1 was fine for a single supervised
+   manual run, but would let an unattended per-minute cron legitimately
+   exhaust the account's entire daily quota with no one watching. 200 is
+   a small fraction of the real 7,500/day budget.
+3. Added `vercel.json` at the repo root:
    ```json
-   { "crons": [{ "path": "/api/cron/football-live-tick", "schedule": "*/10 * * * *" }] }
+   { "crons": [{ "path": "/api/cron/football-live-tick", "schedule": "* * * * *" }] }
    ```
-   (Vercel Cron's minimum granularity is 1 minute on paid plans; start at
-   the brief's conservative 10-minute cadence and tighten later by editing
-   only this schedule string.)
-3. Redeploy. Vercel will then call the route on schedule with its own
-   cron-invocation auth; add that as a second accepted credential in the
-   route only if Vercel's own cron signing is preferred over the
-   hand-rolled `CRON_SECRET` bearer check — either is fine, not decided
-   here since no cron is active yet.
+
+**The one remaining step this pass cannot perform itself** (no Vercel
+deployment/environment-variable access from this environment): in the
+Vercel project's environment variables, set `CRON_SECRET` to a generated
+random value (e.g. `openssl rand -hex 32`) for the Production environment,
+then deploy. Vercel's own Cron Jobs feature automatically sends
+`Authorization: Bearer ${CRON_SECRET}` on every invocation once that env
+var exists — exactly what the route already checks — so no second
+auth path or additional code change is needed once that one value is set.
+
+If a future monitoring pass finds the real matchday cost meaningfully
+different from this estimate (e.g. several Big Five + UCL/UEL kickoffs
+genuinely overlapping), the only thing to revisit is the `vercel.json`
+schedule string and/or `LIVE_INTERVAL_MINUTES` — never the sync logic
+itself, which was built from day one to scale with real fixture activity,
+not with how often it's invoked.
 
 ### Sync observability
 

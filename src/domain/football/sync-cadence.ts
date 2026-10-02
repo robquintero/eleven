@@ -40,8 +40,22 @@ export interface FixtureSyncCadenceDecision {
 const APPROACHING_KICKOFF_WINDOW_MINUTES = 120;
 const APPROACHING_KICKOFF_INTERVAL_MINUTES = 30;
 
-/** Brief §Phase 6: "start conservatively... approximately 10-minute refreshes" — the one constant to change when moving toward 5/2/1-minute cadence later. */
-const LIVE_INTERVAL_MINUTES = 10;
+/**
+ * Pass 9 (brief §Phase 6) started conservatively at 10 minutes, explicitly
+ * flagging this as "the one constant to change when moving toward
+ * 5/2/1-minute cadence later." Pass 12D is that moment: a live
+ * `npm run football:check` against the real account (docs/
+ * football-data-system.md "Production cron activation") confirmed a
+ * 7,500/day, 300/minute budget — comfortably enough to run the cron at
+ * Vercel Cron's own 1-minute minimum granularity without risk, given
+ * `runLiveSyncTick`'s own already-proven zero-cost-when-nothing-is-near
+ * behavior and the raised `DEFAULT_QUOTA_SAFETY_MARGIN` circuit breaker
+ * (quota.ts). This value is advisory (see this module's own doc comment —
+ * the actual cadence enforced is "however often the caller invokes this
+ * decision"), but is now kept truthful to match the real cron schedule
+ * (`vercel.json`) rather than describing a cadence nothing actually runs.
+ */
+const LIVE_INTERVAL_MINUTES = 1;
 
 /**
  * Covers both the brief's "+1h post-FT reconciliation" and "overnight final

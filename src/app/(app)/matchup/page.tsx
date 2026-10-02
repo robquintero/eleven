@@ -43,6 +43,7 @@ export default async function MatchupPage() {
 
   const matchup = team ? await getCurrentMatchup(league.id, team.id) : null;
   const squads = matchup ? await getMatchupSquads(matchup) : null;
+  const now = new Date();
 
   return (
     <div className="flex flex-col gap-6">
@@ -53,7 +54,7 @@ export default async function MatchupPage() {
         <p className="mt-1.5 text-sm text-foreground-secondary">{league.name}</p>
       </div>
 
-      <MatchupCommand matchup={matchup} hasLeague />
+      <MatchupCommand matchup={matchup} hasLeague now={now} />
 
       {matchup && squads && (
         <>

@@ -5,8 +5,20 @@ import type { ProviderPagination, ProviderQuota } from "@/lib/football-providers
  * quota down to exactly zero — leaves headroom for `npm run football:check`
  * and any other manual call made the same day. Pure/configurable so it's
  * unit-testable and not a magic number buried in a sync loop.
+ *
+ * Pass 12D raised this from 1 to 200 when the live-sync tick
+ * (`runLiveSyncTick`) went from "manually invoked occasionally" to
+ * "invoked by a cron up to once a minute, unattended, every day" — a
+ * margin of 1 made sense for a single supervised developer run, but would
+ * let an automated job legitimately exhaust the account's entire daily
+ * quota on an unusually busy matchday with no one watching. 200 is a
+ * small fraction of the account's real measured 7,500/day budget (see
+ * docs/football-data-system.md "Production cron activation"), comfortably
+ * covering any manual `football:check`/`football:sync` call made the same
+ * day without materially reducing how much of the real budget the cron
+ * can use.
  */
-export const DEFAULT_QUOTA_SAFETY_MARGIN = 1;
+export const DEFAULT_QUOTA_SAFETY_MARGIN = 200;
 
 /**
  * Whether a sync loop should stop making further provider requests, given

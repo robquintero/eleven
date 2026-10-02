@@ -11,9 +11,12 @@ import { pad2 } from "@/lib/team-fixture";
 export function MatchupCommand({
   matchup,
   hasLeague,
+  now,
 }: {
   matchup: CurrentMatchup | null;
   hasLeague: boolean;
+  /** Explicit clock (never read internally via `Date.now()` — see this codebase's clock-injection convention, e.g. `determineFixtureSyncCadence`) — the caller passes `new Date()`. */
+  now: Date;
 }) {
   if (!matchup) {
     return (
@@ -43,6 +46,15 @@ export function MatchupCommand({
   const awayScore = matchup.awayFinalPoints ?? matchup.awayLivePoints;
   const total = homeScore + awayScore || 1;
   const homeShare = (homeScore / total) * 100;
+
+  // Pass 12D: truthful freshness, never implied by the "LIVE" label alone
+  // — if the automated sync hasn't actually run recently (e.g. the
+  // production cron isn't active yet), this surfaces that honestly
+  // instead of silently showing a stale score as if it were current.
+  const updatedMinutesAgo = matchup.scoresUpdatedAt
+    ? Math.max(0, Math.round((now.getTime() - new Date(matchup.scoresUpdatedAt).getTime()) / 60_000))
+    : null;
+  const isStale = isLive && updatedMinutesAgo !== null && updatedMinutesAgo > 15;
 
   return (
     <div className="border border-border bg-surface-elevated">
@@ -100,6 +112,18 @@ export function MatchupCommand({
         <div className="relative mt-6 h-1.5 overflow-hidden border border-border bg-muted">
           <div className="h-full bg-accent transition-all" style={{ width: `${homeShare}%` }} />
         </div>
+
+        {isLive && (
+          <p className="label-system mt-2 text-center text-[10px] text-foreground-tertiary">
+            {updatedMinutesAgo === null
+              ? "AWAITING FIRST SYNC"
+              : isStale
+                ? `SYNC STALE · LAST UPDATED ${updatedMinutesAgo}M AGO`
+                : updatedMinutesAgo === 0
+                  ? "UPDATED JUST NOW"
+                  : `UPDATED ${updatedMinutesAgo}M AGO`}
+          </p>
+        )}
       </div>
     </div>
   );

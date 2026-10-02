@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "../supabase/admin.ts";
-import { openNextRound, finalizeRoundIfReady } from "./rounds.ts";
+import { openNextRound, finalizeRoundIfReady, refreshMatchupScores } from "./rounds.ts";
 import { buildStandingsTable, rankStandings } from "../../domain/fantasy/standings.ts";
 import type { Database } from "../supabase/database.types.ts";
 
@@ -85,6 +85,16 @@ export async function progressSeason(admin: SupabaseClient<Database>, leagueId: 
     .maybeSingle();
 
   if (currentRound && currentRound.status !== "completed") {
+    // Pass 12D: refresh live_points EVERY call, not only once the round is
+    // actually ready to finalize — this is what keeps Live Matchday
+    // truthful during the match itself, not just at the final whistle.
+    // `finalizeRoundIfReady` already refreshes scores internally right
+    // before finalizing, but only once `allSettled` is true; while a round
+    // is still genuinely live, nothing else in the engine ever recomputes
+    // `matchup_scores`. Reuses the exact same `refreshMatchupScores` the
+    // finalize path already uses — never a second scoring/aggregation
+    // implementation.
+    await refreshMatchupScores(admin, currentRound.id);
     await finalizeRoundIfReady(admin, currentRound.id, now);
   }
 
@@ -138,4 +148,43 @@ export async function activateKeptRosterSeason(leagueId: string): Promise<void> 
   } catch (err) {
     console.error(`activateKeptRosterSeason: openNextRound threw for league ${leagueId}`, err);
   }
+}
+
+export interface ProgressAllActiveSeasonsResult {
+  leaguesProcessed: number;
+  results: Array<{ leagueId: string; action: ProgressSeasonResult["action"] }>;
+  errors: string[];
+}
+
+/**
+ * Pass 12D: the round-progression half of "football sync -> stats/scoring
+ * reconciliation -> evaluate current round -> finalize if ready ->
+ * progress season if appropriate." Called from the production cron
+ * (`src/app/api/cron/football-live-tick/route.ts`) immediately after
+ * `runLiveSyncTick` has refreshed fixtures/stats/scores, so every league's
+ * current round sees the just-synced data before this runs.
+ *
+ * Deliberately NOT a second round-lifecycle implementation — this is
+ * exactly `progressSeason` (the Pass 12A engine, unmodified), just called
+ * once per league with an ACTIVE season instead of requiring a human (or
+ * a per-league button) to trigger it. One league's failure never blocks
+ * another's — each is wrapped individually, matching the same
+ * "never let one bad fixture corrupt the whole tick" philosophy
+ * `runLiveSyncTick` itself already follows.
+ */
+export async function progressAllActiveSeasons(admin: SupabaseClient<Database>, now: Date): Promise<ProgressAllActiveSeasonsResult> {
+  const { data: activeSeasons } = await admin.from("seasons").select("league_id").eq("status", "ACTIVE");
+  const results: Array<{ leagueId: string; action: ProgressSeasonResult["action"] }> = [];
+  const errors: string[] = [];
+
+  for (const season of activeSeasons ?? []) {
+    try {
+      const result = await progressSeason(admin, season.league_id, now);
+      results.push({ leagueId: season.league_id, action: result.action });
+    } catch (err) {
+      errors.push(`progressSeason threw for league ${season.league_id}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return { leaguesProcessed: results.length, results, errors };
 }

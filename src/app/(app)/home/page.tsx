@@ -6,12 +6,13 @@ import { MatchupCommand } from "@/components/dashboard/matchup-command";
 import { OperationsRail } from "@/components/dashboard/operations-rail";
 import { StartingXI } from "@/components/dashboard/starting-xi";
 import { TradeDesk } from "@/components/dashboard/trade-desk";
+import { MatchupPlayerCounts } from "@/components/matchup/matchup-player-counts";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
-import { getCurrentMatchup, getMatchupFixtureIntelligence, getStandings } from "@/data-access/matchups";
+import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads, getStandings } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
 import { getTeamRosterPlayers, type RosterPlayerOption } from "@/data-access/roster";
 import { getUserSquad } from "@/data-access/roster";
@@ -100,7 +101,24 @@ export default async function HomePage() {
   // single global deadline Eleven's real per-player-lock model doesn't
   // have — `Greeting` itself only renders the "LOCKS ..." segment when
   // this is non-null.
-  const fixtureIntel = matchup ? await getMatchupFixtureIntelligence(matchup, new Date()) : null;
+  const now = new Date();
+  const fixtureIntel = matchup ? await getMatchupFixtureIntelligence(matchup, now) : null;
+
+  // Pass 12D: Club Briefing's LIVE/FINAL states need the actual per-round
+  // squads (live/done/remaining counts, top performance) -- never
+  // fetched for a merely "scheduled" matchup, since there is nothing
+  // truthful to show yet (no fixtures have kicked off).
+  const matchupSquads = matchup && matchup.status !== "scheduled" ? await getMatchupSquads(matchup) : null;
+  const topPerformer = matchupSquads
+    ? [...matchupSquads.home.starters, ...matchupSquads.away.starters]
+        .map((s) => s.player)
+        .reduce<{ name: string; club: string; points: number } | null>((best, player) => {
+          if (!best || player.fantasyPoints > best.points) {
+            return { name: player.name, club: player.club.shortName, points: player.fantasyPoints };
+          }
+          return best;
+        }, null)
+    : null;
   const round: FantasyRound | null = matchup
     ? {
         number: matchup.roundNumber,
@@ -132,7 +150,22 @@ export default async function HomePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="flex flex-col gap-6">
-          <MatchupCommand matchup={matchup} hasLeague />
+          <MatchupCommand matchup={matchup} hasLeague now={now} />
+
+          {matchup && matchupSquads && (matchup.status === "live" || matchup.status === "final") && (
+            <MatchupPlayerCounts
+              myTeamName={matchup.isUserHome ? matchup.homeTeamName : matchup.awayTeamName}
+              opponentTeamName={matchup.isUserHome ? matchup.awayTeamName : matchup.homeTeamName}
+              mySquad={matchup.isUserHome ? matchupSquads.home : matchupSquads.away}
+              opponentSquad={matchup.isUserHome ? matchupSquads.away : matchupSquads.home}
+            />
+          )}
+
+          {topPerformer && topPerformer.points > 0 && (
+            <p className="label-system text-center text-[11px] text-foreground-tertiary">
+              TOP PERFORMANCE · {topPerformer.name} ({topPerformer.club}) · {topPerformer.points.toFixed(1)} PTS
+            </p>
+          )}
 
           {team && vacancies.length > 0 && (
             <div className="flex flex-wrap items-center justify-between gap-3 border border-accent/30 bg-accent/5 px-4 py-3">
@@ -155,8 +188,9 @@ export default async function HomePage() {
           <OperationsRail
             starters={squad.starters}
             standings={standings}
-            hasActiveRound={matchup !== null}
+            hasActiveRound={matchup !== null && matchup.status !== "final"}
             fixtureIntel={fixtureIntel}
+            myTeamId={team?.id ?? null}
           />
 
           {tradeDeskProps && (

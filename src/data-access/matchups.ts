@@ -42,13 +42,19 @@ export interface CurrentMatchup {
   homeFinalPoints: number | null;
   awayFinalPoints: number | null;
   isUserHome: boolean;
+  /** Pass 12D: when `matchup_scores` was last recomputed (the later of the two teams' rows) — truthful freshness for the "LIVE" badge, never implied by status alone. `null` only if no score row exists yet at all (a round that just opened). */
+  scoresUpdatedAt: string | null;
 }
 
 /**
  * The signed-in user's fantasy team's matchup for the league's current
- * (in-progress, else soonest upcoming) round. `null` whenever no
- * `fantasy_rounds`/`matchups` rows exist for the league yet — true for
- * every league today, since round scheduling isn't built (Pass 8+).
+ * (in-progress, else soonest upcoming) round, falling back to the most
+ * recently FINALIZED round's matchup when no in-progress/upcoming round
+ * exists yet (Pass 12D: the window right after a round finalizes and
+ * before the next one opens — without this fallback, Home/Matchup would
+ * silently go blank exactly when there's a real result most worth
+ * showing, the "ROUND FINAL" Club Briefing state). `null` whenever no
+ * `fantasy_rounds`/`matchups` rows exist for the league at all yet.
  */
 export async function getCurrentMatchup(
   leagueId: string,
@@ -58,7 +64,7 @@ export async function getCurrentMatchup(
 
   const supabase = await resolveClient();
 
-  const { data: round } = await supabase
+  const { data: activeRound } = await supabase
     .from("fantasy_rounds")
     .select("id, number, status, starts_at, ends_at")
     .eq("league_id", leagueId)
@@ -67,12 +73,39 @@ export async function getCurrentMatchup(
     .limit(1)
     .maybeSingle();
 
+  let round = activeRound;
+  if (!round) {
+    // Scoped to the league's CURRENT (latest) season specifically --
+    // round numbers reset per season (Pass 12A), so a bare league-wide
+    // "highest round number" could otherwise resolve to an OLDER season's
+    // final round once a new season has progressed past that number.
+    const { data: season } = await supabase
+      .from("seasons")
+      .select("id")
+      .eq("league_id", leagueId)
+      .order("season_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (season) {
+      const { data: lastFinalRound } = await supabase
+        .from("fantasy_rounds")
+        .select("id, number, status, starts_at, ends_at")
+        .eq("season_id", season.id)
+        .eq("status", "completed")
+        .order("number", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      round = lastFinalRound;
+    }
+  }
+
   if (!round) return null;
 
   const { data: matchup } = await supabase
     .from("matchups")
     .select(
-      "id, status, home_fantasy_team_id, away_fantasy_team_id, matchup_scores(fantasy_team_id, live_points, final_points)"
+      "id, status, home_fantasy_team_id, away_fantasy_team_id, matchup_scores(fantasy_team_id, live_points, final_points, updated_at)"
     )
     .eq("fantasy_round_id", round.id)
     .or(`home_fantasy_team_id.eq.${fantasyTeamId},away_fantasy_team_id.eq.${fantasyTeamId}`)
@@ -84,6 +117,10 @@ export async function getCurrentMatchup(
   const scores = matchup.matchup_scores ?? [];
   const homeScore = scores.find((s) => s.fantasy_team_id === matchup.home_fantasy_team_id);
   const awayScore = scores.find((s) => s.fantasy_team_id === matchup.away_fantasy_team_id);
+  const scoresUpdatedAt = scores.reduce<string | null>((latest, s) => {
+    if (!s.updated_at) return latest;
+    return !latest || new Date(s.updated_at) > new Date(latest) ? s.updated_at : latest;
+  }, null);
 
   const { data: teams } = await supabase
     .from("fantasy_teams")
@@ -108,6 +145,7 @@ export async function getCurrentMatchup(
     homeFinalPoints: homeScore?.final_points ?? null,
     awayFinalPoints: awayScore?.final_points ?? null,
     isUserHome,
+    scoresUpdatedAt,
   };
 }
 

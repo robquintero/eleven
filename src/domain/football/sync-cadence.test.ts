@@ -11,7 +11,7 @@ test("a live fixture always needs syncing, regardless of kickoff time", () => {
   );
   assert.equal(decision.shouldSync, true);
   assert.equal(decision.reason, "live");
-  assert.equal(decision.suggestedIntervalMinutes, 10);
+  assert.equal(decision.suggestedIntervalMinutes, 1, "Pass 12D: tightened to minute-level now that the real account quota (7,500/day) was confirmed to support it");
 });
 
 test("half-time still counts as live, not settled", () => {

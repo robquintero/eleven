@@ -20,11 +20,14 @@ export function OperationsRail({
   standings,
   hasActiveRound,
   fixtureIntel,
+  myTeamId,
 }: {
   starters: LineupSlot[];
   standings: StandingsRow[];
   hasActiveRound: boolean;
   fixtureIntel: MatchupFixtureIntelligence | null;
+  /** Pass 12D: Club Briefing's "league rank/record" -- highlights the manager's own row, and surfaces it even when they sit outside the top 6 shown. `null` when the caller has no team in this league. */
+  myTeamId?: string | null;
 }) {
   const buckets = starterBuckets(starters);
 
@@ -86,21 +89,37 @@ export function OperationsRail({
         {standings.length === 0 ? (
           <p className="text-xs text-foreground-tertiary">NO RESULTS YET</p>
         ) : (
-          <div className="divide-y divide-border">
-            {standings.slice(0, 6).map((row, index) => (
-              <div key={row.fantasyTeamId} className="flex items-center gap-2.5 py-2 pl-1.5">
-                <span className="label-system w-4 shrink-0 text-xs font-medium text-foreground-tertiary">
-                  {index + 1}
-                </span>
-                <p className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
-                  {row.teamName}
-                </p>
-                <span className="label-system shrink-0 text-xs font-semibold text-foreground">
-                  {row.pointsFor}
-                </span>
+          (() => {
+            const topRows = standings.slice(0, 6).map((row, index) => ({ row, rank: index + 1 }));
+            const myIndex = myTeamId ? standings.findIndex((r) => r.fantasyTeamId === myTeamId) : -1;
+            const myRowShown = myIndex !== -1 && myIndex < 6;
+            const rows = myRowShown || myIndex === -1 ? topRows : [...topRows, { row: standings[myIndex], rank: myIndex + 1 }];
+
+            return (
+              <div className="divide-y divide-border">
+                {rows.map(({ row, rank }) => {
+                  const isMe = row.fantasyTeamId === myTeamId;
+                  return (
+                    <div key={row.fantasyTeamId} className="flex items-center gap-2.5 py-2 pl-1.5">
+                      <span className="label-system w-4 shrink-0 text-xs font-medium text-foreground-tertiary">
+                        {rank}
+                      </span>
+                      <p className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
+                        {row.teamName}
+                        {isMe && <span className="label-system ml-1.5 text-[9px] text-accent">YOU</span>}
+                      </p>
+                      <span className="label-system shrink-0 text-xs text-foreground-tertiary">
+                        {row.wins}W-{row.draws}D-{row.losses}L
+                      </span>
+                      <span className="label-system shrink-0 text-xs font-semibold text-foreground">
+                        {row.leaguePoints}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
-            ))}
-          </div>
+            );
+          })()
         )}
       </RailModule>
     </div>
