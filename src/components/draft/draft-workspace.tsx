@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import { Ban } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerInspector } from "@/components/players/player-inspector";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { RailModule } from "@/components/ui/rail-module";
 import { submitDraftPickAction, resolveExpiredPickAction } from "@/app/(app)/draft/actions";
-import type { DraftState } from "@/data-access/drafts";
+import type { DraftPickRecord, DraftState } from "@/data-access/drafts";
 import { pad2 } from "@/lib/team-fixture";
 import type { PlayerDatabasePage } from "@/data-access/players";
 import type { Player, PlayerPosition } from "@/lib/types/fantasy";
@@ -237,114 +238,120 @@ export function DraftWorkspace({
           </div>
         </div>
 
-        <ModuleHeader
-          title="AVAILABLE_PLAYERS"
-          meta={`${availablePlayers.total} PLAYERS`}
-        />
-        <div className="mt-2 flex items-center gap-2 border border-border px-2.5 py-1.5">
-          <input
-            ref={searchRef}
-            type="text"
-            placeholder="Search player… ( / )"
-            onChange={(e) => onSearch(e.target.value)}
-            className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
-          />
-        </div>
+        {draft.status === "completed" ? (
+          <DraftCompleteRecap draft={draft} myPicks={myPicks} myCounts={myCounts} />
+        ) : (
+          <>
+            <ModuleHeader
+              title="AVAILABLE_PLAYERS"
+              meta={`${availablePlayers.total} PLAYERS`}
+            />
+            <div className="mt-2 flex items-center gap-2 border border-border px-2.5 py-1.5">
+              <input
+                ref={searchRef}
+                type="text"
+                placeholder="Search player… ( / )"
+                onChange={(e) => onSearch(e.target.value)}
+                className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
+              />
+            </div>
 
-        <div className="mt-2 flex items-center gap-1.5">
-          {POSITION_FILTER_OPTIONS.map((option) => {
-            const value = option === "ALL" ? null : option;
-            const isActive = positionFilter === value;
-            return (
-              <button
-                key={option}
-                type="button"
-                onClick={() => onPositionFilterChange(value)}
-                className={`label-system rounded-control border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
-                  isActive
-                    ? "border-accent bg-accent text-accent-foreground"
-                    : "border-border text-foreground-secondary hover:bg-muted"
-                }`}
-              >
-                {option}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="mt-2 divide-y divide-border border border-border">
-          {availablePlayers.players.length === 0 ? (
-            <p className="p-4 text-center text-sm text-foreground-tertiary">NO AVAILABLE PLAYERS MATCH</p>
-          ) : (
-            availablePlayers.players.map((player) => {
-              // Pass 10.5C: a drafted player stays on the board (context/
-              // history), never disappears -- dimmed + struck-through +
-              // an explicit textual DRAFTED/YOUR PICK state, never
-              // interactive as a pick, and never relying on color alone
-              // (the strike-through + Ban icon + text all carry the same
-              // meaning independently). `ownership` reflects the real,
-              // authoritative `league_player_ownership` state (Pass
-              // 10.5B's getPlayerDatabase), so this updates correctly the
-              // moment polling refreshes it -- for a pick made by this
-              // manager (isMyTurn's own team) or by any other manager.
-              const isDrafted = player.ownership != null && player.ownership !== "free";
-              return (
-                <div
-                  key={player.id}
-                  className={`flex items-center gap-3 px-3 py-2 ${isDrafted ? "opacity-50" : ""}`}
-                >
-                  <span className="label-system w-9 shrink-0 rounded-md bg-muted py-1 text-center text-[11px] font-semibold text-foreground-secondary">
-                    {player.position}
-                  </span>
-                  <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
+            <div className="mt-2 flex items-center gap-1.5">
+              {POSITION_FILTER_OPTIONS.map((option) => {
+                const value = option === "ALL" ? null : option;
+                const isActive = positionFilter === value;
+                return (
                   <button
+                    key={option}
                     type="button"
-                    onClick={() => {
-                      setSelected(player);
-                      setInspectorOpen(true);
-                    }}
-                    className="min-w-0 flex-1 text-left"
+                    onClick={() => onPositionFilterChange(value)}
+                    className={`label-system rounded-control border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                      isActive
+                        ? "border-accent bg-accent text-accent-foreground"
+                        : "border-border text-foreground-secondary hover:bg-muted"
+                    }`}
                   >
-                    <p
-                      className={`truncate text-sm font-medium text-foreground ${isDrafted ? "line-through decoration-2 decoration-foreground-tertiary" : ""}`}
-                    >
-                      {player.name}
-                    </p>
-                    <p className="label-system truncate text-[11px] text-foreground-tertiary">
-                      {player.club.shortName}
-                      {player.totalPoints !== undefined && ` · ${player.totalPoints} PTS`}
-                    </p>
+                    {option}
                   </button>
-                  {isDrafted ? (
-                    <span
-                      className="label-system flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground-tertiary"
-                      aria-label={player.ownership === "mine" ? "Already on your roster" : "Already drafted by another team"}
+                );
+              })}
+            </div>
+
+            <div className="mt-2 divide-y divide-border border border-border">
+              {availablePlayers.players.length === 0 ? (
+                <p className="p-4 text-center text-sm text-foreground-tertiary">NO AVAILABLE PLAYERS MATCH</p>
+              ) : (
+                availablePlayers.players.map((player) => {
+                  // Pass 10.5C: a drafted player stays on the board (context/
+                  // history), never disappears -- dimmed + struck-through +
+                  // an explicit textual DRAFTED/YOUR PICK state, never
+                  // interactive as a pick, and never relying on color alone
+                  // (the strike-through + Ban icon + text all carry the same
+                  // meaning independently). `ownership` reflects the real,
+                  // authoritative `league_player_ownership` state (Pass
+                  // 10.5B's getPlayerDatabase), so this updates correctly the
+                  // moment polling refreshes it -- for a pick made by this
+                  // manager (isMyTurn's own team) or by any other manager.
+                  const isDrafted = player.ownership != null && player.ownership !== "free";
+                  return (
+                    <div
+                      key={player.id}
+                      className={`flex items-center gap-3 px-3 py-2 ${isDrafted ? "opacity-50" : ""}`}
                     >
-                      <Ban className="size-3" strokeWidth={2} aria-hidden="true" />
-                      {player.ownership === "mine" ? "YOUR PICK" : "DRAFTED"}
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled={!draft.isMyTurn || pending !== null || !legalPositions.has(player.position)}
-                      onClick={() => handleDraft(player.id)}
-                      className="label-system flex shrink-0 items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                      {pending === player.id && (
+                      <span className="label-system w-9 shrink-0 rounded-md bg-muted py-1 text-center text-[11px] font-semibold text-foreground-secondary">
+                        {player.position}
+                      </span>
+                      <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelected(player);
+                          setInspectorOpen(true);
+                        }}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <p
+                          className={`truncate text-sm font-medium text-foreground ${isDrafted ? "line-through decoration-2 decoration-foreground-tertiary" : ""}`}
+                        >
+                          {player.name}
+                        </p>
+                        <p className="label-system truncate text-[11px] text-foreground-tertiary">
+                          {player.club.shortName}
+                          {player.totalPoints !== undefined && ` · ${player.totalPoints} PTS`}
+                        </p>
+                      </button>
+                      {isDrafted ? (
                         <span
-                          aria-hidden="true"
-                          className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent"
-                        />
+                          className="label-system flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground-tertiary"
+                          aria-label={player.ownership === "mine" ? "Already on your roster" : "Already drafted by another team"}
+                        >
+                          <Ban className="size-3" strokeWidth={2} aria-hidden="true" />
+                          {player.ownership === "mine" ? "YOUR PICK" : "DRAFTED"}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!draft.isMyTurn || pending !== null || !legalPositions.has(player.position)}
+                          onClick={() => handleDraft(player.id)}
+                          className="label-system flex shrink-0 items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          {pending === player.id && (
+                            <span
+                              aria-hidden="true"
+                              className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent"
+                            />
+                          )}
+                          {pending === player.id ? "PROCESSING PICK" : "DRAFT"}
+                        </button>
                       )}
-                      {pending === player.id ? "PROCESSING PICK" : "DRAFT"}
-                    </button>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-        {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+          </>
+        )}
       </section>
 
       <div className="flex flex-col divide-y divide-border border border-border">
@@ -411,12 +418,12 @@ export function DraftWorkspace({
           </div>
         </RailModule>
 
-        <RailModule header="RECENT_PICKS">
+        <RailModule header={draft.status === "completed" ? "DRAFT_ORDER" : "RECENT_PICKS"}>
           {draft.picks.length === 0 ? (
             <p className="text-xs text-foreground-tertiary">NO PICKS YET</p>
           ) : (
-            <div className="divide-y divide-border">
-              {[...draft.picks].reverse().slice(0, 12).map((pick) => (
+            <div className="max-h-128 divide-y divide-border overflow-y-auto">
+              {[...draft.picks].reverse().slice(0, draft.status === "completed" ? undefined : 12).map((pick) => (
                 <div key={pick.pickNumber} className="flex items-center justify-between py-1.5">
                   <div className="min-w-0">
                     <p className="truncate text-xs text-foreground">{pick.playerName}</p>
@@ -435,6 +442,129 @@ export function DraftWorkspace({
       </div>
 
       <PlayerInspector player={selected} variant="overlay" open={inspectorOpen} onOpenChange={setInspectorOpen} />
+    </div>
+  );
+}
+
+const POSITION_ORDER: Record<PlayerPosition, number> = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
+
+/**
+ * Pass 13 (§9): the draft's completed state no longer renders as "an
+ * active drafting workspace with the clock stopped" -- the full
+ * AVAILABLE_PLAYERS board (search, filters, DRAFT buttons merely
+ * disabled) was replacing this `<section>`'s content unconditionally
+ * regardless of `draft.status`, so a finished draft looked identical to
+ * one in progress. This replaces it with a real recap: the event is over,
+ * here's what happened. Free-agent browsing isn't removed, just demoted
+ * to a link into `/players` (the real, ongoing free-market surface) —
+ * never a dead end.
+ */
+function DraftCompleteRecap({
+  draft,
+  myPicks,
+  myCounts,
+}: {
+  draft: DraftState;
+  myPicks: DraftPickRecord[];
+  myCounts: RosterCounts;
+}) {
+  const sortedMyPicks = useMemo(
+    () => [...myPicks].sort((a, b) => POSITION_ORDER[a.position] - POSITION_ORDER[b.position]),
+    [myPicks]
+  );
+
+  const picksByTeam = useMemo(() => {
+    const order: string[] = [];
+    const byTeam = new Map<string, { teamName: string; picks: DraftPickRecord[] }>();
+    for (const pick of draft.picks) {
+      let entry = byTeam.get(pick.fantasyTeamId);
+      if (!entry) {
+        entry = { teamName: pick.teamName, picks: [] };
+        byTeam.set(pick.fantasyTeamId, entry);
+        order.push(pick.fantasyTeamId);
+      }
+      entry.picks.push(pick);
+    }
+    return order.map((id) => byTeam.get(id)!);
+  }, [draft.picks]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="border border-border bg-surface-elevated px-5 py-6 text-center">
+        <p className="label-system text-[11px] text-foreground-tertiary">DRAFT COMPLETE</p>
+        <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
+          {draft.picks.length} picks · {draft.teamCount} managers
+        </p>
+      </div>
+
+      <div className="border border-border">
+        <div className="border-b border-border px-4 py-2.5">
+          <span className="label-system text-[11px] text-foreground-secondary">YOUR_FINAL_SQUAD</span>
+        </div>
+        {sortedMyPicks.length === 0 ? (
+          <p className="p-4 text-center text-sm text-foreground-tertiary">NO PICKS MADE</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {sortedMyPicks.map((pick) => (
+              <div key={pick.pickNumber} className="flex items-center gap-3 px-4 py-2">
+                <span className="label-system w-9 shrink-0 rounded-md bg-muted py-1 text-center text-[11px] font-semibold text-foreground-secondary">
+                  {pick.position}
+                </span>
+                <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{pick.playerName}</p>
+                <span className="label-system shrink-0 text-[11px] text-foreground-tertiary">{pick.clubShortName}</span>
+                <span className="label-system shrink-0 text-[10px] text-foreground-tertiary">
+                  RD {pad2(pick.round)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-border px-4 py-2.5">
+          {(["GK", "DEF", "MID", "FWD"] as const).map((position) => {
+            const { min, max } = ROSTER_RULES.positionRange[position];
+            const count = myCounts[position] ?? 0;
+            return (
+              <span key={position} className="label-system text-[10px] text-foreground-secondary">
+                {position} {count}/{min === max ? min : `${min}–${max}`}
+              </span>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="border border-border">
+        <div className="border-b border-border px-4 py-2.5">
+          <span className="label-system text-[11px] text-foreground-secondary">LEAGUE_DRAFT_RESULTS</span>
+        </div>
+        <div className="divide-y divide-border">
+          {picksByTeam.map((team) => (
+            <div key={team.teamName} className="px-4 py-3">
+              <p className="text-sm font-semibold text-foreground">{team.teamName}</p>
+              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+                {team.picks.map((pick) => (
+                  <span key={pick.pickNumber} className="label-system text-[11px] text-foreground-tertiary">
+                    {pick.position} <span className="text-foreground-secondary">{pick.playerName}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="border border-border p-4">
+        <p className="label-system text-[11px] text-foreground-tertiary">FREE_AGENTS</p>
+        <p className="mt-1 text-sm text-foreground-secondary">
+          Undrafted players are still available on the open market.
+        </p>
+        <TransitionLink
+          href="/players"
+          label="Players"
+          className="label-system mt-1.5 inline-block text-[11px] text-accent hover:underline"
+        >
+          BROWSE PLAYERS ↗
+        </TransitionLink>
+      </div>
     </div>
   );
 }
