@@ -8,11 +8,13 @@
  * layer itself — a plain source scan, same approach as
  * `no-runtime-mock-imports.test.ts`.
  *
- * EXEMPT: `src/app/api/cron/**` (Pass 9 §Phase 6). A Next.js route handler
- * under `api/cron` is never reached by a page load — it's the production
- * job entry point a deployed cron calls, authenticated by `CRON_SECRET`
- * (see its own module doc comment). It legitimately needs
- * `runLiveSyncTick` from the ingestion layer; that's its entire purpose.
+ * EXEMPT: `src/app/api/cron/**` (Pass 9 §Phase 6; Pass 14 go-live Gate 3
+ * added a second route). A Next.js route handler under `api/cron` is
+ * never reached by a page load — each is a production job entry point a
+ * deployed cron calls, authenticated by `CRON_SECRET` (see each route's
+ * own module doc comment): `football-live-tick` needs `runLiveSyncTick`,
+ * `football-catalog-refresh` needs `bootstrapInternationalCompetitions` —
+ * that's each one's entire purpose.
  *
  * EXEMPT: specific Server Action files, listed exactly in
  * `EXEMPT_EXACT_PATHS` below (Pass 10). No fantasy game-state table
@@ -82,9 +84,12 @@ test("no application module imports the football provider client, raw provider t
   assert.deepEqual(offenders, []);
 });
 
-test("the api/cron exemption is exactly one route, not a broad carve-out", () => {
+test("the api/cron exemption is exactly these two routes, not a broad carve-out", () => {
   const cronFiles = collectFiles("src/app/api/cron");
-  assert.deepEqual(cronFiles, ["src/app/api/cron/football-live-tick/route.ts"]);
+  assert.deepEqual(
+    [...cronFiles].sort(),
+    ["src/app/api/cron/football-catalog-refresh/route.ts", "src/app/api/cron/football-live-tick/route.ts"].sort()
+  );
 });
 
 test("every exact-path Server Action exemption actually exists and does explain itself", () => {

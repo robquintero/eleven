@@ -20,6 +20,7 @@
  * (see docs/football-data-system.md, docs/international-scoring.md).
  *   fixture-stats --fixture <providerFixtureId>   sync one fixture's player stats
  *   national-squad --code FRA --season 2026   Pass 14: associates existing Eleven players (resolved read-only via provider_mappings, never created) with a national team ("clubs --code <international competition>" must have created the national-team club row first) — never touches players.club_id/competition_id
+ *   international-bootstrap               Pass 14 go-live Gate 2: runs competitions -> clubs -> national-squad -> fixtures -> fixture-stats for all 20 enabled international competitions in one idempotent, quota-aware pass (see bootstrap-international.ts) — safe to re-run; stops cleanly (not an error) if quota runs low partway through, and simply continues from wherever it left off on the next run
  *   audit                                 zero-request DB-integrity report (see audit.ts) — safe to run anytime
  *   audit-squad --code ENG --club ARS     ONE live request: compares a club's real provider squad against Eleven, reporting any missing players by name/id
  *   live-tick                             ONE bounded live-sync pass (see live-sync.ts) — fixture-aware, quota-conscious; request count varies with how many fixtures are actually near kickoff/live/recently final (zero on a quiet day)
@@ -42,6 +43,7 @@ import { syncPlayersForClub } from "./sync-players.ts";
 import { syncFixtures } from "./sync-fixtures.ts";
 import { syncFixtureStats } from "./sync-fixture-stats.ts";
 import { syncNationalTeamSquad } from "./sync-national-team-squad.ts";
+import { bootstrapInternationalCompetitions } from "./bootstrap-international.ts";
 import { recordSyncEvent } from "./record-sync-event.ts";
 import { shouldStopForQuota } from "./quota.ts";
 import { compareProviderSquadToEleven, getDatabaseIntegrityReport } from "./audit.ts";
@@ -88,7 +90,7 @@ async function main() {
   const flags = parseFlags(rest);
 
   if (!operation) {
-    console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|national-squad|audit|audit-squad|live-tick|sync-health> [flags]");
+    console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|national-squad|international-bootstrap|audit|audit-squad|live-tick|sync-health> [flags]");
     process.exitCode = 1;
     return;
   }
@@ -181,6 +183,24 @@ async function main() {
         break;
       }
 
+      case "international-bootstrap": {
+        const bootstrapResult = await bootstrapInternationalCompetitions(admin, {
+          onProgress: (message) => console.log(message),
+        });
+        requestsUsedThisRun += bootstrapResult.requestsUsed;
+        for (const step of bootstrapResult.steps) {
+          results.push(step);
+          printResult(step);
+          await recordSyncEvent(admin, step);
+        }
+        console.log(
+          `\n[international-bootstrap] ${bootstrapResult.steps.length} steps, ${bootstrapResult.requestsUsed} requests used${
+            bootstrapResult.stoppedForQuota ? " -- stopped early: quota nearly exhausted (safe to re-run later)" : " -- complete"
+          }`
+        );
+        break;
+      }
+
       case "audit": {
         // No provider request — safe to run anytime, as often as useful.
         const report = await getDatabaseIntegrityReport(admin);
@@ -214,7 +234,7 @@ async function main() {
 
       default:
         console.log(`Unknown operation "${operation}".`);
-        console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|national-squad|audit|audit-squad|live-tick|sync-health> [flags]");
+        console.log("Usage: npm run football:sync -- <competitions|clubs|players|fixtures|fixture-stats|national-squad|international-bootstrap|audit|audit-squad|live-tick|sync-health> [flags]");
         process.exitCode = 1;
         return;
     }

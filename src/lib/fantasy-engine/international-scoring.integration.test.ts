@@ -34,6 +34,7 @@ import { createTestLeague, cleanupTestLeague } from "./integration-test-helpers.
 import type { RoundWindow } from "../../domain/fantasy/round-calendar.ts";
 import { roundWindowContaining } from "../../domain/fantasy/round-calendar.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
+import { queryMatchupSquads, type CurrentMatchup } from "../../data-access/matchups.ts";
 
 const skip = !isSupabaseAdminConfigured();
 
@@ -163,9 +164,38 @@ async function getAnyRealPlayerId(admin: ReturnType<typeof createAdminClient>): 
   return data.id;
 }
 
+/**
+ * Since Pass 14 go-live Gate 2's real international bootstrap, a large
+ * share of real active players now DO have a real `player_national_teams`
+ * row (an actual call-up) -- `getAnyRealPlayerId`'s plain "first active
+ * player" is no longer a safe stand-in for "a player with no national-team
+ * association" specifically. Used only by the one test that explicitly
+ * needs that baseline.
+ */
+async function getRealPlayerIdWithNoNationalTeamAssociation(admin: ReturnType<typeof createAdminClient>): Promise<string> {
+  // Diffed in JS rather than a `.not("id", "in", <list>)` filter -- with
+  // Gate 2's real bootstrap potentially associating thousands of real
+  // players, that id list could exceed Node undici's 16KB request-header
+  // limit (the exact same class of bug already documented and fixed in
+  // backfill.ts's own player read).
+  const { data: associated } = await admin.from("player_national_teams").select("player_id");
+  const associatedIds = new Set((associated ?? []).map((r) => r.player_id));
+
+  let from = 0;
+  for (;;) {
+    const { data, error } = await admin.from("players").select("id").eq("active", true).order("id").range(from, from + 999);
+    if (error) throw new Error(`failed to page through players: ${error.message}`);
+    const unassociated = (data ?? []).find((p) => !associatedIds.has(p.id));
+    if (unassociated) return unassociated.id;
+    if (!data || data.length < 1000) break;
+    from += 1000;
+  }
+  throw new Error("no active, not-yet-internationally-associated player found in the live database");
+}
+
 test("getTeamIdsByPlayer: a player with no national-team association resolves to just their club id", { skip }, async () => {
   const admin = createAdminClient();
-  const playerId = await getAnyRealPlayerId(admin);
+  const playerId = await getRealPlayerIdWithNoNationalTeamAssociation(admin);
   const { data: player } = await admin.from("players").select("club_id").eq("id", playerId).single();
 
   const result = await getTeamIdsByPlayer(admin, [playerId]);
@@ -184,7 +214,15 @@ test("getTeamIdsByPlayer: a player WITH a national-team association resolves to 
     assert.equal(error, null);
 
     const result = await getTeamIdsByPlayer(admin, [playerId]);
-    assert.deepEqual(new Set(result.get(playerId)), new Set([player!.club_id, ctx.nationalTeamAId]));
+    // Subset check, not an exact-set check: since Pass 14 go-live Gate 2's
+    // real international bootstrap, the chosen real test player may
+    // ALREADY have one or more real national-team associations from an
+    // actual call-up -- this test only needs to prove the synthetic
+    // association is additive on top of whatever already exists, not that
+    // it's the player's only one.
+    const resultIds = new Set(result.get(playerId));
+    assert.ok(resultIds.has(player!.club_id), "the player's real club id must still be present");
+    assert.ok(resultIds.has(ctx.nationalTeamAId), "the newly-associated national team id must be present");
 
     // The association is additive, never a replacement: the player's
     // canonical club membership (the field every draftable-universe,
@@ -402,12 +440,15 @@ test("UI data: getNextFixtureByPlayer shows the real international participants,
     const nextFixtures = await getNextFixtureByPlayer(admin, [playerId]);
     const next = nextFixtures.get(playerId);
 
-    // This assertion only holds if the player's real club has no SOONER
-    // real scheduled fixture than our synthetic one -- extremely likely
-    // for a kickoff 2 days out, but if it ever flakes, the real club
-    // fixture winning "soonest" is itself correct behavior (not a bug),
-    // just not what this specific test is set up to isolate.
-    if (next) {
+    // This assertion only holds if the synthetic international fixture is
+    // genuinely the player's SOONEST eligible fixture. Since Pass 14
+    // go-live Gate 2's real international bootstrap, a randomly-chosen
+    // real player may well have a real club or international fixture of
+    // their own scheduled sooner than our synthetic one -- that's correct
+    // behavior (not a bug), just not what this specific test is set up to
+    // isolate, so it's checked explicitly rather than assumed.
+    const isOurSyntheticFixture = next?.kickoffAt.getTime() === kickoff.getTime();
+    if (next && isOurSyntheticFixture) {
       assert.notEqual(next.homeLabel, realClubShortName, "the fixture's home label must never be silently replaced by the player's permanent club");
       assert.ok(
         next.homeLabel === "TLA" || next.awayLabel === "TLA",
@@ -418,5 +459,158 @@ test("UI data: getNextFixtureByPlayer shows the real international participants,
     await admin.from("player_national_teams").delete().eq("player_id", playerId).eq("national_team_club_id", ctx.nationalTeamAId);
   } finally {
     await tearDownNationalTeams(admin, ctx);
+  }
+});
+
+/**
+ * Pass 14 go-live Gate 6: a club performance and an international
+ * performance by the same player, inside the same Tuesday-Monday fantasy
+ * round, must AGGREGATE in the player's round total -- neither may
+ * overwrite the other. Proven against the real `queryMatchupSquads`
+ * (the exact function the Matchup page renders from), not a reimplemented
+ * summing check, since `fantasy_player_scores` is keyed
+ * `(player_id, fixture_id, scoring_rule_version)` by design (never one row
+ * per player per round) specifically so this aggregation falls out of a
+ * plain SUM rather than needing special-cased logic -- this test is what
+ * actually exercises that real query path end-to-end with two distinct
+ * fixture kinds for one player.
+ */
+test("GATE 6: a club performance and an international performance in the same round both count toward the player's round total -- neither overwrites the other", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  const ctx = await setUpNationalTeams(admin);
+  try {
+    const { data: midCandidate } = await admin
+      .from("players")
+      .select("id, club_id, competition_id")
+      .eq("active", true)
+      .eq("position", "MID")
+      .limit(1)
+      .single();
+    const playerId = midCandidate!.id;
+
+    const { error: signError } = await league.clients[0].rpc("sign_player", { p_league_id: league.leagueId, p_player_id: playerId });
+    assert.equal(signError, null);
+
+    const { data: otherClub } = await admin
+      .from("clubs")
+      .select("id")
+      .eq("competition_id", midCandidate!.competition_id)
+      .neq("id", midCandidate!.club_id)
+      .limit(1)
+      .single();
+
+    // Same real round window the end-to-end test above uses -- both
+    // fixtures' kickoffs must fall inside the round openNextRound is
+    // about to create, since buildMatchupTeamSquad composes the squad
+    // from that round's real lineup_slots rows, not from roster_entries
+    // directly (a nonexistent/arbitrary roundId legitimately returns a
+    // completely empty squad, not a bench fallback).
+    const window = roundWindowContaining(new Date());
+    const clubKickoff = new Date(window.startsAt.getTime() + (window.endsAt.getTime() - window.startsAt.getTime()) / 3);
+    const intlKickoff = new Date(window.startsAt.getTime() + (2 * (window.endsAt.getTime() - window.startsAt.getTime())) / 3);
+
+    // The CLUB performance: a real fixture using the player's own real
+    // club/competition -- no synthetic national-team machinery involved.
+    const { data: clubFixture, error: clubFixtureError } = await admin
+      .from("fixtures")
+      .insert({
+        competition_id: midCandidate!.competition_id,
+        home_club_id: midCandidate!.club_id,
+        away_club_id: otherClub!.id,
+        kickoff_at: clubKickoff.toISOString(),
+        status: "final",
+        season: 2026,
+        home_score: 1,
+        away_score: 0,
+      })
+      .select("id")
+      .single();
+    assert.equal(clubFixtureError, null);
+
+    // The INTERNATIONAL performance: the shared synthetic national-team
+    // fixture infrastructure, same as every other test in this file.
+    const intlFixtureId = await insertFixture(admin, ctx, ctx.eligibleCompetitionId, intlKickoff, "final");
+    await admin.from("fixtures").update({ home_score: 2, away_score: 1 }).eq("id", intlFixtureId);
+    await admin.from("player_national_teams").insert({ player_id: playerId, national_team_club_id: ctx.nationalTeamAId });
+
+    const opened = await openNextRound(admin, league.leagueId, new Date());
+    assert.ok(opened.ok, `round must open: ${!opened.ok ? opened.error : ""}`);
+    if (!opened.ok) return;
+
+    const matchup: CurrentMatchup = {
+      id: "test-matchup",
+      roundId: opened.roundId,
+      roundNumber: 1,
+      roundStartsAt: window.startsAt.toISOString(),
+      roundEndsAt: window.endsAt.toISOString(),
+      status: "live",
+      homeFantasyTeamId: league.teamIds[0],
+      awayFantasyTeamId: league.teamIds[1],
+      homeTeamName: "Home",
+      awayTeamName: "Away",
+      homeLivePoints: 0,
+      awayLivePoints: 0,
+      homeFinalPoints: null,
+      awayFinalPoints: null,
+      isUserHome: true,
+      scoresUpdatedAt: null,
+    };
+
+    function findPlayer(squads: Awaited<ReturnType<typeof queryMatchupSquads>>) {
+      const allPlayers = [...squads.home.starters.map((s) => s.player), ...squads.home.bench, ...squads.away.starters.map((s) => s.player), ...squads.away.bench];
+      return allPlayers.find((p) => p.id === playerId);
+    }
+
+    // Baseline BEFORE either synthetic stat line exists -- the real
+    // player chosen here may legitimately already have other real
+    // fixtures/scores inside this same real current round (their actual
+    // club's real schedule, or, since Pass 14 go-live Gate 2's real
+    // bootstrap, a real national-team call-up of their own). The claim
+    // this test proves is about the INCREMENT two new performances add,
+    // not the player's absolute total, which this isolates correctly
+    // regardless of whatever else already contributes to it.
+    const before = findPlayer(await queryMatchupSquads(admin, matchup));
+    assert.ok(before, "the signed player must appear in the matchup squad even before either synthetic performance is scored");
+    const baselinePoints = before!.fantasyPoints;
+
+    // Distinct, non-clean-sheet stat lines so each fixture's score is
+    // real, non-zero, and (critically) DIFFERENT -- a bug that accidentally
+    // overwrote one with the other would still coincidentally "pass" an
+    // equality check if both scores happened to match.
+    await admin.from("player_match_stats").insert([
+      { player_id: playerId, fixture_id: clubFixture!.id, minutes: 90, goals: 1, assists: 0 },
+      { player_id: playerId, fixture_id: intlFixtureId, minutes: 90, goals: 0, assists: 1 },
+    ]);
+
+    const backfillResult = await backfillScores(admin, { fixtureIds: [clubFixture!.id, intlFixtureId] });
+    assert.equal(backfillResult.failed, 0, backfillResult.errors.join("; "));
+    assert.equal(backfillResult.scored, 2);
+
+    const { data: scoreRows } = await admin
+      .from("fantasy_player_scores")
+      .select("fixture_id, points")
+      .eq("player_id", playerId)
+      .eq("scoring_rule_version", SCORING_RULE_VERSION)
+      .in("fixture_id", [clubFixture!.id, intlFixtureId]);
+    const clubPoints = scoreRows!.find((r) => r.fixture_id === clubFixture!.id)!.points;
+    const intlPoints = scoreRows!.find((r) => r.fixture_id === intlFixtureId)!.points;
+    assert.notEqual(clubPoints, intlPoints, "the two stat lines must produce different scores, or this test can't distinguish summing from overwriting");
+
+    const after = findPlayer(await queryMatchupSquads(admin, matchup));
+    assert.ok(after, "the signed player must still appear in the matchup squad");
+    assert.equal(
+      after!.fantasyPoints - baselinePoints,
+      clubPoints + intlPoints,
+      `the round total must increase by the SUM of the club (${clubPoints}) and international (${intlPoints}) performances, never by just one of them`
+    );
+
+    await admin.from("fantasy_player_scores").delete().in("fixture_id", [clubFixture!.id, intlFixtureId]).eq("player_id", playerId);
+    await admin.from("player_match_stats").delete().in("fixture_id", [clubFixture!.id, intlFixtureId]).eq("player_id", playerId);
+    await admin.from("player_national_teams").delete().eq("player_id", playerId).eq("national_team_club_id", ctx.nationalTeamAId);
+    await admin.from("fixtures").delete().eq("id", clubFixture!.id);
+  } finally {
+    await tearDownNationalTeams(admin, ctx);
+    await cleanupTestLeague(admin, league);
   }
 });
