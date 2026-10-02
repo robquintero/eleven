@@ -12,7 +12,7 @@ import { ModuleHeader } from "@/components/ui/module-header";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
-import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads, getStandings, getTeamIdsByPlayerIds } from "@/data-access/matchups";
+import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads, getStandings } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
 import { getTeamRosterPlayers, type RosterPlayerOption } from "@/data-access/roster";
 import { getUserSquad } from "@/data-access/roster";
@@ -103,10 +103,6 @@ export default async function HomePage() {
   // this is non-null.
   const now = new Date();
   const fixtureIntel = matchup ? await getMatchupFixtureIntelligence(matchup, now) : null;
-  // Pass 14: each starter's full team-id set (club + any national teams)
-  // so "N OF YOUR XI INVOLVED" correctly counts a starter whose next
-  // fixture is international, not just a club match.
-  const teamIdsByPlayerId = await getTeamIdsByPlayerIds(squad.starters.map((slot) => slot.player.id));
 
   // Pass 12D: Club Briefing's LIVE/FINAL states need the actual per-round
   // squads (live/done/remaining counts, top performance) -- never
@@ -154,7 +150,7 @@ export default async function HomePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="flex flex-col gap-6">
-          <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={squad.starters} teamIdsByPlayerId={teamIdsByPlayerId} />
+          <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={squad.starters} />
 
           {matchup && matchupSquads && (matchup.status === "live" || matchup.status === "final") && (
             <MatchupPlayerCounts

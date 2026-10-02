@@ -92,7 +92,7 @@ export async function syncClubs(
       const toInsert = plan.toCreate.map((c) => {
         const code = resolveUniqueClubCode(c.code, c.externalId, takenCodes);
         takenCodes.add(code);
-        return { externalId: c.externalId, code, name: c.name, shortName: c.shortName, isNationalTeam: c.isNationalTeam };
+        return { externalId: c.externalId, code, name: c.name, shortName: c.shortName };
       });
 
       const { data: inserted, error: insertError } = await admin
@@ -103,7 +103,6 @@ export async function syncClubs(
             code: c.code,
             name: c.name,
             short_name: c.shortName,
-            is_national_team: c.isNationalTeam,
           }))
         )
         .select("id");
@@ -123,14 +122,9 @@ export async function syncClubs(
 
     for (const { internalId, item } of plan.toUpdate) {
       // Deliberately NOT updating competition_id — see module doc comment.
-      // is_national_team IS refreshed every sync (Pass 14) -- unlike
-      // competition_id, it's a stable structural fact about the team
-      // itself, provider-sourced, never a value that should drift once
-      // Eleven has an opinion of its own; safe (and self-healing) to
-      // overwrite every time.
       const { error: updateError } = await admin
         .from("clubs")
-        .update({ name: item.name, short_name: item.shortName, is_national_team: item.isNationalTeam })
+        .update({ name: item.name, short_name: item.shortName })
         .eq("id", internalId);
 
       if (updateError) {

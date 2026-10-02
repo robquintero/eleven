@@ -7,7 +7,6 @@ import "server-only";
 import { isSupabaseConfigured } from "../lib/supabase/config.ts";
 import type { createClient } from "../lib/supabase/server.ts";
 import { getEligibleFixtureIds } from "../lib/fantasy-engine/round-eligibility.ts";
-import { getFixturesForTeamIds, getTeamIdsByPlayer } from "../lib/fantasy-engine/player-fixture-participation.ts";
 import { bigFiveLeagueFromCompetitionCode } from "../lib/leagues.ts";
 import { buildStandingsTable, rankStandings } from "../domain/fantasy/standings.ts";
 import { computeFixtureIntelligence } from "../domain/fantasy/fixture-intelligence.ts";
@@ -158,9 +157,6 @@ export interface MatchupFixtureIntelligence {
     kickoffAt: string;
     homeClubShortName: string;
     awayClubShortName: string;
-    /** Pass 14: the fixture's real participant club/national-team ids — `countStartersInFixture` (lib/team-fixture.ts) must compare against these, never against short names (which can collide/aren't a safe identity key). */
-    homeClubId: string;
-    awayClubId: string;
   } | null;
 }
 
@@ -185,28 +181,31 @@ export async function getMatchupFixtureIntelligence(
 
   const { data: rosterEntries } = await supabase
     .from("roster_entries")
-    .select("player_id")
+    .select("players(club_id)")
     .in("fantasy_team_id", [matchup.homeFantasyTeamId, matchup.awayFantasyTeamId])
     .eq("status", "active");
 
-  const playerIds = Array.from(new Set((rosterEntries ?? []).map((r) => r.player_id)));
-  if (playerIds.length === 0) return empty;
+  const clubIds = Array.from(
+    new Set(
+      (rosterEntries ?? [])
+        .map((r) => (r.players as { club_id: string } | null)?.club_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
+  if (clubIds.length === 0) return empty;
 
-  // Pass 14: every team id (club OR national team) either roster's
-  // players could have a fixture through — was club_id only, structurally
-  // blind to an international fixture.
-  const teamIdsByPlayer = await getTeamIdsByPlayer(supabase, playerIds);
-  const allTeamIds = Array.from(new Set(Array.from(teamIdsByPlayer.values()).flat()));
-  if (allTeamIds.length === 0) return empty;
-
-  const fixtures = await getFixturesForTeamIds(supabase, allTeamIds);
+  const { data: fixtures } = await supabase
+    .from("fixtures")
+    .select("kickoff_at, status, home_club_id, away_club_id")
+    .or(`home_club_id.in.(${clubIds.join(",")}),away_club_id.in.(${clubIds.join(",")})`)
+    .order("kickoff_at", { ascending: true });
 
   const window: RoundWindow = { startsAt: new Date(matchup.roundStartsAt), endsAt: new Date(matchup.roundEndsAt) };
-  const fixtureRows: FixtureRow[] = fixtures.map((f) => ({
-    kickoffAt: f.kickoffAt.toISOString(),
+  const fixtureRows: FixtureRow[] = (fixtures ?? []).map((f) => ({
+    kickoffAt: f.kickoff_at,
     status: f.status as FixtureRow["status"],
-    homeClubId: f.homeClubId,
-    awayClubId: f.awayClubId,
+    homeClubId: f.home_club_id,
+    awayClubId: f.away_club_id,
   }));
 
   const { liveFixtureCount, hasAnyFixtureData, nextFixture: nextWithinRound } = computeFixtureIntelligence(
@@ -226,26 +225,10 @@ export async function getMatchupFixtureIntelligence(
       kickoffAt: nextWithinRound.kickoffAt,
       homeClubShortName: shortNameById.get(nextWithinRound.homeClubId) ?? "—",
       awayClubShortName: shortNameById.get(nextWithinRound.awayClubId) ?? "—",
-      homeClubId: nextWithinRound.homeClubId,
-      awayClubId: nextWithinRound.awayClubId,
     };
   }
 
   return { liveFixtureCount, hasAnyFixtureData, nextFixture };
-}
-
-/**
- * Pass 14: thin data-access wrapper around `getTeamIdsByPlayer` (lib/
- * fantasy-engine/player-fixture-participation.ts) — lets a page compute
- * each starter's full team-id set (club + any national teams) to pass
- * into `countStartersInFixture`, without reaching into `lib/fantasy-
- * engine` directly (pages use `data-access`, consistent with every other
- * read here).
- */
-export async function getTeamIdsByPlayerIds(playerIds: string[]): Promise<Map<string, string[]>> {
-  if (!isSupabaseConfigured() || playerIds.length === 0) return new Map();
-  const supabase = await resolveClient();
-  return getTeamIdsByPlayer(supabase, playerIds);
 }
 
 const FIXTURE_STATUS_TO_MATCH_STATE: Record<string, PlayerMatchState> = {
@@ -308,7 +291,7 @@ async function buildMatchupTeamSquad(
   fantasyTeamId: string,
   roundId: string,
   pointsByPlayerId: Map<string, number>,
-  fixtureByPlayerId: Map<string, { opponent: string; isHome: boolean; kickoff: string; state: PlayerMatchState; homeLabel: string; awayLabel: string }>
+  fixtureByClubId: Map<string, { opponent: string; isHome: boolean; kickoff: string; state: PlayerMatchState }>
 ): Promise<Squad> {
   const empty: Squad = { formation: "—", starters: [], bench: [] };
 
@@ -325,7 +308,7 @@ async function buildMatchupTeamSquad(
   function toPlayer(row: MatchupSlotRow): Player {
     const player = row.roster_entries.players;
     const club = player.clubs;
-    const fixture = fixtureByPlayerId.get(player.id);
+    const fixture = fixtureByClubId.get(player.club_id);
     return {
       id: player.id,
       externalId: "",
@@ -416,11 +399,9 @@ export interface MatchupSquads {
  * Both managers' full starting XI + bench for one already-opened fantasy
  * round -- the Matchup page's "show both complete lineups side by side"
  * requirement. A single round-window-scoped query set shared by both
- * teams (never duplicated per team): one roster_entries read per team,
- * one shared eligible-fixtures lookup, one shared fantasy_player_scores
- * aggregate, one shared fixtures-by-PLAYER lookup (Pass 14 -- was
- * fixtures-by-club, which a national-team fixture can never match via a
- * player's permanent club_id).
+ * teams (never duplicated per team, never per-player): one roster_entries
+ * read per team, one shared eligible-fixtures lookup, one shared
+ * fantasy_player_scores aggregate, one shared fixtures-by-club lookup.
  */
 export async function getMatchupSquads(matchup: CurrentMatchup): Promise<MatchupSquads> {
   if (!isSupabaseConfigured()) {
@@ -443,10 +424,17 @@ export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: 
 
   const { data: entries } = await supabase
     .from("roster_entries")
-    .select("player_id")
+    .select("player_id, players(club_id)")
     .in("fantasy_team_id", teamIds)
     .eq("status", "active");
 
+  const clubIds = Array.from(
+    new Set(
+      (entries ?? [])
+        .map((e) => (e.players as { club_id: string } | null)?.club_id)
+        .filter((id): id is string => Boolean(id))
+    )
+  );
   const playerIds = Array.from(new Set((entries ?? []).map((e) => e.player_id)));
 
   const window: RoundWindow = { startsAt: new Date(matchup.roundStartsAt), endsAt: new Date(matchup.roundEndsAt) };
@@ -469,56 +457,61 @@ export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: 
     }
   }
 
-  // Fixture display state per PLAYER (Pass 14 -- was per club, which is
-  // structurally blind to an international fixture whose participants
-  // are national teams, not the player's own club; see
-  // player-fixture-participation.ts), scoped strictly to this round's
+  // Fixture display state per club, scoped strictly to this round's
   // window (never a future round's fixture just to have something to
-  // show -- same rule getMatchupFixtureIntelligence follows). A player
-  // can have more than one eligible fixture in a round (club AND
-  // international, or two internationals) -- picks whichever is most
-  // relevant to show without changing what it's worth: live first, else
-  // the earliest still-upcoming one, else the most recent final one. The
-  // POINTS value above already sums every fixture in the window
-  // regardless of which one is displayed, so this choice is purely
-  // presentational.
-  const fixtureByPlayerId = new Map<string, { opponent: string; isHome: boolean; kickoff: string; state: PlayerMatchState; homeLabel: string; awayLabel: string }>();
-  if (playerIds.length > 0) {
-    const teamIdsByPlayer = await getTeamIdsByPlayer(supabase, playerIds);
-    const allTeamIds = Array.from(new Set(Array.from(teamIdsByPlayer.values()).flat()));
-    const fixtures = await getFixturesForTeamIds(supabase, allTeamIds, { window });
+  // show -- same rule getMatchupFixtureIntelligence follows). A club can
+  // have more than one fixture in a round (a real, if rare, multi-match
+  // round) -- picks whichever is most relevant to show without changing
+  // what it's worth: live first, else the earliest still-upcoming one,
+  // else the most recent final one. The POINTS value above already sums
+  // every fixture in the window regardless of which one is displayed, so
+  // this choice is purely presentational.
+  const fixtureByClubId = new Map<string, { opponent: string; isHome: boolean; kickoff: string; state: PlayerMatchState }>();
+  if (clubIds.length > 0) {
+    const { data: fixtures } = await supabase
+      .from("fixtures")
+      .select("kickoff_at, status, home_club_id, away_club_id")
+      .gte("kickoff_at", window.startsAt.toISOString())
+      .lt("kickoff_at", window.endsAt.toISOString())
+      .or(`home_club_id.in.(${clubIds.join(",")}),away_club_id.in.(${clubIds.join(",")})`)
+      .order("kickoff_at", { ascending: true });
 
-    const involvedClubIds = Array.from(new Set(fixtures.flatMap((f) => [f.homeClubId, f.awayClubId])));
-    const { data: clubs } = involvedClubIds.length
-      ? await supabase.from("clubs").select("id, short_name").in("id", involvedClubIds)
+    const opponentClubIds = Array.from(
+      new Set((fixtures ?? []).flatMap((f) => [f.home_club_id, f.away_club_id]))
+    );
+    const { data: clubs } = opponentClubIds.length
+      ? await supabase.from("clubs").select("id, short_name").in("id", opponentClubIds)
       : { data: [] as { id: string; short_name: string }[] };
     const shortNameById = new Map((clubs ?? []).map((c) => [c.id, c.short_name]));
 
-    for (const playerId of playerIds) {
-      const teamIds = new Set(teamIdsByPlayer.get(playerId) ?? []);
-      const playerFixtures = fixtures.filter((f) => teamIds.has(f.homeClubId) || teamIds.has(f.awayClubId));
-      if (playerFixtures.length === 0) continue;
+    const byClub = new Map<string, NonNullable<typeof fixtures>>();
+    for (const fixture of fixtures ?? []) {
+      for (const clubId of [fixture.home_club_id, fixture.away_club_id]) {
+        if (!clubIds.includes(clubId)) continue;
+        const list = byClub.get(clubId) ?? [];
+        list.push(fixture);
+        byClub.set(clubId, list);
+      }
+    }
 
-      const live = playerFixtures.find((f) => f.status === "live" || f.status === "ht");
-      const upcoming = playerFixtures.find((f) => f.status === "scheduled" || f.status === "postponed");
-      const chosen = live ?? upcoming ?? playerFixtures[playerFixtures.length - 1];
-      const isHome = teamIds.has(chosen.homeClubId);
-      const homeLabel = shortNameById.get(chosen.homeClubId) ?? "—";
-      const awayLabel = shortNameById.get(chosen.awayClubId) ?? "—";
-      fixtureByPlayerId.set(playerId, {
-        opponent: isHome ? awayLabel : homeLabel,
+    for (const [clubId, clubFixtures] of byClub) {
+      const live = clubFixtures.find((f) => f.status === "live" || f.status === "ht");
+      const upcoming = clubFixtures.find((f) => f.status === "scheduled" || f.status === "postponed");
+      const chosen = live ?? upcoming ?? clubFixtures[clubFixtures.length - 1];
+      const isHome = chosen.home_club_id === clubId;
+      const opponentId = isHome ? chosen.away_club_id : chosen.home_club_id;
+      fixtureByClubId.set(clubId, {
+        opponent: shortNameById.get(opponentId) ?? "—",
         isHome,
-        kickoff: chosen.kickoffAt.toISOString(),
+        kickoff: chosen.kickoff_at,
         state: FIXTURE_STATUS_TO_MATCH_STATE[chosen.status] ?? "upcoming",
-        homeLabel,
-        awayLabel,
       });
     }
   }
 
   const [home, away] = await Promise.all([
-    buildMatchupTeamSquad(supabase, matchup.homeFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByPlayerId),
-    buildMatchupTeamSquad(supabase, matchup.awayFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByPlayerId),
+    buildMatchupTeamSquad(supabase, matchup.homeFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByClubId),
+    buildMatchupTeamSquad(supabase, matchup.awayFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByClubId),
   ]);
 
   return { home, away };

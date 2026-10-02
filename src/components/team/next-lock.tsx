@@ -1,5 +1,5 @@
 import { Countdown } from "@/components/football/countdown";
-import { fixtureOpponentLabel, formatKickoff, playerFixtureParticipantLabel } from "@/lib/team-fixture";
+import { fixtureOpponentLabel, formatKickoff } from "@/lib/team-fixture";
 import type { LineupSlot } from "@/lib/types/fantasy";
 
 export function NextLock({ slot, hasStarters = true }: { slot: LineupSlot | null; hasStarters?: boolean }) {
@@ -18,7 +18,7 @@ export function NextLock({ slot, hasStarters = true }: { slot: LineupSlot | null
           {slot.player.name}
         </p>
         <p className="label-system truncate text-[11px] text-foreground-tertiary">
-          {playerFixtureParticipantLabel(slot.player)} {fixtureOpponentLabel(slot.player)} ·{" "}
+          {slot.player.club.shortName} {fixtureOpponentLabel(slot.player)} ·{" "}
           {formatKickoff(slot.player.fixture.kickoff)}
         </p>
       </div>

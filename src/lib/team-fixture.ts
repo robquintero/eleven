@@ -39,22 +39,6 @@ export function playerFixtureCode(player: Player) {
   return `${player.fixture.opponent} (${player.fixture.isHome ? "H" : "A"})`;
 }
 
-/**
- * Pass 14: the short label for whichever side the player is actually
- * participating in THEIR next fixture as — `player.club.shortName` for a
- * club fixture, but the real national-team short name (e.g. "FRA") for an
- * international one. Falls back to `player.club.shortName` with no
- * fixture at all. Use this, never `player.club.shortName` directly,
- * anywhere a compact row shows "<my side> · <fixture code>" together —
- * splicing the player's permanent club onto an international fixture's
- * opponent produces a matchup that doesn't exist (e.g. "REA · GER" when
- * the real fixture is France vs Germany).
- */
-export function playerFixtureParticipantLabel(player: Player): string {
-  if (!player.fixture) return player.club.shortName;
-  return player.fixture.isHome ? player.fixture.homeLabel : player.fixture.awayLabel;
-}
-
 export interface PlayerStatusLabel {
   text: string;
   tone: "destructive" | "warning" | "live" | "neutral";
@@ -178,26 +162,15 @@ export function starterBuckets(starters: LineupSlot[]) {
  * against `MatchupFixtureIntelligence.nextFixture`
  * (`src/data-access/matchups.ts`), which only ever contains a fixture that
  * genuinely exists in stored data.
- *
- * Pass 14: compares real club/national-team IDs, never
- * `club.shortName` (a display string, never a safe identity key, and
- * always wrong for a starter whose participating team in this specific
- * fixture is a national team rather than their permanent club).
- * `teamIdsByPlayerId` (from `getTeamIdsByPlayer`,
- * `lib/fantasy-engine/player-fixture-participation.ts`) supplies each
- * starter's full team-id set (club + any national teams); a starter
- * missing from it falls back to their own `club.id` alone, which is
- * exactly correct for a club-only fixture and for every caller that
- * hasn't been updated to pass the map yet.
  */
 export function countStartersInFixture(
   starters: LineupSlot[],
-  fixture: { homeClubId: string; awayClubId: string } | null,
-  teamIdsByPlayerId?: Map<string, string[]>
+  fixture: { homeClubShortName: string; awayClubShortName: string } | null
 ): number {
   if (!fixture) return 0;
-  return starters.filter((slot) => {
-    const teamIds = teamIdsByPlayerId?.get(slot.player.id) ?? [slot.player.club.id];
-    return teamIds.includes(fixture.homeClubId) || teamIds.includes(fixture.awayClubId);
-  }).length;
+  return starters.filter(
+    (slot) =>
+      slot.player.club.shortName === fixture.homeClubShortName ||
+      slot.player.club.shortName === fixture.awayClubShortName
+  ).length;
 }

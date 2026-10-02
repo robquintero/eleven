@@ -13,7 +13,6 @@ import type { createClient } from "../lib/supabase/server.ts";
 import { bigFiveLeagueFromCompetitionCode } from "../lib/leagues.ts";
 import { normalizeForSearch } from "../lib/search-normalize.ts";
 import { SCORING_RULE_VERSION } from "../domain/fantasy/scoring.ts";
-import { getNextFixtureByPlayer, getTeamIdsByPlayer } from "../lib/fantasy-engine/player-fixture-participation.ts";
 import type { Player, PlayerFixture, PlayerMatchState, PlayerPosition } from "../lib/types/fantasy.ts";
 
 /** Dynamically imported (not a static top-level import) so this whole module -- specifically `queryPlayerDatabase` -- stays importable from a plain Node integration test; see this file's own import-block comment. */
@@ -339,10 +338,11 @@ export async function queryPlayerDatabase(
   }
 
   const playerIds = data.map((row) => row.id);
+  const clubIds = Array.from(new Set(data.map((row) => row.club_id)));
 
-  const [usageByPlayerId, nextFixtureByPlayerId, scoresByPlayerId] = await Promise.all([
+  const [usageByPlayerId, nextFixtureByClubId, scoresByPlayerId] = await Promise.all([
     getUsageAggregates(supabase, playerIds),
-    getNextFixtureByPlayer(supabase, playerIds),
+    getNextFixtureByClub(supabase, clubIds),
     getFantasyScoreAggregates(supabase, playerIds),
   ]);
 
@@ -350,17 +350,7 @@ export async function queryPlayerDatabase(
     const club = row.clubs;
     const competitionCode = club?.competitions?.code ?? null;
     const usage = usageByPlayerId.get(row.id);
-    const nextFixtureInfo = nextFixtureByPlayerId.get(row.id);
-    const nextFixture: PlayerFixture | undefined = nextFixtureInfo
-      ? {
-          opponent: nextFixtureInfo.opponentLabel,
-          isHome: nextFixtureInfo.isHome,
-          kickoff: nextFixtureInfo.kickoffAt.toISOString(),
-          state: FIXTURE_STATUS_TO_MATCH_STATE[nextFixtureInfo.status] ?? "upcoming",
-          homeLabel: nextFixtureInfo.homeLabel,
-          awayLabel: nextFixtureInfo.awayLabel,
-        }
-      : undefined;
+    const nextFixture = club ? nextFixtureByClubId.get(club.id) : undefined;
     const scores = scoresByPlayerId.get(row.id);
 
     return {
@@ -505,6 +495,45 @@ async function getFantasyScoreAggregates(
   return result;
 }
 
+async function getNextFixtureByClub(
+  supabase: SupabaseClientType,
+  clubIds: string[]
+): Promise<Map<string, PlayerFixture>> {
+  const result = new Map<string, PlayerFixture>();
+  if (clubIds.length === 0) return result;
+
+  const { data } = await supabase
+    .from("fixtures")
+    .select("kickoff_at, status, home_club_id, away_club_id")
+    .eq("status", "scheduled")
+    .or(`home_club_id.in.(${clubIds.join(",")}),away_club_id.in.(${clubIds.join(",")})`)
+    .order("kickoff_at", { ascending: true });
+
+  if (!data) return result;
+
+  const clubShortNames = await getClubShortNames(
+    supabase,
+    Array.from(new Set(data.flatMap((f) => [f.home_club_id, f.away_club_id])))
+  );
+
+  for (const fixture of data) {
+    for (const [clubId, opponentId, isHome] of [
+      [fixture.home_club_id, fixture.away_club_id, true] as const,
+      [fixture.away_club_id, fixture.home_club_id, false] as const,
+    ]) {
+      if (!clubIds.includes(clubId) || result.has(clubId)) continue;
+      result.set(clubId, {
+        opponent: clubShortNames.get(opponentId) ?? "—",
+        isHome,
+        kickoff: fixture.kickoff_at,
+        state: FIXTURE_STATUS_TO_MATCH_STATE[fixture.status] ?? "upcoming",
+      });
+    }
+  }
+
+  return result;
+}
+
 /** Every club's short name, id-keyed -- used by the club-sort path, which needs ALL of them (not just a page's worth) to compute a real sort key. A small table (~200 rows) but paginated via `fetchAllRows` anyway so this never silently breaks if it grows past max_rows. */
 async function getAllClubShortNames(supabase: SupabaseClientType): Promise<Map<string, string>> {
   const rows = await fetchAllRows<{ id: string; short_name: string }>((from, to) =>
@@ -562,14 +591,7 @@ export interface ClubFilterOption {
 export async function getClubFilters(competitionId?: string): Promise<ClubFilterOption[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await resolveClient();
-  // Pass 14: national teams now live in `clubs` too (fixture participants
-  // only) -- excluded here so "France"/"Germany" never show up as a
-  // selectable "club" filter on a page that means real, draftable clubs.
-  let builder = supabase
-    .from("clubs")
-    .select("id, name, short_name, competition_id")
-    .eq("is_national_team", false)
-    .order("name", { ascending: true });
+  let builder = supabase.from("clubs").select("id, name, short_name, competition_id").order("name", { ascending: true });
   if (competitionId) builder = builder.eq("competition_id", competitionId);
   const { data } = await builder;
   return (data ?? []).map((c) => ({ id: c.id, name: c.name, shortName: c.short_name, competitionId: c.competition_id }));
@@ -600,9 +622,8 @@ export async function getPlayerRecentMatches(playerId: string, limit = 10): Prom
   if (!isSupabaseConfigured()) return [];
   const supabase = await resolveClient();
 
-  const teamIdsByPlayer = await getTeamIdsByPlayer(supabase, [playerId]);
-  const teamIds = new Set(teamIdsByPlayer.get(playerId) ?? []);
-  if (teamIds.size === 0) return [];
+  const { data: player } = await supabase.from("players").select("club_id").eq("id", playerId).maybeSingle();
+  if (!player) return [];
 
   // Sorted and limited in JS, not via `.order("kickoff_at", { referencedTable:
   // "fixtures" })` — found live while building Form Tracker: PostgREST
@@ -627,12 +648,8 @@ export async function getPlayerRecentMatches(playerId: string, limit = 10): Prom
     .filter((row) => row.fixtures)
     .sort((a, b) => new Date(b.fixtures!.kickoff_at).getTime() - new Date(a.fixtures!.kickoff_at).getTime())
     .slice(0, limit);
-  // Pass 14: which side the player actually played for in each fixture is
-  // "home_club_id/away_club_id is one of their team ids (club OR national
-  // team)" -- was `=== player.club_id` alone, which is wrong for an
-  // international fixture (neither side is the player's permanent club).
   const opponentClubIds = rows.map((row) =>
-    teamIds.has(row.fixtures!.home_club_id) ? row.fixtures!.away_club_id : row.fixtures!.home_club_id
+    row.fixtures!.home_club_id === player.club_id ? row.fixtures!.away_club_id : row.fixtures!.home_club_id
   );
   const fixtureIds = rows.map((row) => row.fixtures!.id);
   const [clubShortNames, pointsByFixtureId] = await Promise.all([
@@ -642,7 +659,7 @@ export async function getPlayerRecentMatches(playerId: string, limit = 10): Prom
 
   return rows.map((row) => {
     const fixture = row.fixtures!;
-    const isHome = teamIds.has(fixture.home_club_id);
+    const isHome = fixture.home_club_id === player.club_id;
     const opponentId = isHome ? fixture.away_club_id : fixture.home_club_id;
     return {
       fixtureId: fixture.id,
@@ -684,9 +701,8 @@ export async function getPlayerLatestScoreBreakdown(playerId: string): Promise<P
   if (!isSupabaseConfigured()) return null;
   const supabase = await resolveClient();
 
-  const teamIdsByPlayer = await getTeamIdsByPlayer(supabase, [playerId]);
-  const teamIds = new Set(teamIdsByPlayer.get(playerId) ?? []);
-  if (teamIds.size === 0) return null;
+  const { data: player } = await supabase.from("players").select("club_id").eq("id", playerId).maybeSingle();
+  if (!player) return null;
 
   const { data } = await supabase
     .from("fantasy_player_scores")
@@ -699,8 +715,7 @@ export async function getPlayerLatestScoreBreakdown(playerId: string): Promise<P
 
   const latest = rows.sort((a, b) => new Date(b.fixtures!.kickoff_at).getTime() - new Date(a.fixtures!.kickoff_at).getTime())[0];
   const fixture = latest.fixtures!;
-  // Pass 14: see getPlayerRecentMatches's identical comment above.
-  const isHome = teamIds.has(fixture.home_club_id);
+  const isHome = fixture.home_club_id === player.club_id;
   const opponentId = isHome ? fixture.away_club_id : fixture.home_club_id;
   const clubShortNames = await getClubShortNames(supabase, [opponentId]);
 

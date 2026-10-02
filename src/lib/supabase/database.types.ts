@@ -45,7 +45,6 @@ export type Database = {
           competition_id: string
           created_at: string
           id: string
-          is_national_team: boolean
           name: string
           name_unaccented: string | null
           short_name: string
@@ -57,7 +56,6 @@ export type Database = {
           competition_id: string
           created_at?: string
           id?: string
-          is_national_team?: boolean
           name: string
           name_unaccented?: string | null
           short_name: string
@@ -69,7 +67,6 @@ export type Database = {
           competition_id?: string
           created_at?: string
           id?: string
-          is_national_team?: boolean
           name?: string
           name_unaccented?: string | null
           short_name?: string
@@ -864,42 +861,6 @@ export type Database = {
           },
         ]
       }
-      player_national_teams: {
-        Row: {
-          created_at: string
-          national_team_club_id: string
-          player_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          national_team_club_id: string
-          player_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          national_team_club_id?: string
-          player_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "player_national_teams_national_team_club_id_fkey"
-            columns: ["national_team_club_id"]
-            isOneToOne: false
-            referencedRelation: "clubs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "player_national_teams_player_id_fkey"
-            columns: ["player_id"]
-            isOneToOne: false
-            referencedRelation: "players"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       players: {
         Row: {
           active: boolean
@@ -1396,15 +1357,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      _current_round_id: { Args: { p_league_id: string }; Returns: string }
-      _init_current_round_slot: {
-        Args: {
-          p_league_id: string
-          p_player_id: string
-          p_roster_entry_id: string
-        }
-        Returns: undefined
-      }
       _perform_draft_pick: {
         Args: {
           p_actor_user_id: string
@@ -1417,10 +1369,6 @@ export type Database = {
           pick_number: number
           round: number
         }[]
-      }
-      _release_current_round_slot: {
-        Args: { p_league_id: string; p_roster_entry_id: string }
-        Returns: undefined
       }
       accept_trade: { Args: { p_trade_id: string }; Returns: undefined }
       cancel_trade: { Args: { p_trade_id: string }; Returns: undefined }
@@ -1437,10 +1385,7 @@ export type Database = {
           league_id: string
         }[]
       }
-      drop_player: {
-        Args: { p_league_id: string; p_player_id: string }
-        Returns: undefined
-      }
+      drop_player: { Args: { p_league_id: string; p_player_id: string }; Returns: undefined }
       generate_invite_code: { Args: { p_length?: number }; Returns: string }
       immutable_unaccent: { Args: { "": string }; Returns: string }
       is_league_commissioner: {
@@ -1474,9 +1419,7 @@ export type Database = {
           p_receiving_team_id: string
           p_requested_player_ids: string[]
         }
-        Returns: {
-          trade_id: string
-        }[]
+        Returns: { trade_id: string }[]
       }
       reject_trade: { Args: { p_trade_id: string }; Returns: undefined }
       resolve_expired_pick: {
@@ -1496,9 +1439,7 @@ export type Database = {
       shares_league_with: { Args: { p_user_id: string }; Returns: boolean }
       sign_player: {
         Args: { p_league_id: string; p_player_id: string }
-        Returns: {
-          roster_entry_id: string
-        }[]
+        Returns: { roster_entry_id: string }[]
       }
       start_draft: {
         Args: { p_league_id: string }
@@ -1507,13 +1448,9 @@ export type Database = {
         }[]
       }
       start_next_season: {
-        Args: {
-          p_league_id: string
-          p_roster_mode: string
-          p_schedule_cycles: number
-        }
+        Args: { p_league_id: string; p_roster_mode: string; p_schedule_cycles: number }
         Returns: {
-          draft_id: string
+          draft_id: string | null
           season_id: string
           season_number: number
         }[]

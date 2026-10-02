@@ -92,9 +92,7 @@ export function getStatus() {
   return request<ApiFootballStatusResponse>("/status");
 }
 
-export function getLeagues(
-  params: { id?: number; season?: number; search?: string; country?: string; type?: string } = {}
-) {
+export function getLeagues(params: { id?: number; season?: number } = {}) {
   return request<ApiFootballLeagueItem>("/leagues", params);
 }
 

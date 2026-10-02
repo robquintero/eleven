@@ -181,7 +181,9 @@ export function PlayerInspectorContent({
         <TerminalPanelSection>
           <p className="label-system text-[11px] text-foreground-tertiary">Next</p>
           <p className="mt-1.5 text-sm font-medium text-foreground">
-            {player.fixture.homeLabel} — {player.fixture.awayLabel}
+            {player.fixture.isHome
+              ? `${player.club.shortName} — ${player.fixture.opponent}`
+              : `${player.fixture.opponent} — ${player.club.shortName}`}
           </p>
           <p className="label-system mt-1 text-xs text-foreground-tertiary">
             {formatKickoff(player.fixture.kickoff)}
