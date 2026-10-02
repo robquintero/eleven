@@ -1,3 +1,316 @@
+# Pass 13 — Premium Visual System + Signature Product Surfaces: COMPLETE
+
+**Branch:** `feature/pass-13-premium-visual-system` (off `main` at
+`c620e5b` — Pass 12F is merged and deployed to production). **Not
+pushed, not merged.** Latest commit: **`57db570`** before this HANDOFF
+update.
+
+This was explicitly NOT a site-wide redesign brief — the instruction was
+to refine hierarchy, composition, states, and football identity on top of
+an already-coherent system, not rebuild it. The Phase 1 audit (three
+parallel research passes covering every named surface against DESIGN.md's
+own documented rules) confirmed that framing: the core system — dual
+typography, terminal geometry, semantic color — was applied with real
+discipline almost everywhere. Drift was concentrated in a handful of
+concrete, fixable spots rather than being systemic, and exactly one
+screen (League) genuinely matched the brief's "boxed dashboard" complaint.
+
+| Phase | Commit | Summary |
+|---|---|---|
+| 1–2 | `9900d62` | Full visual-system audit (3 parallel research passes) + refinement spec written into DESIGN.md §23 |
+| 3 (part 1) | `0c56dad` | Cross-cutting fixes: typography-register misuse, an emoji glyph, a stray pill, squared-up `ui/dialog.tsx`, left-edge roster selection, new `SelectTrigger` control |
+| 3 + 6 | `734a7c2` | League recomposed: one hero table (Standings), not ~12 equal boxes |
+| 9 | `3a406c0` | Draft completed state is a real recap, not a stalled active board |
+| 4 | `4240f37` | Real pre-match anticipation state for `MatchupCommand` (NEXT KICKOFF / real fixture / XI involved) |
+| 5 | `c4e4c89` | Matchup score area compact on mobile, tighter coupling to the XI below |
+| 7 | `ff6f3a7` | Team pitch: less nationality-flag weight, more name emphasis, legend removed |
+| 10 | `4425c99` | Empty-state consistency (NO XI SET / NO STARTING XI SET) + real context for an empty Standings table |
+| 11 | `57db570` | Event-state design language documented (DESIGN.md §24) — no live-animation code written, see below for why |
+| 8, 12, 13, 14 | (this commit) | Player Inspector audit (no changes needed), responsive audit, visual-QA limitations, final validation |
+
+`tsc --noEmit`, `npm run lint`, and `npm run build` are clean as of every
+commit above.
+
+## 1. Visual-system problems found (Phase 1 audit)
+
+Three parallel research passes read every named surface's actual current
+source against DESIGN.md's own rules. Concrete findings (file:line level,
+not vague impressions):
+
+- **League was the one real "boxed dashboard" offender**: ~12-13
+  independently bordered, identically-weighted sections, no focal hero —
+  textbook DESIGN.md §21 "dashboard tile overload." Home and Matchup were
+  already reasonably composed (one clear hero module each).
+- `.label-system` (forces uppercase) was being applied to full
+  human-readable prose (activity-feed entries, league transaction
+  summaries) — uppercasing real team/player names, which §18 explicitly
+  forbids.
+- A literal 🔒 emoji in one compact status row (forbidden icon source).
+- A `rounded-full` pill around static attribution text (that radius is
+  reserved for human/football identity, never metadata chrome).
+- `ui/dialog.tsx` (shadcn default, never customized) was a second,
+  un-terminal-ized dialog language — `rounded-xl`, a ring, a rounded
+  muted footer strip — used by Propose Trade and both Drop Player
+  confirmations.
+- `bench-row.tsx`'s roster-row selection used a rounded ring highlight
+  instead of the `border-l-accent` edge indicator every other roster list
+  already uses.
+- The Players desktop filter bar — the brief's own cited reference
+  pattern — was actually the clearest remaining generic control: six bare
+  native `<select>` elements with full default browser chrome.
+- The Draft completed state had **zero visual differentiation** from an
+  active draft: the full available-players board stayed primary, DRAFT
+  buttons were merely `disabled`, and RECENT_PICKS stayed capped at 12.
+- `MatchupCommand` showed a dead "0 – 0" score + empty progress bar for
+  every scheduled-but-not-live matchup — a common, not rare, state — even
+  though the real fixture-intelligence data to build a genuine
+  anticipation state already existed and was already being fetched.
+- Team pitch markers lead with a nationality-flag avatar heavier than the
+  player's own name, and carry a LIVE/LOCKED/INJ·SUSP legend that's pure
+  vocabulary restatement of what each marker already shows on itself.
+- `crestColor` is wired through every data-access layer but hardcoded to
+  flat gray everywhere it's read — club color never reaches the UI, and
+  no club crest imagery exists anywhere in the codebase.
+
+Full findings, including the ones deliberately left unfixed and why, are
+in `DESIGN.md` §23.
+
+## 2. New typography hierarchy
+
+No new roles introduced — the existing dual-register system (sans/human
+for names and prose, mono/`.label-system` for statuses/codes/timestamps)
+was already correctly specified in DESIGN.md §2. The fix was enforcement:
+activity-feed and league-transaction summaries (team/player names) now
+render in human-register prose instead of being force-uppercased through
+`.label-system`; `ui/dialog.tsx`'s `DialogTitle` now defaults to
+`.label-system` styling so the operational strings every real caller
+already passes ("PROPOSE TRADE", "DROP {name}") render correctly instead
+of accidentally uppercasing human-register type.
+
+## 3. New semantic color rules
+
+None — the audit found the existing §3 table (blue = interaction, green =
+live/positive, amber = doubtful/caution, red = destructive, gray =
+locked/neutral) already applied with unusual discipline everywhere
+checked. The Pass 13 brief's own color semantics are a restatement of
+what was already true in this codebase, not a change. One DRY gap found
+(the destructive/warning/live/neutral tone map is hand-written in four
+separate files) was documented as a known follow-up, not fixed — pure
+refactor risk with no visible product effect.
+
+## 4. Border/surface reductions
+
+League: replaced its always-shown season-status box with a single
+light header line (league name + `SEASON N · ROUND X/Y · STATUS`) for
+the common "nothing to do" case; `SeasonPanel` now renders a box only for
+a genuine action or milestone. Standings promoted to the page's one
+Focus-surface (`bg-surface-elevated`) module. Current-round matchups +
+recent results merged into one MATCHUPS module (was two equal boxes);
+draft status + transactions merged into one OPERATIONS module the same
+way. League records demoted to a bare workspace region (no border) — a
+handful of stat lines doesn't need its own frame. Net: ~12 equal boxes →
+one elevated hero + ~5 bordered modules + one bare region.
+
+## 5. Home changes
+
+Wired the already-fetched `fixtureIntel` into `MatchupCommand` for the
+first time. When a matchup is `scheduled` (not yet live), the dead
+"0 – 0" + empty progress bar is replaced with real telemetry: the actual
+next fixture involving either roster, its real kickoff time, and how many
+of the caller's own starters it affects (new `countStartersInFixture()`,
+`lib/team-fixture.ts`, 4 tests) — or a neutral "KICKOFF NOT YET
+SCHEDULED" when no fixture data exists yet. Live and final states were
+already reasonably well-treated (MatchupPlayerCounts' LIVE/DONE/LEFT
+breakdown, a TOP PERFORMANCE line) and were left alone.
+
+## 6. Matchup changes
+
+Same `MatchupCommand` anticipation-state fix applies here too (this page
+never fetched fixture intelligence before this pass). The score row no
+longer stacks three blocks vertically on mobile (name / score / name,
+each with a gap-6) — that stacking was the real source of "the score area
+is too tall relative to the player battle below it." It's one row at
+every breakpoint now, with the score scaling from `text-3xl` to
+`text-6xl` across breakpoints so it still reads as a confident scoreboard
+on a phone. The page also groups MatchupCommand + MatchupPlayerCounts +
+MatchupLineups under a tighter `gap-3` instead of the page's own `gap-6`,
+so proximity (not a merged border) signals "one matchday surface." The
+Phase 12F mobile side-by-side XI rule is untouched.
+
+## 7. League changes
+
+See item 4 above for the structural recomposition. The league table
+itself (`StandingsTable`) was already a real professional structure
+(rank/team/P/W/D/L/PF/PA/DIFF/PTS, tabular numerals, real data only) and
+needed no rework — only its placement/visual weight changed.
+
+## 8. Football identity improvements
+
+Deliberately limited: no crest imagery was introduced (none exists in the
+codebase, and the brief explicitly prohibits adding any without a
+confirmed asset policy first — a product decision, not a styling one).
+The real improvement is the Home/Matchup anticipation state (item 5/6) —
+real opponent club, kickoff time, and fixture involvement, which is
+genuine football-fixture identity surfaced for the first time in that
+spot. `crestColor` stays documented dead code (DESIGN.md §23) rather than
+silently left unexplained.
+
+## 9. Team pitch refinements
+
+Per the brief's explicit "do NOT redesign the pitch": the nationality-flag
+avatar shrunk slightly (`size-10/12` → `size-9/11`) and the player's own
+surname bumped up one type step, rebalancing toward human identity over
+decorative flag. The LIVE/LOCKED/INJ·SUSP legend strip was removed
+outright (not redesigned) — every marker already shows its own
+unambiguous status via icon + color + text, so the legend was pure
+vocabulary restatement nobody needed to consult.
+
+## 10. Player Inspector changes
+
+**None — audited, not changed.** The three-agent Phase 1 audit found this
+component already well-ordered and complete: Identity → Ownership/Status
+→ Next fixture → Season stats → Recent form → Recent usage → V2 scoring
+breakdown → Action, shared identically across Team/Players/Draft (exactly
+one inspector body, per DESIGN.md §21). DESIGN.md's own §19 section
+describing an older ordering was stale documentation, not a code problem
+— not corrected further in this pass since it doesn't affect the product.
+No "acquisition context" section exists and none was added — the brief
+marks it optional ("if available") and there's no acquisition-history
+data to show. Making a change here without a concrete problem to fix
+would have been exactly the "make everything prettier" the brief warns
+against.
+
+## 11. Draft completed-state changes
+
+New `DraftCompleteRecap` replaces the full available-players board once
+`draft.status === "completed"`: a DRAFT COMPLETE banner, YOUR FINAL SQUAD
+(every pick + positional composition — now visible on mobile too, where
+the old desktop-only SQUAD rail module never was), and LEAGUE_DRAFT_
+RESULTS grouped by team so every manager's full squad is visible, not
+just your own. Free-agent browsing is demoted to a link into `/players`
+rather than a disabled DRAFT button next to every name. The rail's
+RECENT_PICKS becomes DRAFT_ORDER and shows every pick, not just the last
+12, once the draft is complete.
+
+## 12. Empty/anticipation state improvements
+
+Reconciled "NO XI SET" (mobile) vs. "NO STARTING XI SET" (desktop) for
+the identical underlying state. Added real context to Standings' empty
+state (new `standingsEmptyContext()`, 4 tests) — "ROUND 1 HAS NOT CLOSED
+YET" / "ROUND 1 HAS NOT OPENED YET" / "SEASON NOT STARTED" in place of a
+bare "NO RESULTS YET," computed from real season/round state, never a
+fabricated round number. The wider inventory of flat "NO X" strings found
+in the audit (several duplicated "NO RESULTS YET" literals across files,
+permanent "NO FIXTURE DATA" dead-feature states) was deliberately left
+alone — deduplicating identical copy across files is a DRY concern, not a
+visual bug, and rewriting every empty state's copy would have been the
+site-wide copy sweep the brief explicitly says not to do.
+
+## 13. Event-state design
+
+Documented in DESIGN.md §24, not implemented as live animation. Most
+named events (player goes LIVE, locks, reaches FT, trade accepted, round
+final/champion) already have a real, restrained, correctly-scoped
+treatment. Score/lead changes are deliberately NOT animated: confirmed
+`MatchupCommand` is a server component and neither Home nor `/matchup`
+has any client-side polling today (no `setInterval`/`router.refresh`
+anywhere in either page's tree) — a score only ever changes across a full
+navigation/reload, so a "flash on change" treatment would have no code
+path that could ever fire it. The exact motion hook for the eventual
+live-matchday pass (reuse this codebase's own established previous-value-
+during-render comparison pattern) is written down precisely rather than
+left as a surprise. Standings rank-movement arrows are deferred as a data
+gap (no previous-round rank is persisted anywhere), not a styling one.
+
+## 14. Mobile/responsive improvements
+
+Phase 12's audit (code-level — see "known visual limitations" below for
+why not a live device check): every surface touched this pass was
+reviewed against its actual Tailwind breakpoint classes for overflow/
+truncation risk. Concrete fix: `MatchupCommand`'s score row (item 6). No
+other new responsive regressions were found introduced by this pass's
+changes — the League recomposition, Draft recap, pitch-marker sizing, and
+`SelectTrigger` were all checked by dimensional estimate (truncate/
+min-w-0 coverage, flex-wrap usage, worst-case content width against each
+container's padding) and found sound. The Phase 12F mobile Matchup
+side-by-side rule remains untouched and intact.
+
+## 15. Shared components created/changed
+
+- New `ui/select-trigger.tsx` (`SelectTrigger`) — joins
+  `Button`/`Input`/`TerminalPanel` as a base control primitive; replaces
+  all six bare `<select>` elements in the Players filter bar.
+- `ui/dialog.tsx` squared up to the terminal-geometry system
+  (`rounded-soft`, hard `border-t` footer, `.label-system` `DialogTitle`)
+  — affects every dialog in the app (Propose Trade, both Drop Player
+  confirmations).
+- `bench-row.tsx` selection moved from a ring highlight to the
+  `border-l-accent` edge pattern used everywhere else.
+- `MatchupCommand` gained optional `fixtureIntel`/`starters` props for
+  the anticipation state (both Home and `/matchup` now pass them).
+- New pure helpers: `countStartersInFixture()` (`lib/team-fixture.ts`),
+  `leagueSeasonIdentityLabel()` and `standingsEmptyContext()`
+  (`domain/fantasy/season.ts`) — all tested.
+
+## 16. Screenshots/artifacts produced
+
+**None.** No browser-automation tool (Playwright or otherwise) is
+available in this environment — see the next section. Every visual claim
+above is verified by `tsc`/`lint`/`build` passing plus matching new code
+to already-shipped, previously-verified patterns (the draft board's row
+style, the league switcher's selected state, the command palette's popup
+geometry), never by an actual rendered screenshot.
+
+## 17. Tests/integration/tsc/lint/build results
+
+- `npx tsc --noEmit` — clean after every commit.
+- `npm run lint` — zero errors after every commit; one pre-existing
+  warning (`player-avatar.tsx`'s `<img>` vs `next/image`), unrelated to
+  this pass.
+- `npm run build` — succeeds, all 30 routes compile, after every commit.
+- `npm test` — full pass after every commit touching testable logic
+  (season.ts: 27 tests including 8 new; team-fixture.ts: 4 new tests).
+- `npm run test:integration` — run once at the end of this pass (no
+  migration, no backend/game-logic change was made this entire pass, so
+  this is a regression check, not an expected-change verification).
+
+## 18. Known visual limitations
+
+- **No browser-automation tool is available in this environment.**
+  Nothing in this pass was visually verified in a live rendered browser —
+  every change was verified by type-checking, linting, building, and
+  deliberately matching new code to the exact classes/structure of
+  already-shipped, previously-verified UI patterns elsewhere in the app,
+  never by looking at a screenshot. This is the single biggest
+  verification gap in this pass and applies to every item above equally.
+  **Recommended manual QA before relying on this in front of real users**
+  — exact pages/viewports:
+  - **Desktop (1440px+) and laptop (1024–1280px)**: Home, Matchup,
+    League, Team, Draft (both an active and a completed draft, if you
+    have one of each), Players, Player Inspector (open from any of
+    Team/Players/Draft).
+  - **Mobile (390px) and narrow mobile (320–360px)**: the same seven
+    surfaces, specifically checking: the League page's new header strip
+    wrapping with a long league name; the Matchup score row at its
+    smallest size (a double-digit score on both sides, long team names);
+    the Draft completed recap's LEAGUE_DRAFT_RESULTS chip-wrap with many
+    teams; the Team pitch's slightly smaller player markers remain
+    legible; the Players filter bar's new `SelectTrigger` chevron doesn't
+    visually collide with a long selected option label.
+- Club crest/color identity (`crestColor`) remains hardcoded gray
+  everywhere — carried forward from before this pass, now explicitly
+  documented (DESIGN.md §23) rather than silently unexplained.
+- Score/lead-change animation and standings rank-movement arrows are
+  deliberately deferred (see item 13) — not bugs, documented follow-ups.
+
+## 19. Commit hashes
+
+See the phase table at the top of this section. Final commit before push/
+merge decisions: **(this HANDOFF commit, immediately following
+`57db570`)**.
+
+---
+
 # Pass 12F — Beta Readiness + Product Polish: COMPLETE
 
 **Branch:** `feature/pass-12f-beta-readiness` (off `main` at `011bb3b` —
