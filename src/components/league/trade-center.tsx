@@ -310,7 +310,7 @@ export function ProposeTradeDialog({
         )}
 
         {step === "players" && targetTeam && (
-          <div className="grid max-h-80 grid-cols-2 gap-3 overflow-y-auto">
+          <div className="grid max-h-80 grid-cols-1 gap-4 overflow-y-auto sm:grid-cols-2 sm:gap-3">
             <div>
               <p className="label-system text-[10px] text-foreground-tertiary">YOU SEND</p>
               <div className="mt-1.5 flex flex-col gap-1">
