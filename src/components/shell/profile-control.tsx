@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { LogOut } from "lucide-react";
+import Link from "next/link";
+import { LogOut, Settings } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { Profile } from "@/data-access/profiles";
 import { signOut } from "@/data-access/auth";
@@ -78,11 +79,20 @@ export function ProfileControl({ profile }: { profile: Profile | null }) {
                 SIGNED IN
               </p>
             </div>
+            <Link
+              href="/account"
+              role="menuitem"
+              onClick={() => setOpen(false)}
+              className="label-system flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-foreground-secondary transition-colors hover:bg-surface hover:text-foreground"
+            >
+              <Settings className="size-3.5" strokeWidth={2} />
+              Account settings
+            </Link>
             <form action={signOut}>
               <button
                 type="submit"
                 role="menuitem"
-                className="label-system flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-foreground-secondary transition-colors hover:bg-surface hover:text-foreground"
+                className="label-system flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-xs text-foreground-secondary transition-colors hover:bg-surface hover:text-foreground"
               >
                 <LogOut className="size-3.5" strokeWidth={2} />
                 Sign out

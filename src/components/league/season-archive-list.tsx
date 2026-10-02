@@ -35,16 +35,16 @@ export function SeasonArchiveList({ seasons }: { seasons: SeasonListEntry[] }) {
               {SCHEDULE_CYCLES_LABEL[season.scheduleCycles]}
             </p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex min-w-0 shrink items-center gap-2">
             {season.championTeamName && (
-              <span className="flex items-center gap-1 text-xs text-foreground-secondary">
-                <Trophy className="size-3.5 text-accent" strokeWidth={1.75} />
-                {season.championTeamName}
+              <span className="flex min-w-0 items-center gap-1 text-xs text-foreground-secondary">
+                <Trophy className="size-3.5 shrink-0 text-accent" strokeWidth={1.75} />
+                <span className="max-w-24 truncate sm:max-w-40">{season.championTeamName}</span>
               </span>
             )}
             <span
               className={cn(
-                "label-system text-[10px]",
+                "label-system shrink-0 text-[10px]",
                 season.status === "COMPLETED" ? "text-accent" : season.status === "ACTIVE" ? "text-live" : "text-foreground-tertiary"
               )}
             >

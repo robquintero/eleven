@@ -282,3 +282,41 @@ test("historical season immutability: starting season 2 never mutates season 1's
     await cleanupTestLeague(admin, league);
   }
 });
+
+test("concurrent Start Next Season attempts (two genuinely simultaneous RPC calls) resolve to exactly one winner, never two season-2 rows", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    await completeSeasonOne(admin, league);
+
+    // Fire both from the SAME commissioner client at once -- the realistic
+    // "double-click" race -- genuinely concurrent, not sequential.
+    const [first, second] = await Promise.all([
+      league.clients[0].rpc("start_next_season", { p_league_id: league.leagueId, p_roster_mode: "REDRAFT", p_schedule_cycles: 2 }),
+      league.clients[0].rpc("start_next_season", { p_league_id: league.leagueId, p_roster_mode: "KEEP_ROSTERS", p_schedule_cycles: 1 }),
+    ]);
+
+    const results = [first, second];
+    const succeeded = results.filter((r) => !r.error);
+    const failed = results.filter((r) => r.error);
+    assert.equal(succeeded.length, 1, "exactly one of the two concurrent calls must win");
+    assert.equal(failed.length, 1, "the other must fail cleanly, never silently duplicate");
+    // Depending on exact timing, the loser fails one of two equally-correct
+    // ways: either it also read "season 1 COMPLETED" as latest and then lost
+    // the race at INSERT time (SEASON_ALREADY_STARTED, the unique-violation
+    // path), or its own read happened just after the winner's commit, so it
+    // already saw a SETUP season 2 as "latest" (SEASON_NOT_COMPLETE). Both
+    // mean exactly the same thing at the product level: it did not win.
+    assert.ok(
+      ["SEASON_ALREADY_STARTED", "SEASON_NOT_COMPLETE"].includes(failed[0]!.error?.message ?? ""),
+      `unexpected failure reason: ${failed[0]!.error?.message}`
+    );
+
+    const { data: seasonTwoRows } = await admin.from("seasons").select("id, roster_mode").eq("league_id", league.leagueId).eq("season_number", 2);
+    assert.equal(seasonTwoRows?.length, 1, "never two season-2 rows, regardless of which call actually won the race");
+    assert.equal(seasonTwoRows![0]!.id, succeeded[0]!.data![0]!.season_id, "the one row that exists must be the one the winning call actually created");
+    assert.ok(["REDRAFT", "KEEP_ROSTERS"].includes(seasonTwoRows![0]!.roster_mode!), "the winner's own roster mode choice is what persisted");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
