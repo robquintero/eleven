@@ -73,6 +73,7 @@ interface TestFixtureContext {
   eligibleCompetitionId: string;
   friendlyCompetitionId: string;
   createdEligibleCompetition: boolean;
+  createdFriendlyCompetition: boolean;
   nationalTeamAId: string;
   nationalTeamBId: string;
   fixtureIds: string[];
@@ -92,12 +93,18 @@ async function setUpNationalTeams(admin: ReturnType<typeof createAdminClient>): 
     createdEligibleCompetition = true;
   }
 
-  const { data: friendlyComp, error: friendlyErr } = await admin
-    .from("competitions")
-    .insert({ name: "Test Friendlies", code: TEST_FRIENDLY_COMPETITION_CODE, country: "World" })
-    .select("id")
-    .single();
-  if (friendlyErr || !friendlyComp) throw new Error(`failed to create test friendly competition: ${friendlyErr?.message}`);
+  let createdFriendlyCompetition = false;
+  let { data: friendlyComp } = await admin.from("competitions").select("id").eq("code", TEST_FRIENDLY_COMPETITION_CODE).maybeSingle();
+  if (!friendlyComp) {
+    const { data: inserted, error } = await admin
+      .from("competitions")
+      .insert({ name: "Test Friendlies", code: TEST_FRIENDLY_COMPETITION_CODE, country: "World" })
+      .select("id")
+      .single();
+    if (error || !inserted) throw new Error(`failed to create test friendly competition: ${error?.message}`);
+    friendlyComp = inserted;
+    createdFriendlyCompetition = true;
+  }
 
   const { data: clubs, error: clubsErr } = await admin
     .from("clubs")
@@ -112,6 +119,7 @@ async function setUpNationalTeams(admin: ReturnType<typeof createAdminClient>): 
     eligibleCompetitionId: eligibleComp.id,
     friendlyCompetitionId: friendlyComp.id,
     createdEligibleCompetition,
+    createdFriendlyCompetition,
     nationalTeamAId: clubs[0].id,
     nationalTeamBId: clubs[1].id,
     fixtureIds: [],
@@ -121,7 +129,7 @@ async function setUpNationalTeams(admin: ReturnType<typeof createAdminClient>): 
 async function tearDownNationalTeams(admin: ReturnType<typeof createAdminClient>, ctx: TestFixtureContext) {
   if (ctx.fixtureIds.length > 0) await admin.from("fixtures").delete().in("id", ctx.fixtureIds);
   await admin.from("clubs").delete().in("id", [ctx.nationalTeamAId, ctx.nationalTeamBId]);
-  await admin.from("competitions").delete().eq("id", ctx.friendlyCompetitionId);
+  if (ctx.createdFriendlyCompetition) await admin.from("competitions").delete().eq("id", ctx.friendlyCompetitionId);
   if (ctx.createdEligibleCompetition) await admin.from("competitions").delete().eq("id", ctx.eligibleCompetitionId);
 }
 
@@ -376,8 +384,9 @@ test("UI data: getNextFixtureByPlayer shows the real international participants,
   const ctx = await setUpNationalTeams(admin);
   try {
     const playerId = await getAnyRealPlayerId(admin);
-    const { data: player } = await admin.from("players").select("club_id, clubs(short_name)").eq("id", playerId).single();
-    const realClubShortName = (player!.clubs as { short_name: string } | null)?.short_name;
+    const { data: player } = await admin.from("players").select("club_id").eq("id", playerId).single();
+    const { data: realClub } = await admin.from("clubs").select("short_name").eq("id", player!.club_id).single();
+    const realClubShortName = realClub?.short_name;
 
     await admin.from("player_national_teams").insert({ player_id: playerId, national_team_club_id: ctx.nationalTeamAId });
     const kickoff = new Date(Date.now() + 2 * 86_400_000);
