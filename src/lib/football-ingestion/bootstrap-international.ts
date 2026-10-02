@@ -7,6 +7,7 @@ import { syncFixtures } from "./sync-fixtures.ts";
 import { syncFixtureStats } from "./sync-fixture-stats.ts";
 import { syncNationalTeamSquadByClubId } from "./sync-national-team-squad.ts";
 import { hasMorePages, shouldStopForQuota } from "./quota.ts";
+import { INTERNATIONAL_SCORING_EPOCH } from "./competition-eligibility.ts";
 import { PROVIDER } from "./identity.ts";
 import type { SyncResult } from "./types.ts";
 import type { Database } from "../supabase/database.types.ts";
@@ -157,10 +158,27 @@ export async function bootstrapInternationalCompetitions(
   }
 
   // Step 5: stats for every already-final fixture in these 20
-  // competitions that doesn't have a fixture-level provider mapping
-  // problem -- needed for V2 scoring (Gate 8's real end-to-end proof
-  // depends on this). Resolved via provider_mappings, exactly like
-  // live-sync.ts's own stats step.
+  // competitions, ON OR AFTER INTERNATIONAL_SCORING_EPOCH, that doesn't
+  // have a fixture-level provider mapping problem -- needed for V2
+  // scoring. Resolved via provider_mappings, exactly like live-sync.ts's
+  // own stats step.
+  //
+  // Pass 14 go-live product-scope correction: Eleven's international
+  // scoring HISTORY starts at the epoch (the real first UEFA Nations
+  // League fixture after the real 2026 World Cup final) -- NOT at
+  // whatever historical fixture metadata each competition's season
+  // happens to include. An earlier version of this step had no such
+  // bound and started backfilling detailed player-match stats for
+  // EVERY already-final international fixture ever ingested (1,765 of
+  // them, spanning back to 2023) -- unnecessary provider spend for
+  // fixtures that predate Eleven's international scoring entirely and
+  // were never going to be eligible to score anyway (see
+  // competition-eligibility.ts's isEligibleFixtureKickoff, which
+  // backfillScores itself also enforces as the authoritative gate on
+  // whether a performance may ever become a fantasy_player_scores row).
+  // Filtering the QUOTA-SPENDING decision here too, not only the scoring
+  // decision downstream, is what actually stops the wasted provider
+  // calls rather than just discarding their result after paying for it.
   if (!stoppedForQuota && includeFixtureStats) {
     const competitionIds = (
       await admin
@@ -173,22 +191,50 @@ export async function bootstrapInternationalCompetitions(
     ).data?.map((c) => c.id) ?? [];
 
     if (competitionIds.length > 0) {
-      const { data: finalFixtures } = await admin.from("fixtures").select("id").in("competition_id", competitionIds).eq("status", "final");
-      const fixtureIds = (finalFixtures ?? []).map((f) => f.id);
+      // Paginated explicitly -- a real international allowlist already
+      // has 1,700+ final fixtures (found live running this bootstrap),
+      // comfortably past PostgREST's default 1000-row max_rows; an
+      // unbounded .select() here silently truncates, the same class of
+      // bug already fixed in backfill.ts's player read and live-sync.ts's
+      // own candidate fetch.
+      let finalFixtures: { id: string }[] = [];
+      {
+        let from = 0;
+        for (;;) {
+          const { data } = await admin
+            .from("fixtures")
+            .select("id")
+            .in("competition_id", competitionIds)
+            .eq("status", "final")
+            .gte("kickoff_at", INTERNATIONAL_SCORING_EPOCH.toISOString())
+            .range(from, from + 999);
+          finalFixtures = finalFixtures.concat(data ?? []);
+          if (!data || data.length < 1000) break;
+          from += 1000;
+        }
+      }
+      const fixtureIds = finalFixtures.map((f) => f.id);
 
-      if (fixtureIds.length > 0) {
-        const { data: mappings } = await admin
+      // Chunked, not one `.in()` with every id -- a chunk of even 500
+      // UUIDs produces a >19KB request URL, which exceeds Node undici's
+      // 16KB header limit and fails the whole request (the same real
+      // limit documented in backfill.ts's own player read).
+      const mappings: { internal_entity_id: string; external_id: string }[] = [];
+      for (let i = 0; i < fixtureIds.length; i += 200) {
+        const chunk = fixtureIds.slice(i, i + 200);
+        const { data } = await admin
           .from("provider_mappings")
           .select("internal_entity_id, external_id")
           .eq("provider", PROVIDER)
           .eq("internal_entity_type", "fixture")
-          .in("internal_entity_id", fixtureIds);
+          .in("internal_entity_id", chunk);
+        mappings.push(...(data ?? []));
+      }
 
-        for (const mapping of mappings ?? []) {
-          if (stoppedForQuota) break;
-          log(`[fixture-stats] fixture ${mapping.internal_entity_id}`);
-          if (recordStep(await syncFixtureStats(admin, mapping.external_id))) break;
-        }
+      for (const mapping of mappings) {
+        if (stoppedForQuota) break;
+        log(`[fixture-stats] fixture ${mapping.internal_entity_id}`);
+        if (recordStep(await syncFixtureStats(admin, mapping.external_id))) break;
       }
     }
   }

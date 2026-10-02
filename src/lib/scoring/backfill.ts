@@ -6,7 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // do) — see docs/football-data-system.md and the same pattern throughout
 // src/lib/football-ingestion/.
 import { calculateFantasyScore, SCORING_RULE_VERSION } from "../../domain/fantasy/scoring.ts";
-import { isScoringEligibleCompetitionCode } from "../football-ingestion/competition-eligibility.ts";
+import { isEligibleFixtureKickoff, isScoringEligibleCompetitionCode } from "../football-ingestion/competition-eligibility.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
 import type { Database } from "../supabase/database.types.ts";
 
@@ -73,7 +73,7 @@ export async function backfillScores(
 
   const fixturesQuery = admin
     .from("fixtures")
-    .select("id, home_club_id, away_club_id, home_score, away_score, competition_id");
+    .select("id, home_club_id, away_club_id, home_score, away_score, competition_id, kickoff_at");
   const { data: fixtures, error: fixturesError } = await (options.fixtureIds
     ? fixturesQuery.in("id", options.fixtureIds)
     : fixturesQuery.eq("season", season).eq("status", "final"));
@@ -103,15 +103,26 @@ export async function backfillScores(
   // score and still count toward a fantasy round — exactly what the
   // brief's "international friendlies do not score" requires to hold
   // unconditionally, not just "as long as ingestion stays disciplined."
+  //
+  // Pass 14 go-live product-scope correction: an international fixture
+  // must ALSO kick off at or after INTERNATIONAL_SCORING_EPOCH (the real
+  // first UEFA Nations League fixture after the real 2026 World Cup
+  // final) — Eleven's international scoring HISTORY starts there, not at
+  // the start of whatever historical fixture metadata a competition's
+  // season happens to include. Older international fixture metadata is
+  // fine to keep ingested for catalog/schedule purposes; this is the one
+  // authoritative point that decides whether it may ever be SCORED.
+  // isEligibleFixtureKickoff is a no-op for Big Five/UEFA codes.
   const eligibleFixtures = (fixtures ?? []).filter((f) => {
     const code = compCodeById.get(f.competition_id);
-    const eligible = code !== undefined && isScoringEligibleCompetitionCode(code);
+    const eligible =
+      code !== undefined && isScoringEligibleCompetitionCode(code) && isEligibleFixtureKickoff(code, new Date(f.kickoff_at));
     // Not counted in `skipped` here (the per-stat-row loop below already
     // counts and reports each affected player_match_stats row once the
     // fixture is excluded from `fixtureById`) -- this message exists
     // purely so a non-eligible fixture's PRESENCE is diagnosable without
     // having to cross-reference every row it affected individually.
-    if (!eligible) errors.push(`Excluding fixture ${f.id}: competition "${code ?? f.competition_id}" is not scoring-eligible.`);
+    if (!eligible) errors.push(`Excluding fixture ${f.id}: competition "${code ?? f.competition_id}" is not scoring-eligible (or precedes the international scoring epoch).`);
     return eligible;
   });
   const fixtureById = new Map(eligibleFixtures.map((f) => [f.id, f]));

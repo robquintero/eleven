@@ -51,4 +51,36 @@ export function isInternationalScoringCompetitionCode(code: string): boolean {
   return (INTERNATIONAL_COMPETITION_CODES as readonly string[]).includes(code);
 }
 
+/**
+ * Pass 14 go-live product-scope correction: Eleven's international
+ * scoring HISTORY begins here, not at the start of whatever historical
+ * fixture metadata the provider happens to return for a competition/
+ * season. Defined as the real kickoff of the first UEFA Nations League
+ * match played after the real 2026 FIFA World Cup final — grounded in
+ * real production data, not guessed: the World Cup final kicked off
+ * 2026-07-19T19:00:00Z (real, stored FIFA_WC fixture); the first UEFA_NL
+ * fixture after it is Andorra vs Malta, Eleven fixture
+ * d9de1736-863b-4453-b1ef-fce85193b30f, provider fixture id 1545601.
+ *
+ * This is NOT an ingestion-time filter — older international fixture
+ * METADATA (kickoff dates, results, the schedule itself) may still exist
+ * in `fixtures` for catalog/discovery purposes; retaining it is harmless
+ * and was already done before this boundary was introduced. This is
+ * specifically the boundary for whether an international fixture's
+ * performance may ever be converted into a scored `fantasy_player_scores`
+ * row — see `backfillScores`'s own use of `isEligibleFixtureKickoff`.
+ */
+export const INTERNATIONAL_SCORING_EPOCH = new Date("2026-09-24T16:00:00Z");
+
+/**
+ * Whether a fixture in competition `code`, kicking off at `kickoffAt`, may
+ * ever be scored. Big Five/UEFA club competitions are unaffected — this
+ * pass only ever restricts INTERNATIONAL competitions, which must
+ * additionally kick off at or after `INTERNATIONAL_SCORING_EPOCH`.
+ */
+export function isEligibleFixtureKickoff(code: string, kickoffAt: Date): boolean {
+  if (!isInternationalScoringCompetitionCode(code)) return true;
+  return kickoffAt.getTime() >= INTERNATIONAL_SCORING_EPOCH.getTime();
+}
+
 export { isUefaCompetitionCode };

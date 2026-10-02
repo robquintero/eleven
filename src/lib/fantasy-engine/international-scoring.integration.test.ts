@@ -30,6 +30,7 @@ import { getFixturesForTeamIds, getKickoffsByPlayer, getNextFixtureByPlayer, get
 import { openNextRound } from "./rounds.ts";
 import { backfillScores } from "../scoring/backfill.ts";
 import { SCORING_RULE_VERSION } from "../../domain/fantasy/scoring.ts";
+import { INTERNATIONAL_SCORING_EPOCH } from "../football-ingestion/competition-eligibility.ts";
 import { createTestLeague, cleanupTestLeague } from "./integration-test-helpers.ts";
 import type { RoundWindow } from "../../domain/fantasy/round-calendar.ts";
 import { roundWindowContaining } from "../../domain/fantasy/round-calendar.ts";
@@ -612,5 +613,74 @@ test("GATE 6: a club performance and an international performance in the same ro
   } finally {
     await tearDownNationalTeams(admin, ctx);
     await cleanupTestLeague(admin, league);
+  }
+});
+
+/**
+ * Pass 14 go-live product-scope correction: Eleven's international
+ * scoring HISTORY begins at INTERNATIONAL_SCORING_EPOCH (the real first
+ * UEFA Nations League fixture after the real 2026 World Cup final), not
+ * at the start of whatever historical fixture metadata a competition's
+ * season happens to include. A pre-epoch international fixture must
+ * never score, even with real player_match_stats recorded against it;
+ * the identical fixture one second later (at/after the epoch) must.
+ */
+test("GATE 8/epoch: an international fixture BEFORE the scoring epoch never scores, even with real stats recorded; the identical fixture at/after the epoch does", { skip }, async () => {
+  const admin = createAdminClient();
+  const ctx = await setUpNationalTeams(admin);
+  try {
+    const [gkId] = await admin
+      .from("players")
+      .select("id")
+      .eq("active", true)
+      .eq("position", "GK")
+      .limit(1)
+      .then((r) => (r.data ?? []).map((p) => p.id));
+    assert.ok(gkId, "a real GK must exist to test with");
+    await admin.from("player_national_teams").insert({ player_id: gkId, national_team_club_id: ctx.nationalTeamAId });
+
+    const preEpochKickoff = new Date(INTERNATIONAL_SCORING_EPOCH.getTime() - 1000);
+    const postEpochKickoff = new Date(INTERNATIONAL_SCORING_EPOCH.getTime());
+
+    const preEpochFixtureId = await insertFixture(admin, ctx, ctx.eligibleCompetitionId, preEpochKickoff, "final");
+    const postEpochFixtureId = await insertFixture(admin, ctx, ctx.eligibleCompetitionId, postEpochKickoff, "final");
+    await admin.from("fixtures").update({ home_score: 1, away_score: 0 }).in("id", [preEpochFixtureId, postEpochFixtureId]);
+    await admin.from("player_match_stats").insert([
+      { player_id: gkId, fixture_id: preEpochFixtureId, minutes: 90, saves: 3 },
+      { player_id: gkId, fixture_id: postEpochFixtureId, minutes: 90, saves: 3 },
+    ]);
+
+    const result = await backfillScores(admin, { fixtureIds: [preEpochFixtureId, postEpochFixtureId] });
+    assert.equal(result.failed, 0, result.errors.join("; "));
+    assert.equal(result.scored, 1, "exactly one of the two identical fixtures (the post-epoch one) must score");
+    assert.ok(
+      result.errors.some((e) => e.includes(preEpochFixtureId)),
+      "the pre-epoch fixture's exclusion must be diagnosable in the errors, not silently dropped"
+    );
+
+    const { data: preEpochScore } = await admin
+      .from("fantasy_player_scores")
+      .select("id")
+      .eq("player_id", gkId)
+      .eq("fixture_id", preEpochFixtureId)
+      .eq("scoring_rule_version", SCORING_RULE_VERSION)
+      .maybeSingle();
+    assert.equal(preEpochScore, null, "a pre-epoch international fixture must NEVER produce a fantasy_player_scores row, even with real stats recorded");
+
+    const { data: postEpochScore } = await admin
+      .from("fantasy_player_scores")
+      .select("points")
+      .eq("player_id", gkId)
+      .eq("fixture_id", postEpochFixtureId)
+      .eq("scoring_rule_version", SCORING_RULE_VERSION)
+      .single();
+    assert.ok(postEpochScore, "the identical fixture at the exact epoch instant must score normally");
+    assert.equal(postEpochScore!.points > 0, true, "the post-epoch clean sheet must score real, non-zero points");
+
+    await admin.from("player_match_stats").delete().in("fixture_id", [preEpochFixtureId, postEpochFixtureId]);
+    await admin.from("fantasy_player_scores").delete().in("fixture_id", [preEpochFixtureId, postEpochFixtureId]);
+    await admin.from("player_national_teams").delete().eq("player_id", gkId).eq("national_team_club_id", ctx.nationalTeamAId);
+  } finally {
+    await tearDownNationalTeams(admin, ctx);
   }
 });

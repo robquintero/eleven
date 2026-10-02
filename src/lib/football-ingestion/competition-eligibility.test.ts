@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  INTERNATIONAL_SCORING_EPOCH,
   isDraftableCompetitionCode,
+  isEligibleFixtureKickoff,
   isInternationalScoringCompetitionCode,
   isScoringEligibleCompetitionCode,
 } from "./competition-eligibility.ts";
@@ -79,4 +81,29 @@ test("isInternationalScoringCompetitionCode: true only for the international all
   assert.equal(isInternationalScoringCompetitionCode("FIFA_WC"), true);
   assert.equal(isInternationalScoringCompetitionCode("ENG"), false);
   assert.equal(isInternationalScoringCompetitionCode("UCL"), false);
+});
+
+// ===========================================================================
+// isEligibleFixtureKickoff -- Pass 14 go-live product-scope correction: the
+// international scoring epoch (the real first UEFA Nations League fixture
+// after the real 2026 World Cup final).
+// ===========================================================================
+
+test("INTERNATIONAL_SCORING_EPOCH is the real, grounded kickoff -- not a guess", () => {
+  assert.equal(INTERNATIONAL_SCORING_EPOCH.toISOString(), "2026-09-24T16:00:00.000Z");
+});
+
+test("isEligibleFixtureKickoff: a Big Five fixture is always eligible, regardless of date -- the epoch never applies to domestic/UEFA competitions", () => {
+  assert.equal(isEligibleFixtureKickoff("ENG", new Date("2000-01-01T00:00:00Z")), true);
+  assert.equal(isEligibleFixtureKickoff("UCL", new Date("2000-01-01T00:00:00Z")), true);
+});
+
+test("isEligibleFixtureKickoff: an international fixture BEFORE the epoch is never eligible", () => {
+  assert.equal(isEligibleFixtureKickoff("UEFA_NL", new Date("2026-09-24T15:59:59Z")), false);
+  assert.equal(isEligibleFixtureKickoff("FIFA_WC", new Date("2026-07-19T19:00:00Z")), false, "even the real World Cup final itself, which precedes the epoch");
+});
+
+test("isEligibleFixtureKickoff: an international fixture AT or AFTER the epoch is eligible", () => {
+  assert.equal(isEligibleFixtureKickoff("UEFA_NL", new Date("2026-09-24T16:00:00Z")), true, "the exact epoch fixture itself");
+  assert.equal(isEligibleFixtureKickoff("FIFA_WCQ_EUR", new Date("2026-10-02T00:00:00Z")), true);
 });
