@@ -1,3 +1,165 @@
+# Pass 12F — Beta Readiness + Product Polish: IN PROGRESS (safe-stop checkpoint)
+
+**Branch:** `feature/pass-12f-beta-readiness` (off `main` at `011bb3b` —
+Pass 12 is merged and deployed to production). Not pushed. Latest commit:
+**`1cdd8bb`**.
+
+**Stopped at a context-budget safe-stop, mid-pass, NOT mid-edit.** Every
+commit on this branch compiles clean (`tsc`/`lint`/`build` all pass as of
+`1cdd8bb`). Phases 1–5 of the 11-phase Pass 12F brief are done; Phases
+6–11 have not been started at all.
+
+## What's done (commits `6ad6b75`, `1cdd8bb`)
+
+**Phase 1 (production action, not code) — fake account cleanup.**
+Audited every `public.*` → `auth.users` relationship directly via
+`pg_constraint` on the live project (see `docs/auth-deletion-contract.md`
+for the full table). Found exactly one blocking constraint:
+`fantasy_leagues.created_by_user_id` is `RESTRICT`; everything else
+cascades cleanly. Deleted, in order: 20 fake leagues (created by fake
+accounts), then 71 fake `auth.users` accounts (32 this session's own
+`@example.invalid` integration-test artifacts, 26 `pass6.*` scripted-test
+accounts, 12 explicitly-fake-named accounts, 1 ambiguous account the user
+explicitly approved via AskUserQuestion). Preserved 4 real accounts
+(`robquinterobiz@gmail.com`, `robertnyse5@gmail.com`,
+`pantherbehot@gmail.com`, `joaqmic@outlook.com`) after confirming none of
+the 70+ deleted accounts shared a league with any of them. Verified
+afterward: 4 `auth.users` rows, 4 profiles (0 orphaned), 2
+`fantasy_leagues` (0 dangling `created_by_user_id`), 3 `fantasy_teams` (0
+dangling `owner_user_id`), and the football universe untouched (2,767
+players, 23,034 `fantasy_player_scores` = exactly 11,517 V1 + 11,517 V2,
+unchanged from before Pass 12F).
+
+**Phase 2 — confirmed-email signup.** `signUp()` no longer assumes an
+immediate session. New dedicated `CheckYourEmail` state (shows the real
+address, a working resend action with a client-side cooldown) replaces
+the old inline message shown next to a still-submittable form. `signIn()`
+distinguishes `email_not_confirmed` from a wrong password with its own
+copy and an inline resend — never the same message. All Supabase error
+codes route through one shared, unit-tested mapper
+(`src/lib/errors/auth-error.ts`) instead of raw provider strings. Network
+failures are isolated from the `redirect()` control-flow throw.
+
+**Phase 3 — auth callback + password recovery (built from scratch; didn't
+exist before).** `/forgot-password` (neutral "sent" state, never reveals
+account existence) → `/auth/callback` (now validates `next` against
+open-redirect via a tested pure function, `src/lib/auth/safe-redirect.ts`;
+surfaces Supabase's own `error_code` param for expired/invalid links with
+specific copy) → `/reset-password` (checks for a real session before
+rendering the form; truthful "link expired" state otherwise). Reuses the
+already-correct `SITE_URL` (`https://elevenfantasy.com`,
+`src/lib/site-config.ts`) for the redirect target.
+
+**Phase 4 — Account page.** Added Change Password (reuses the same
+`updatePassword` recovery uses — it operates on "the current session"
+either way) and a visually-separated Delete Account danger zone
+(type-your-email-to-confirm). Deletion only proceeds for an account that
+created zero leagues — the audited contract is fully documented in
+`docs/auth-deletion-contract.md`; a real commissioner-transfer flow is
+explicitly deferred, not forced into this pass. The actual admin-client
+delete call lives in `src/lib/account/delete-account.ts` (never
+`src/app/*`/`src/data-access/*`, per the existing
+`no-provider-imports-in-app.test.ts` guard).
+
+**Phase 5 — mobile Matchup is now always side-by-side.** Fixed the
+explicit bug: `MatchupLineups` used `grid-cols-1 lg:grid-cols-2`, which
+stacked the two teams vertically below `lg:`. Below `lg:`, a new compact
+row (`src/components/matchup/matchup-compact-row.tsx`) keeps both teams
+in a true half-width column each (position letter, small avatar,
+truncated name, compact points/status) — tapping still opens the same
+`PlayerInspector`. At `lg:`+, the existing full-detail `BenchRow`
+presentation is unchanged. Extracted `BenchRow`'s local status-deriving
+logic into a shared `playerStatusLabel()` (`src/lib/team-fixture.ts`) so
+both row styles agree on a player's status — pure refactor, no behavior
+change to the existing desktop/tablet view.
+
+**New tests this phase**: `src/lib/errors/auth-error.test.ts` (14 cases —
+every mapped error code, anti-enumeration equivalence, never-leaks-the-
+raw-code), `src/lib/auth/safe-redirect.test.ts` (7 cases — the
+open-redirect guard). No test was written for Phase 5 (no
+`@testing-library`/jsdom component-render infrastructure exists in this
+codebase yet) — verified instead by `tsc`/`lint`/`build` and manual
+width/overflow accounting. **This is a known verification gap** worth
+closing with real width-at-375px browser/device testing before shipping
+to real beta users.
+
+## What's NOT done — Phases 6–11 (none started)
+
+- **Phase 6 — Search baseline.** Audit the existing Search UI; three
+  actions currently show "SOON" placeholders — remove them and build
+  real basic search (Players, League/app destinations) that actually
+  navigates. Not investigated at all yet this pass — don't assume
+  anything about its current file locations without reading them fresh.
+- **Phase 7 — Trade rule: equal player counts only.** Needs a new
+  migration enforcing this AUTHORITATIVELY in `propose_trade`/
+  `accept_trade` (not just the UI), plus tests (1-for-1, 2-for-2 accepted;
+  2-for-1, 3-for-2 rejected; backend rejection even if the client is
+  bypassed). Not started.
+- **Phase 8 — Trade UI polish.** Depends conceptually on Phase 7's new
+  constraint being in place first (so the UI can show "YOUR SIDE 2 / THEIR
+  SIDE 1 / ADD 1 PLAYER" feedback against a real rule). Not started.
+- **Phase 9 — Universal navigation-transition coverage.** Audit
+  `NavigationTransitionProvider` (or whatever the actual current
+  implementation is called — re-verify, don't trust this name blindly)
+  and every contextual in-page link (League → My Matchup is the brief's
+  own named example) to confirm they all trigger the same transition
+  primary nav already does. Not started/investigated.
+- **Phase 10 — Responsive/consistency audit** of Matchup, Search, Trade
+  proposal, Account/Auth states, contextual navigation. Partially covered
+  incidentally by Phase 5's Matchup work; Search/Trade/nav pieces not
+  touched.
+- **Phase 11 — Final testing + validation sweep** (`npm test`,
+  `npm run test:integration`, `tsc`, `lint`, `build`) once Phases 6–10 are
+  actually done — don't run this prematurely and call the pass complete;
+  it hasn't reached that point.
+
+## Production state (already executed, do not repeat)
+
+- 20 fake leagues + 71 fake accounts deleted from the LIVE Supabase
+  project (Phase 1) — this is done, verified, and irreversible. Do not
+  attempt it again or assume it still needs doing.
+- No new migration was applied this pass (Phases 1–5 needed none — Phase
+  7's equal-trade-count rule WILL need one).
+- `main` already has Pass 12 (A–E) merged and deployed to production
+  (Vercel Pro). This branch (`feature/pass-12f-beta-readiness`) is based
+  on that current `main`.
+
+## Exact remaining manual Supabase step (from Pass 12F Phase 3)
+
+Set `CRON_SECRET` in Vercel's production env (Pass 12D's own leftover
+step, still not done) is UNRELATED to Phase 3's auth work. For Phase 3
+specifically: confirm in the Supabase dashboard (Authentication → URL
+Configuration) that **Site URL** = `https://elevenfantasy.com` and
+**Redirect URLs** includes `https://elevenfantasy.com/auth/callback`
+(plus a `localhost:3000/auth/callback` entry for local dev testing) — this
+was not independently re-verified against the live dashboard this pass
+(no Supabase dashboard access from this environment); it's inferred from
+`SITE_URL` already being correct in code. Confirm this manually before
+relying on real confirmation/recovery emails working end-to-end in
+production.
+
+## Continuation prompt for a fresh Claude session
+
+> Continue Pass 12F (Beta Readiness + Product Polish) on branch
+> `feature/pass-12f-beta-readiness` (latest commit `1cdd8bb`). Read
+> `HANDOFF.md`'s "Pass 12F" section first — Phases 1–5 are complete and
+> committed (production fake-account cleanup, confirmed-email auth +
+> password recovery, Account page Change Password/Delete Account, mobile
+> Matchup now always side-by-side). Do NOT redo those. Start Phase 6
+> (Search baseline) next, then work through Phases 7–11 in order exactly
+> as originally specified (equal-player-count trade rule enforced
+> authoritatively in the backend, trade UI polish, universal
+> navigation-transition coverage — audit every contextual link including
+> League → My Matchup — responsive/consistency audit, then the full
+> final validation sweep and completion report). Audit each surface fresh
+> before changing it; don't assume anything about current file locations
+> or names beyond what HANDOFF.md says. Keep the same scope discipline as
+> the original brief: no scoring/season/draft/lineup/sync changes, no
+> broad redesign, proportional changes only. Commit checkpoints per phase
+> on this same branch. Do not push, do not merge, do not start a Pass 13.
+
+---
+
 # Pass 12 — Final Product Engine Pass: Completion Handoff
 
 **Branch:** `feature/pass-12-final` (off `main` at `d621e78`, the merged
