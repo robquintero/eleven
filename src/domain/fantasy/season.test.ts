@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeCycleLength, computeTotalRounds, isValidScheduleCycles, leagueSeasonIdentityLabel } from "./season.ts";
+import {
+  computeCycleLength,
+  computeTotalRounds,
+  isValidScheduleCycles,
+  leagueSeasonIdentityLabel,
+  standingsEmptyContext,
+} from "./season.ts";
 import { generateRoundRobinCycle, pairingsForSeasonRound } from "./schedule.ts";
 
 test("computeCycleLength: even manager counts need N-1 rounds for one cycle", () => {
@@ -58,6 +64,22 @@ test("leagueSeasonIdentityLabel: scheduled-but-not-yet-opened shows the total wi
     }),
     "SEASON 1 · ONCE · 9 ROUNDS SCHEDULED · SETUP"
   );
+});
+
+test("standingsEmptyContext: no season at all is SEASON NOT STARTED", () => {
+  assert.equal(standingsEmptyContext(null), "SEASON NOT STARTED");
+});
+
+test("standingsEmptyContext: SETUP status is SEASON NOT STARTED even if a round number leaked in", () => {
+  assert.equal(standingsEmptyContext({ status: "SETUP", currentRoundNumber: 1 }), "SEASON NOT STARTED");
+});
+
+test("standingsEmptyContext: ACTIVE with no round open yet never fabricates a round number", () => {
+  assert.equal(standingsEmptyContext({ status: "ACTIVE", currentRoundNumber: null }), "ROUND 1 HAS NOT OPENED YET");
+});
+
+test("standingsEmptyContext: ACTIVE with a real open round names it", () => {
+  assert.equal(standingsEmptyContext({ status: "ACTIVE", currentRoundNumber: 3 }), "ROUND 3 HAS NOT CLOSED YET");
 });
 
 test("leagueSeasonIdentityLabel: neither total nor current round known yet is SCHEDULE PENDING", () => {

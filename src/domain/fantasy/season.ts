@@ -68,3 +68,17 @@ export function leagueSeasonIdentityLabel(
         : "SCHEDULE PENDING";
   return `SEASON ${season.seasonNumber} · ${SCHEDULE_CYCLES_LABEL[season.scheduleCycles]} · ${roundLabel} · ${season.status}`;
 }
+
+/**
+ * Pass 13 (§10): the specific, real reason an empty standings table is
+ * empty, in place of a flat "NO RESULTS YET" -- the brief's own example
+ * ("ROUND 01 HAS NOT CLOSED"). Never fabricates a round number that
+ * doesn't exist yet.
+ */
+export function standingsEmptyContext(
+  season: { status: SeasonLifecycleStatus; currentRoundNumber: number | null } | null
+): string {
+  if (!season || season.status === "SETUP") return "SEASON NOT STARTED";
+  if (season.currentRoundNumber === null) return "ROUND 1 HAS NOT OPENED YET";
+  return `ROUND ${season.currentRoundNumber} HAS NOT CLOSED YET`;
+}

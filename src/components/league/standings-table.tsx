@@ -12,9 +12,25 @@ import { cn } from "@/lib/utils";
  * signed-in manager's own row is marked with a restrained left accent bar
  * + "YOU" tag, never an oversized special card.
  */
-export function StandingsTable({ standings, myTeamId }: { standings: StandingsRow[]; myTeamId: string | null }) {
+export function StandingsTable({
+  standings,
+  myTeamId,
+  emptyContext,
+}: {
+  standings: StandingsRow[];
+  myTeamId: string | null;
+  /** Pass 13 (§10): real, specific reason the table is empty (e.g. "ROUND 1 HAS NOT CLOSED YET") in place of a flat "NO RESULTS YET" with no context -- `undefined` falls back to the plain label rather than fabricating a reason when the caller doesn't have one. */
+  emptyContext?: string;
+}) {
   if (standings.length === 0) {
-    return <p className="p-4 text-center text-sm text-foreground-secondary">NO RESULTS YET</p>;
+    return (
+      <div className="p-4 text-center">
+        <p className="label-system text-sm text-foreground-secondary">NO RESULTS YET</p>
+        {emptyContext && (
+          <p className="label-system mt-1 text-[11px] text-foreground-tertiary">{emptyContext}</p>
+        )}
+      </div>
+    );
   }
 
   const gridCols = "grid-cols-[1.5rem_9rem_2rem_2rem_2rem_2rem_3rem_3rem_3.5rem_2.5rem]";

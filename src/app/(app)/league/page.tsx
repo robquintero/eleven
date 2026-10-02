@@ -25,7 +25,7 @@ import {
   deriveLeagueLifecycle,
   LEAGUE_LIFECYCLE_LABEL,
 } from "@/domain/fantasy/league-lifecycle";
-import { leagueSeasonIdentityLabel } from "@/domain/fantasy/season";
+import { leagueSeasonIdentityLabel, standingsEmptyContext } from "@/domain/fantasy/season";
 
 export default async function LeaguePage() {
   const profile = await getCurrentProfile();
@@ -201,7 +201,13 @@ export default async function LeaguePage() {
                 <div className="border-b border-border px-4 py-2.5">
                   <span className="label-system text-[11px] text-foreground-secondary">STANDINGS</span>
                 </div>
-                <StandingsTable standings={standings} myTeamId={myTeam?.id ?? null} />
+                <StandingsTable
+                  standings={standings}
+                  myTeamId={myTeam?.id ?? null}
+                  emptyContext={standingsEmptyContext(
+                    season && { status: season.status, currentRoundNumber: season.currentRoundNumber }
+                  )}
+                />
               </div>
 
               {/* Current round + recent results merged into one module

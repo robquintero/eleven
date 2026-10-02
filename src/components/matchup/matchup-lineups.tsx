@@ -102,7 +102,7 @@ function MatchupCompactColumn({
       </div>
 
       {squad.starters.length === 0 ? (
-        <p className="p-3 text-center text-[11px] text-foreground-tertiary">NO XI SET</p>
+        <p className="p-3 text-center text-[11px] text-foreground-tertiary">NO STARTING XI SET</p>
       ) : (
         <div className="divide-y divide-border">
           {squad.starters.map((slot: LineupSlot) => (
