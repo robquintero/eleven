@@ -304,9 +304,151 @@ player can score from.
 
 ---
 
-Phases 6 onward (ingestion wiring, scoring verification, round-evidence/
-locking fix, UI fixture-context fixes, sync/cron volume, backfill policy,
-tests, simulation, validation) are implemented against this design in
-subsequent commits on `feature/pass-14-international-scoring`, each
-checkpointed separately. See `HANDOFF.md` for the running completion
-status.
+## 6. Fixture ingestion, player-fixture participation, and locking (implementation)
+
+`sync-fixtures.ts`/`sync-fixture-stats.ts`/`sync-competitions.ts` needed
+**zero modification** to work correctly for international competitions —
+confirmed by code inspection, not assumption: all three are already
+generic over `CompetitionSyncTarget` (`resolve-competition.ts` already
+resolves international codes, Phase 3), write `fixtures.competition_id`
+to whatever the REAL competition is (never the `INTL` bookkeeping
+competition — that only ever appears on a national team's own
+`clubs.competition_id`), and `sync-fixture-stats.ts` resolves player
+identity exclusively via `provider_mappings`, confirmed safe in Phase 1.
+
+The one real architectural gap (confirmed by the Phase 1 audit): every
+"what fixture does this player have" query in the codebase joined on
+`players.club_id` directly, structurally unable to find an international
+fixture. New `src/lib/fantasy-engine/player-fixture-participation.ts` is
+the single shared primitive now used everywhere that mattered:
+
+- `getTeamIdsByPlayer` — a player's club_id plus any national-team
+  membership(s), batched (2 queries total, never N+1).
+- `getFixturesForTeamIds` — every scoring-eligible fixture (checked
+  against `competition-eligibility.ts` as a defense-in-depth filter,
+  even though nothing non-eligible should ever be ingested) for a set of
+  team ids, optionally window/status-bounded.
+- `getKickoffsByPlayer` — feeds `lineup.ts`'s `createRoundLineupSlots`
+  lock computation; replaces the old club-id-only kickoff lookup.
+  `computeLockInstant` (unchanged) already took "the earliest of however
+  many kickoffs," so handing it a longer list needed no change there.
+- `getNextFixtureByPlayer` — feeds the Players market and Player
+  Inspector's "next fixture" display; carries the fixture's own real
+  `homeLabel`/`awayLabel`, never re-derived from the player's permanent
+  `club.shortName`.
+
+Updated to use this shared primitive instead of their own club-id
+queries: `lineup.ts` (locking), `data-access/players.ts`
+(`getPlayerDatabase`'s next-fixture column, `getPlayerRecentMatches`,
+`getPlayerLatestScoreBreakdown`), `data-access/matchups.ts`
+(`getMatchupFixtureIntelligence`, `getMatchupSquads`). `PlayerFixture`
+(`lib/types/fantasy.ts`) gained `homeLabel`/`awayLabel` fields so render
+code (`player-inspector-content.tsx`, `next-lock.tsx`, `bench-row.tsx`)
+stops splicing the player's own club onto the fixture's opponent to
+build a "home — away" label. `countStartersInFixture`
+(`lib/team-fixture.ts`) now compares real club/national-team IDs instead
+of `club.shortName` string equality, via an optional
+`teamIdsByPlayerId` map (falls back to the starter's own `club.id` when
+omitted, preserving exact prior behavior for any caller not yet
+updated).
+
+**A second, independent instance of the same bug class was found and
+fixed**: `src/lib/scoring/backfill.ts`'s clean-sheet computation
+(`concededByOwnClub`) also compared `player.club_id` against a fixture's
+home/away club id directly — meaning a player's international clean
+sheet would silently never be credited (always resolving to `null`, no
+clean-sheet points) even once stats were correctly ingested. Fixed the
+same way: also check the player's national-team id(s)
+(`player_national_teams`, batched-fetched once per backfill run, not
+per player). `ELEVEN_STANDARD_V2`'s constants and `calculateFantasyScore`
+itself are untouched — the function has zero awareness of club vs.
+competition context by design (`ScoringInput` carries only raw stats +
+position + `concededByOwnClub`), so once the INPUT is computed correctly
+for an international fixture, scoring is provably identical to a club
+performance with the same stat line.
+
+Club-facing generic queries audited for national-team leakage (Phase
+11/Step 11): only `getClubFilters()` (Players page's club filter
+dropdown) needed an explicit `is_national_team = false` filter — every
+other generic `clubs` read is either scoped by a specific fixture's own
+home/away ids (where a national team is a legitimate, intended result)
+or scoped by a real player's own `club_id` (which structurally never
+resolves to a national team).
+
+## 7. Sync/cron volume (Step 12/14)
+
+`runLiveSyncTick`/`determineFixtureSyncCadence` needed **zero
+modification**. Both are already fully fixture-driven and competition-
+agnostic: the live-tick reads every non-settled stored fixture
+regardless of competition, groups the ones needing attention by their
+real `competitions.code`, and calls `resolveCompetition(code)` per
+distinct competition — which already resolves international codes
+(Phase 3). Cost scales with real fixture proximity/liveness, exactly as
+it already did for Big Five + UEFA; expanding the competition universe
+to ~27 configured competitions does not change this function's shape at
+all.
+
+**Expected request volume, reasoned from the existing design** (no live
+international fixtures exist yet to measure against directly):
+
+- **Normal day** (no international competitive fixtures near kickoff):
+  unchanged from Pass 12D's existing, already-measured behavior (0
+  requests on a quiet day; cost scales only with real Big Five/UEFA
+  activity).
+- **International window** (a FIFA match week — the ~6–8 weeks/year
+  when qualifiers/tournaments are live): the dominant cost driver is
+  `syncFixtureStats`, which re-syncs EVERY live/newly-final fixture on
+  EVERY one-minute tick for as long as it stays live — this is the
+  existing, already-proven-safe design for Big Five Saturday afternoons
+  (5–10+ simultaneous top-5-league kickoffs are routine and already
+  shown safe within the 7,500/day budget), now applied to a wider
+  competition set. Worst-case reasoning: a dense international date
+  (e.g. UEFA qualifiers) realistically clusters at most ~12–14
+  simultaneous kickoffs per confederation per slot; even a pessimistic
+  ~40–60 simultaneous live fixtures across all confederations sustained
+  for a ~100-minute match, at 1 request/fixture/tick, is a similar order
+  of magnitude to a busy Big Five Saturday's multi-league overlap, not a
+  new category of cost.
+- **Worst plausible day**: the existing `shouldStopForQuota` circuit
+  breaker (checked before every `syncFixtures`/`syncFixtureStats` call,
+  `DEFAULT_QUOTA_SAFETY_MARGIN` = 200) is the real safety net here, not
+  a precise volume prediction — if a day's real fixture density ever
+  approaches the 7,500/day budget, the tick stops early and reports
+  `stoppedForQuota: true` rather than erroring or exceeding quota. This
+  is graceful degradation (that day's live-score freshness lags until
+  quota resets), never a failure.
+- **Recommendation, not implemented this pass**: once real international
+  fixtures are flowing and a genuinely busy date is observed, re-run
+  `npm run football:sync -- sync-health` during it to replace this
+  reasoned estimate with a measured one — exactly the same "measure
+  before activating further" discipline Pass 12D already used for the
+  Big Five + UEFA cron activation.
+
+## 8. Backfill policy (Step 13/15)
+
+**Confirmed structurally safe, by tracing the actual code**: a completed
+fantasy round's `matchup_scores` can never be silently altered by
+ingesting/scoring historical international fixtures. `backfillScores`
+(`lib/scoring/backfill.ts`) writes only to `fantasy_player_scores`
+(keyed `player_id, fixture_id, scoring_rule_version` — canonical,
+round/league-independent) and never touches `matchup_scores` at all.
+The only function that aggregates `fantasy_player_scores` into a
+fantasy team's round total, `refreshMatchupScores`, is only ever called
+(via `progressSeason`) for a league's CURRENT round, and only when that
+round's own status is not yet `'completed'` — a completed round is
+simply never revisited by the normal sync/progression flow, regardless
+of what new `fantasy_player_scores` rows later appear for fixtures whose
+`kickoff_at` happens to fall inside that round's historical window.
+
+**This pass's actual policy**: no historical international backfill was
+performed. No international fixtures have been ingested into the live
+database at all yet (Phase 2's provider audit was read-only — 10
+`GET /leagues` discovery requests, zero writes). The primary requirement
+("correct scoring going forward") is satisfied by the ingestion/scoring/
+locking fixes above; a future population of historical international
+fixture data, if ever desired for football-statistical completeness,
+would be a separate, explicitly-scoped action — never run automatically
+as a side effect of this pass.
+
+Phases 16–18 (tests, simulation, final validation) and the complete
+commit history are tracked in `HANDOFF.md`.

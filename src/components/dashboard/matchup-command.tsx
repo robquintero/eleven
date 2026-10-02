@@ -14,6 +14,7 @@ export function MatchupCommand({
   now,
   fixtureIntel,
   starters,
+  teamIdsByPlayerId,
 }: {
   matchup: CurrentMatchup | null;
   hasLeague: boolean;
@@ -23,6 +24,8 @@ export function MatchupCommand({
   fixtureIntel?: MatchupFixtureIntelligence | null;
   /** The caller's own starting XI, used only to compute "N OF YOUR XI INVOLVED" against `fixtureIntel.nextFixture` — never shown as a lineup here. */
   starters?: LineupSlot[];
+  /** Pass 14: each starter's full team-id set (club + any national teams, from `getTeamIdsByPlayer`) — without this, `countStartersInFixture` falls back to club-only comparison, which undercounts starters whose next fixture is international. */
+  teamIdsByPlayerId?: Map<string, string[]>;
 }) {
   if (!matchup) {
     return (
@@ -59,7 +62,7 @@ export function MatchupCommand({
   // involving either roster, and how many of the caller's own starters it
   // affects) replaces it whenever that data genuinely exists.
   const nextFixture = fixtureIntel?.nextFixture ?? null;
-  const involvedCount = starters ? countStartersInFixture(starters, nextFixture) : 0;
+  const involvedCount = starters ? countStartersInFixture(starters, nextFixture, teamIdsByPlayerId) : 0;
 
   // Pass 12D: truthful freshness, never implied by the "LIVE" label alone
   // — if the automated sync hasn't actually run recently (e.g. the

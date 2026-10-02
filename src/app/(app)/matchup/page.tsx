@@ -7,7 +7,7 @@ import { MatchupPlayerCounts } from "@/components/matchup/matchup-player-counts"
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
-import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads } from "@/data-access/matchups";
+import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads, getTeamIdsByPlayerIds } from "@/data-access/matchups";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
 
@@ -46,6 +46,10 @@ export default async function MatchupPage() {
   const now = new Date();
   const fixtureIntel = matchup ? await getMatchupFixtureIntelligence(matchup, now) : null;
   const myStarters = squads ? (matchup!.isUserHome ? squads.home.starters : squads.away.starters) : undefined;
+  // Pass 14: see the identical Home comment -- each starter's full
+  // team-id set so "N OF YOUR XI INVOLVED" correctly counts international
+  // fixture participation, not just club matches.
+  const teamIdsByPlayerId = await getTeamIdsByPlayerIds((myStarters ?? []).map((slot) => slot.player.id));
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,7 +67,7 @@ export default async function MatchupPage() {
           sibling components (DESIGN.md §5's hierarchy order puts
           whitespace ahead of borders for exactly this reason). */}
       <div className="flex flex-col gap-3">
-        <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={myStarters} />
+        <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={myStarters} teamIdsByPlayerId={teamIdsByPlayerId} />
 
         {matchup && squads && (
           <>

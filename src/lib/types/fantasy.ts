@@ -33,10 +33,21 @@ export type PlayerAvailability =
 export type PlayerMatchState = "upcoming" | "live" | "locked" | "final";
 
 export interface PlayerFixture {
+  /** The OTHER side's short label, from this player's participating side — e.g. "GER" for a France international fixture, or the usual club short name for a club fixture. */
   opponent: string;
   isHome: boolean;
   kickoff: string;
   state: PlayerMatchState;
+  /**
+   * Pass 14: the fixture's own real home/away short labels — e.g.
+   * "FRA"/"GER" for an international fixture. Render "home — away" from
+   * THESE, never by splicing the player's own `club.shortName` onto
+   * `opponent` — that assumption broke the moment a player's fixture can
+   * be international (their permanent club is never one of the two sides
+   * of that fixture). See docs/international-scoring.md.
+   */
+  homeLabel: string;
+  awayLabel: string;
 }
 
 /** Whether a real player is on a fantasy roster, and whose. */

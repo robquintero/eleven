@@ -51,10 +51,10 @@ test("getOwnershipLabel defaults to FREE when ownership is unset", () => {
 
 test("getNextFixtureLabel formats home/away correctly", () => {
   const home = makePlayer({
-    fixture: { opponent: "TOT", isHome: true, kickoff: "2026-10-04T15:30:00.000Z", state: "upcoming" },
+    fixture: { opponent: "TOT", isHome: true, kickoff: "2026-10-04T15:30:00.000Z", state: "upcoming", homeLabel: "ARS", awayLabel: "TOT" },
   });
   const away = makePlayer({
-    fixture: { opponent: "TOT", isHome: false, kickoff: "2026-10-04T15:30:00.000Z", state: "upcoming" },
+    fixture: { opponent: "TOT", isHome: false, kickoff: "2026-10-04T15:30:00.000Z", state: "upcoming", homeLabel: "TOT", awayLabel: "ARS" },
   });
   assert.equal(getNextFixtureLabel(home), "vs TOT");
   assert.equal(getNextFixtureLabel(away), "@ TOT");

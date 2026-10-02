@@ -1,6 +1,6 @@
 import { Ban } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
-import { playerFixtureCode, playerStatusLabel } from "@/lib/team-fixture";
+import { playerFixtureCode, playerFixtureParticipantLabel, playerStatusLabel } from "@/lib/team-fixture";
 import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
@@ -73,7 +73,7 @@ export function BenchRow({
           )}
         </p>
         <p className="label-system truncate text-[11px] text-foreground-tertiary sm:hidden">
-          {player.club.shortName} · {playerFixtureCode(player)}
+          {playerFixtureParticipantLabel(player)} · {playerFixtureCode(player)}
         </p>
       </div>
 

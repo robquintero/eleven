@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeLockInstant, isLocked } from "../../domain/fantasy/lineup-lock.ts";
 import { isStarterCompositionValid } from "../../domain/fantasy/constants.ts";
 import { chooseAutomaticStartingXi } from "../../domain/fantasy/auto-lineup.ts";
+import { getKickoffsByPlayer } from "./player-fixture-participation.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
 import type { RoundWindow } from "../../domain/fantasy/round-calendar.ts";
 import type { Database } from "../supabase/database.types.ts";
@@ -63,30 +64,24 @@ export async function createRoundLineupSlots(
     autoInitialStarterIds = new Set(starters.map((s) => s.rosterEntryId));
   }
 
-  const clubIds = Array.from(new Set(rosterEntries.map((r) => (r.players as { club_id: string } | null)?.club_id).filter((id): id is string => Boolean(id))));
-  const { data: clubFixtures } = await admin
-    .from("fixtures")
-    .select("home_club_id, away_club_id, kickoff_at")
-    .gte("kickoff_at", window.startsAt.toISOString())
-    .lt("kickoff_at", window.endsAt.toISOString())
-    .or(`home_club_id.in.(${clubIds.join(",")}),away_club_id.in.(${clubIds.join(",")})`);
-
-  const kickoffsByClubId = new Map<string, Date[]>();
-  for (const fixture of clubFixtures ?? []) {
-    for (const clubId of [fixture.home_club_id, fixture.away_club_id]) {
-      if (!clubIds.includes(clubId)) continue;
-      const list = kickoffsByClubId.get(clubId) ?? [];
-      list.push(new Date(fixture.kickoff_at));
-      kickoffsByClubId.set(clubId, list);
-    }
-  }
+  // Pass 14: every eligible kickoff for this roster's players, club OR
+  // national team (see player-fixture-participation.ts) -- a player
+  // whose only fixture this round is international used to never lock
+  // at all under the old club-id-only query, and one with both a club
+  // and an earlier international fixture would lock at the wrong (later,
+  // club-only) instant.
+  const kickoffsByPlayerId = await getKickoffsByPlayer(
+    admin,
+    rosterEntries.map((r) => r.player_id),
+    window
+  );
 
   const rows = rosterEntries.map((entry) => {
     const player = entry.players as { club_id: string; position: string } | null;
     const previous = previousSlotByRosterEntry.get(entry.id);
     const starter = previousRoundId ? (previous?.starter ?? false) : (autoInitialStarterIds?.has(entry.id) ?? false);
     const slot = starter ? (player?.position ?? "BENCH") : "BENCH";
-    const kickoffs = player ? (kickoffsByClubId.get(player.club_id) ?? []) : [];
+    const kickoffs = kickoffsByPlayerId.get(entry.player_id) ?? [];
     const lockedAt = computeLockInstant(kickoffs);
 
     return {
