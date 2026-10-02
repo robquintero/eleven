@@ -258,6 +258,7 @@ export type Database = {
           current_round: number
           id: string
           league_id: string
+          season_id: string | null
           started_at: string | null
           status: string
           type: string
@@ -271,6 +272,7 @@ export type Database = {
           current_round?: number
           id?: string
           league_id: string
+          season_id?: string | null
           started_at?: string | null
           status?: string
           type?: string
@@ -284,6 +286,7 @@ export type Database = {
           current_round?: number
           id?: string
           league_id?: string
+          season_id?: string | null
           started_at?: string | null
           status?: string
           type?: string
@@ -293,8 +296,15 @@ export type Database = {
           {
             foreignKeyName: "drafts_league_id_fkey"
             columns: ["league_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "fantasy_leagues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drafts_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: true
+            referencedRelation: "seasons"
             referencedColumns: ["id"]
           },
         ]
@@ -1068,6 +1078,7 @@ export type Database = {
           created_at: string
           id: string
           league_id: string
+          roster_mode: string | null
           schedule_cycles: number
           season_number: number
           starts_at: string | null
@@ -1080,6 +1091,7 @@ export type Database = {
           created_at?: string
           id?: string
           league_id: string
+          roster_mode?: string | null
           schedule_cycles?: number
           season_number: number
           starts_at?: string | null
@@ -1092,6 +1104,7 @@ export type Database = {
           created_at?: string
           id?: string
           league_id?: string
+          roster_mode?: string | null
           schedule_cycles?: number
           season_number?: number
           starts_at?: string | null
@@ -1432,6 +1445,14 @@ export type Database = {
         Args: { p_league_id: string }
         Returns: {
           draft_id: string
+        }[]
+      }
+      start_next_season: {
+        Args: { p_league_id: string; p_roster_mode: string; p_schedule_cycles: number }
+        Returns: {
+          draft_id: string | null
+          season_id: string
+          season_number: number
         }[]
       }
     }

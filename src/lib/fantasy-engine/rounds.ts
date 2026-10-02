@@ -293,18 +293,61 @@ export async function openNextRound(
  * second auto-lineup implementation, and never touching a team that
  * already has even one lineup_slots row (which would stomp any lineup
  * edits a manager has since made).
+ *
+ * Pass 12B: a league can now run MORE than one draft over its lifetime
+ * (REDRAFT at the start of Season N+1 — `supabase/migrations/
+ * 20261003000000_multi_season_lifecycle.sql`), so this can no longer
+ * assume "the league's draft" is a single, unambiguous row. It now
+ * resolves the draft belonging to the league's CURRENT (latest) season
+ * specifically. The league's very first (inaugural) draft predates any
+ * season row ever existing (season 1 only comes into being when its
+ * first round opens — Pass 12A's own design, unchanged) and so has
+ * `season_id = NULL`; that remains the one legacy case handled by
+ * leagueId-wide lookups below, and it can only ever apply once per
+ * league (every later draft is created by `start_next_season`, which
+ * always sets `season_id` explicitly).
  */
 export async function ensureFirstRoundOpened(admin: SupabaseClient<Database>, leagueId: string): Promise<void> {
-  const { data: draft } = await admin.from("drafts").select("status").eq("league_id", leagueId).maybeSingle();
-  if (!draft || draft.status !== "completed") return;
-
-  const { data: existingRound } = await admin
-    .from("fantasy_rounds")
-    .select("id, number")
+  const { data: latestSeason } = await admin
+    .from("seasons")
+    .select("id, status")
     .eq("league_id", leagueId)
-    .order("number", { ascending: true })
+    .order("season_number", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  if (!latestSeason) {
+    // No season row exists yet at all -- this can only be the league's
+    // very first (season-1) draft, created before season 1's own
+    // bootstrap (see resolveOrCreateActiveSeason above).
+    const { data: draft } = await admin.from("drafts").select("status").eq("league_id", leagueId).is("season_id", null).maybeSingle();
+    if (!draft || draft.status !== "completed") return;
+    await ensureRoundOneOpenedForSeason(admin, leagueId, null);
+    return;
+  }
+
+  // A season has fully concluded -- starting the next one is a
+  // deliberate, separate commissioner action (start_next_season), never
+  // auto-triggered by this self-heal check.
+  if (latestSeason.status === "COMPLETED") return;
+
+  // SETUP or ACTIVE: resolve the draft tied to THIS specific season, if
+  // any -- a KEEP_ROSTERS season has no draft at all, which is fine: it
+  // activates directly via openNextRound below, no draft gate to wait on.
+  const { data: draft } = await admin.from("drafts").select("status").eq("season_id", latestSeason.id).maybeSingle();
+  if (draft && draft.status !== "completed") return;
+
+  await ensureRoundOneOpenedForSeason(admin, leagueId, latestSeason.id);
+}
+
+async function ensureRoundOneOpenedForSeason(
+  admin: SupabaseClient<Database>,
+  leagueId: string,
+  seasonId: string | null
+): Promise<void> {
+  let query = admin.from("fantasy_rounds").select("id, number").order("number", { ascending: true }).limit(1);
+  query = seasonId ? query.eq("season_id", seasonId) : query.eq("league_id", leagueId);
+  const { data: existingRound } = await query.maybeSingle();
 
   if (!existingRound) {
     try {

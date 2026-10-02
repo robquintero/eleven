@@ -8,14 +8,19 @@ import type { PlayerPosition } from "@/lib/types/fantasy";
 export type DraftStatus = "scheduled" | "in_progress" | "completed";
 
 /**
- * A league's draft row, or `null` if none exists yet. `drafts` has at most
- * one row per league (see the UNIQUE constraint in
- * supabase/migrations/20260929141135_draft.sql). Pass 10's draft engine
+ * The status of the league's CURRENT draft, or `null` if none exists yet.
+ * `drafts` no longer has at most one row per league as of Pass 12B — a
+ * REDRAFT at the start of a new season creates another one (see
+ * `supabase/migrations/20261003000000_multi_season_lifecycle.sql`, which
+ * replaced the old `unique(league_id)` with `unique(season_id)`) — so this
+ * always resolves the MOST RECENTLY CREATED draft (`created_at desc`),
+ * which is correct regardless of how many a league has accumulated: the
+ * inaugural draft when there's only ever been one, or the active/most
+ * recent redraft once there have been more. Pass 10's draft engine
  * (`start_draft`/`make_draft_pick`, supabase/migrations/20260930024807_draft_engine.sql)
- * is what actually writes this row now — a real league reaches
- * `in_progress`/`completed` once its commissioner starts the draft.
- * Callers must still treat `null` as "not started," never assume a row
- * exists.
+ * and `start_next_season`'s REDRAFT branch are what actually write these
+ * rows. Callers must still treat `null` as "not started," never assume a
+ * row exists.
  */
 export async function getDraftStatus(leagueId: string): Promise<DraftStatus | null> {
   if (!isSupabaseConfigured()) return null;
@@ -25,6 +30,8 @@ export async function getDraftStatus(leagueId: string): Promise<DraftStatus | nu
     .from("drafts")
     .select("status")
     .eq("league_id", leagueId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
 
   if (error || !data) return null;
@@ -84,6 +91,8 @@ export async function getDraftState(leagueId: string): Promise<DraftState | null
     .from("drafts")
     .select("id, status, current_round, current_pick, current_pick_started_at")
     .eq("league_id", leagueId)
+    .order("created_at", { ascending: false })
+    .limit(1)
     .maybeSingle();
   if (!draftRow) return null;
 

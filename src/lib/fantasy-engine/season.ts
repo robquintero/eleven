@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "../supabase/admin.ts";
 import { openNextRound, finalizeRoundIfReady } from "./rounds.ts";
 import { buildStandingsTable, rankStandings } from "../../domain/fantasy/standings.ts";
 import type { Database } from "../supabase/database.types.ts";
@@ -106,4 +107,35 @@ export async function progressSeason(admin: SupabaseClient<Database>, leagueId: 
     return currentRound ? { action: "waiting_on_fixtures", roundId: currentRound.id } : { action: "open_failed", error: openResult.error };
   }
   return { action: "open_failed", error: openResult.error };
+}
+
+/**
+ * Pass 12B: activates a freshly-started KEEP_ROSTERS season by opening
+ * its first round — the one step `start_next_season` (the SQL RPC) can't
+ * itself do, since it has no draft-completion event to hang the trigger
+ * on (unlike REDRAFT, whose new draft completing re-enters the existing
+ * `maybeOpenFirstRound` -> `ensureFirstRoundOpened` chain unchanged).
+ * Reuses `openNextRound` exactly as every other round-open path does — no
+ * second activation implementation. Best-effort/self-healing (same
+ * swallow-and-log convention as `ensureFirstRoundOpened`): if this
+ * particular call fails for any transient reason, the very next visit to
+ * any page that calls `ensureFirstRoundOpened` (e.g. the Team page) will
+ * pick the SETUP season up and open it then — this is never the only
+ * chance the season gets to activate.
+ *
+ * Called from the Server Action right after `start_next_season` succeeds
+ * for a KEEP_ROSTERS choice — never from `src/data-access/*`, which must
+ * never import the admin client directly (see
+ * `no-provider-imports-in-app.test.ts`).
+ */
+export async function activateKeptRosterSeason(leagueId: string): Promise<void> {
+  const admin = createAdminClient();
+  try {
+    const result = await openNextRound(admin, leagueId, new Date());
+    if (!result.ok) {
+      console.error(`activateKeptRosterSeason: openNextRound failed for league ${leagueId}: ${result.error}`);
+    }
+  } catch (err) {
+    console.error(`activateKeptRosterSeason: openNextRound threw for league ${leagueId}`, err);
+  }
 }

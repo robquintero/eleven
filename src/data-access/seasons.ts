@@ -1,9 +1,12 @@
 import "server-only";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
+import { toSeasonActionError } from "@/lib/errors/season-action-error";
+import { getStandingsForSeason, getSeasonMatchupResults, type StandingsRow, type LeagueMatchupSummary } from "@/data-access/matchups";
 import type { ScheduleCycles } from "@/domain/fantasy/season";
 
 export type SeasonStatus = "SETUP" | "ACTIVE" | "COMPLETED";
+export type RosterMode = "REDRAFT" | "KEEP_ROSTERS";
 export type { ScheduleCycles };
 
 export interface SeasonSummary {
@@ -11,6 +14,8 @@ export interface SeasonSummary {
   seasonNumber: number;
   status: SeasonStatus;
   scheduleCycles: ScheduleCycles;
+  /** `null` for season 1 (always a fresh draft) -- see `roster_mode`'s own column comment. */
+  rosterMode: RosterMode | null;
   /** `null` while still SETUP -- not computed until the real team count is known at the first round's open (see resolveOrCreateActiveSeason). */
   totalRounds: number | null;
   /** The highest-numbered fantasy round opened so far this season, or `null` if none has opened yet. */
@@ -33,7 +38,7 @@ export async function getSeasonSummary(leagueId: string): Promise<SeasonSummary 
 
   const { data: season } = await supabase
     .from("seasons")
-    .select("id, season_number, status, schedule_cycles, total_rounds, champion_fantasy_team_id")
+    .select("id, season_number, status, schedule_cycles, roster_mode, total_rounds, champion_fantasy_team_id")
     .eq("league_id", leagueId)
     .order("season_number", { ascending: false })
     .limit(1)
@@ -63,10 +68,113 @@ export async function getSeasonSummary(leagueId: string): Promise<SeasonSummary 
     seasonNumber: season.season_number,
     status: season.status as SeasonStatus,
     scheduleCycles: season.schedule_cycles as ScheduleCycles,
+    rosterMode: season.roster_mode as RosterMode | null,
     totalRounds: season.total_rounds,
     currentRoundNumber: latestRound?.number ?? null,
     championFantasyTeamId: season.champion_fantasy_team_id,
     championTeamName,
+  };
+}
+
+export interface SeasonListEntry {
+  id: string;
+  seasonNumber: number;
+  status: SeasonStatus;
+  scheduleCycles: ScheduleCycles;
+  rosterMode: RosterMode | null;
+  championTeamName: string | null;
+}
+
+/**
+ * Every season this league has ever had, most recent first — the Season
+ * Archive's index (brief 12B §1: "a league member must be able to inspect
+ * completed seasons"). Includes the current season too (whatever its
+ * status), since there is nothing to hide about it; the archive DETAIL
+ * view (`getSeasonArchiveDetail`) is what a member opens from here.
+ */
+export async function listSeasons(leagueId: string): Promise<SeasonListEntry[]> {
+  if (!isSupabaseConfigured()) return [];
+  const supabase = await createClient();
+
+  const { data: seasons } = await supabase
+    .from("seasons")
+    .select("id, season_number, status, schedule_cycles, roster_mode, champion_fantasy_team_id")
+    .eq("league_id", leagueId)
+    .order("season_number", { ascending: false });
+  if (!seasons || seasons.length === 0) return [];
+
+  const championIds = Array.from(new Set(seasons.map((s) => s.champion_fantasy_team_id).filter((id): id is string => Boolean(id))));
+  const { data: teams } = championIds.length
+    ? await supabase.from("fantasy_teams").select("id, name").in("id", championIds)
+    : { data: [] as { id: string; name: string }[] };
+  const nameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
+
+  return seasons.map((s) => ({
+    id: s.id,
+    seasonNumber: s.season_number,
+    status: s.status as SeasonStatus,
+    scheduleCycles: s.schedule_cycles as ScheduleCycles,
+    rosterMode: s.roster_mode as RosterMode | null,
+    championTeamName: s.champion_fantasy_team_id ? (nameById.get(s.champion_fantasy_team_id) ?? null) : null,
+  }));
+}
+
+export interface SeasonArchiveDetail {
+  id: string;
+  seasonNumber: number;
+  status: SeasonStatus;
+  scheduleCycles: ScheduleCycles;
+  rosterMode: RosterMode | null;
+  totalRounds: number | null;
+  championFantasyTeamId: string | null;
+  championTeamName: string | null;
+  standings: StandingsRow[];
+  results: LeagueMatchupSummary[];
+}
+
+/**
+ * Full detail for ONE EXPLICIT historical season, looked up by its
+ * `seasonNumber` within `leagueId` (never "the current season" — see
+ * `getStandingsForSeason`'s own doc comment on why historical views must
+ * never go through a current-season resolver). `null` if that league has
+ * no season with that number. Standings and results are both derived
+ * ONLY from that season's own finalized matchups, so a completed season's
+ * archive can never be affected by anything happening in a later season.
+ */
+export async function getSeasonArchiveDetail(leagueId: string, seasonNumber: number): Promise<SeasonArchiveDetail | null> {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = await createClient();
+
+  const { data: season } = await supabase
+    .from("seasons")
+    .select("id, season_number, status, schedule_cycles, roster_mode, total_rounds, champion_fantasy_team_id")
+    .eq("league_id", leagueId)
+    .eq("season_number", seasonNumber)
+    .maybeSingle();
+  if (!season) return null;
+
+  let championTeamName: string | null = null;
+  if (season.champion_fantasy_team_id) {
+    const { data: team } = await supabase.from("fantasy_teams").select("name").eq("id", season.champion_fantasy_team_id).maybeSingle();
+    championTeamName = team?.name ?? null;
+  }
+
+  const [standings, results] = await Promise.all([
+    getStandingsForSeason(supabase, season.id),
+    getSeasonMatchupResults(supabase, season.id),
+  ]);
+
+  return {
+    id: season.id,
+    seasonNumber: season.season_number,
+    status: season.status as SeasonStatus,
+    scheduleCycles: season.schedule_cycles as ScheduleCycles,
+    rosterMode: season.roster_mode as RosterMode | null,
+    totalRounds: season.total_rounds,
+    championFantasyTeamId: season.champion_fantasy_team_id,
+    championTeamName,
+    standings,
+    results,
   };
 }
 
@@ -108,4 +216,40 @@ export async function setSeasonScheduleFormat(leagueId: string, cycles: Schedule
     const code = KNOWN_CODES.find((c) => c === error.message);
     throw new SetSeasonScheduleFormatError(code ?? "UNKNOWN", error.message);
   }
+}
+
+export interface StartNextSeasonResult {
+  seasonId: string;
+  seasonNumber: number;
+  /** Only present for REDRAFT — null for KEEP_ROSTERS, which creates no draft. */
+  draftId: string | null;
+}
+
+/**
+ * Commissioner-only "Start Next Season" (brief 12B §2/§3) — calls
+ * `start_next_season` (supabase/migrations/20261003000000_multi_season_lifecycle.sql),
+ * which atomically creates Season N+1 and applies the chosen roster
+ * mode's ownership side effects in one transaction. For REDRAFT, the new
+ * draft is already `in_progress` by the time this returns — the Draft
+ * page picks it up the same way it already does any draft (see
+ * `getDraftStatus`'s own Pass 12B update). For KEEP_ROSTERS, THIS
+ * function does not itself open Season N+1's first round — the calling
+ * Server Action must follow up via the fantasy-engine layer's
+ * `activateKeptRosterSeason` (never call the admin-client engine from
+ * this data-access file directly — see src/lib/fantasy-engine/season.ts).
+ */
+export async function startNextSeason(
+  leagueId: string,
+  rosterMode: RosterMode,
+  scheduleCycles: ScheduleCycles
+): Promise<StartNextSeasonResult> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("start_next_season", {
+    p_league_id: leagueId,
+    p_roster_mode: rosterMode,
+    p_schedule_cycles: scheduleCycles,
+  });
+  if (error || !data || data.length === 0) throw toSeasonActionError(error?.message);
+  const row = data[0];
+  return { seasonId: row.season_id, seasonNumber: row.season_number, draftId: row.draft_id };
 }

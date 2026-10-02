@@ -493,33 +493,23 @@ export interface StandingsRow {
 }
 
 /**
- * League standings for the league's CURRENT (latest) season, derived from
+ * The standings table for ONE EXPLICIT season id — never "whichever
+ * season is current." This is the single shared core both `getStandings`
+ * (current-season convenience wrapper, below) and the season-archive
+ * view (`getSeasonArchiveDetail`, src/data-access/seasons.ts) call —
+ * Pass 12B's historical views must never accidentally go through a
+ * "resolve the current season" helper, so this function takes a
+ * `seasonId` directly and does no such resolution itself. Derived from
  * that season's completed (`status = 'final'`) matchups' `matchup_scores`
- * — never a stored win/loss column (the schema deliberately has none; see
- * supabase/migrations/…fantasy_leagues.sql). `matchups` has no season_id
- * of its own (Pass 12A deliberately avoids that duplication); scoping is
- * done via `fantasy_rounds.season_id`. Ranking/tiebreak logic lives in
- * `@/domain/fantasy/standings` (league points, then fantasy-point
- * differential, then fantasy points for, then head-to-head, then team id
- * — docs/game-rules.md "Standings") so it's pure and independently tested
- * rather than duplicated here. `[]` until this season has a season row at
- * all, or until at least one of its matchups has been played.
+ * — never a stored win/loss column. `matchups` has no season_id of its
+ * own (Pass 12A deliberately avoids that duplication); scoping is done
+ * via `fantasy_rounds.season_id`. Ranking/tiebreak logic lives in
+ * `@/domain/fantasy/standings` so it's pure and independently tested
+ * rather than duplicated here. `[]` until at least one matchup in this
+ * specific season has been played.
  */
-export async function getStandings(leagueId: string): Promise<StandingsRow[]> {
-  if (!isSupabaseConfigured()) return [];
-
-  const supabase = await resolveClient();
-
-  const { data: season } = await supabase
-    .from("seasons")
-    .select("id")
-    .eq("league_id", leagueId)
-    .order("season_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (!season) return [];
-
-  const { data: rounds } = await supabase.from("fantasy_rounds").select("id").eq("season_id", season.id);
+export async function getStandingsForSeason(supabase: SupabaseClientType, seasonId: string): Promise<StandingsRow[]> {
+  const { data: rounds } = await supabase.from("fantasy_rounds").select("id").eq("season_id", seasonId);
   const roundIds = (rounds ?? []).map((r) => r.id);
   if (roundIds.length === 0) return [];
 
@@ -567,6 +557,31 @@ export async function getStandings(leagueId: string): Promise<StandingsRow[]> {
     pointsAgainst: row.pointsAgainst,
     leaguePoints: row.leaguePoints,
   }));
+}
+
+/**
+ * League standings for the league's CURRENT (latest) season — resolves
+ * which season that is, then delegates to `getStandingsForSeason`. This
+ * is the "current season" convenience wrapper the League page itself
+ * uses; the season archive view calls `getStandingsForSeason` directly
+ * with an explicit historical `seasonId` instead of this function (see
+ * that function's own doc comment for why the distinction matters).
+ */
+export async function getStandings(leagueId: string): Promise<StandingsRow[]> {
+  if (!isSupabaseConfigured()) return [];
+
+  const supabase = await resolveClient();
+
+  const { data: season } = await supabase
+    .from("seasons")
+    .select("id")
+    .eq("league_id", leagueId)
+    .order("season_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!season) return [];
+
+  return getStandingsForSeason(supabase, season.id);
 }
 
 export interface LeagueMatchupSummary {
@@ -636,12 +651,35 @@ function emptyCompetitionSummary(): LeagueCompetitionSummary {
   };
 }
 
-/** Client-injectable core of `getLeagueCompetitionSummary` -- same reasoning as `queryPlayerDatabase`/`queryMatchupSquads`: lets the real database prove this against a real league in matchups.integration.test.ts without a live Next.js request. */
+/**
+ * Client-injectable core of `getLeagueCompetitionSummary` -- same
+ * reasoning as `queryPlayerDatabase`/`queryMatchupSquads`: lets the real
+ * database prove this against a real league in
+ * matchups.integration.test.ts without a live Next.js request.
+ *
+ * Pass 12B: scoped to the league's CURRENT (latest) season. Before
+ * multi-season support this was scoped by `league_id` alone, which was
+ * correct when a league could only ever have one season's worth of
+ * matchups ever -- now that `start_next_season` lets a league accumulate
+ * several seasons' matchups, "current round"/"recent results"/"records"
+ * must never blend an old, completed season's matchups into the new
+ * season's view. The season archive (`getSeasonMatchupResults`, below)
+ * is the explicitly-season-scoped equivalent for a HISTORICAL season.
+ */
 export async function queryLeagueCompetitionSummary(
   supabase: SupabaseClientType,
   leagueId: string
 ): Promise<LeagueCompetitionSummary> {
   const empty = emptyCompetitionSummary();
+
+  const { data: season } = await supabase
+    .from("seasons")
+    .select("id")
+    .eq("league_id", leagueId)
+    .order("season_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!season) return empty;
 
   // No `.order()` on the embedded `fantasy_rounds(number)` column --
   // PostgREST does not order outer rows by an embedded relation's column
@@ -651,9 +689,9 @@ export async function queryLeagueCompetitionSummary(
   const { data: allMatchups } = await supabase
     .from("matchups")
     .select(
-      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(number), matchup_scores(fantasy_team_id, live_points, final_points)"
+      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(number, season_id), matchup_scores(fantasy_team_id, live_points, final_points)"
     )
-    .eq("league_id", leagueId);
+    .eq("fantasy_rounds.season_id", season.id);
 
   if (!allMatchups || allMatchups.length === 0) return empty;
 
@@ -744,4 +782,46 @@ export async function queryLeagueCompetitionSummary(
   }
 
   return { currentRoundMatchups, recentResults, records };
+}
+
+/**
+ * Every FINAL matchup in ONE EXPLICIT (typically historical) season,
+ * grouped by round ascending — the "rounds/results for that season" slice
+ * of the Pass 12B season archive. Takes `seasonId` directly, never
+ * resolves "the current season" itself, so a historical season's results
+ * can never accidentally reflect whichever season is active right now.
+ */
+export async function getSeasonMatchupResults(supabase: SupabaseClientType, seasonId: string): Promise<LeagueMatchupSummary[]> {
+  const { data: rows } = await supabase
+    .from("matchups")
+    .select(
+      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(number, season_id), matchup_scores(fantasy_team_id, live_points, final_points)"
+    )
+    .eq("fantasy_rounds.season_id", seasonId)
+    .eq("status", "final");
+
+  if (!rows || rows.length === 0) return [];
+
+  const teamIds = Array.from(new Set(rows.flatMap((m) => [m.home_fantasy_team_id, m.away_fantasy_team_id])));
+  const { data: teams } = await supabase.from("fantasy_teams").select("id, name").in("id", teamIds);
+  const nameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
+
+  return rows
+    .map((m): LeagueMatchupSummary => {
+      const scores = m.matchup_scores ?? [];
+      const home = scores.find((s) => s.fantasy_team_id === m.home_fantasy_team_id);
+      const away = scores.find((s) => s.fantasy_team_id === m.away_fantasy_team_id);
+      return {
+        id: m.id,
+        roundNumber: (m.fantasy_rounds as unknown as { number: number }).number,
+        status: m.status as LeagueMatchupSummary["status"],
+        homeTeamId: m.home_fantasy_team_id,
+        homeTeamName: nameById.get(m.home_fantasy_team_id) ?? "—",
+        homePoints: home?.final_points ?? home?.live_points ?? 0,
+        awayTeamId: m.away_fantasy_team_id,
+        awayTeamName: nameById.get(m.away_fantasy_team_id) ?? "—",
+        awayPoints: away?.final_points ?? away?.live_points ?? 0,
+      };
+    })
+    .sort((a, b) => a.roundNumber - b.roundNumber);
 }

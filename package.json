@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --conditions=react-server --experimental-strip-types --test $(find src/domain src/lib src/data-access -name '*.test.ts')",
-    "test:integration": "node --env-file=.env.local --conditions=react-server --experimental-strip-types --test src/lib/fantasy-engine/draft-engine.integration.test.ts src/lib/fantasy-engine/market-trades.integration.test.ts src/lib/fantasy-engine/season.integration.test.ts src/data-access/players.integration.test.ts src/data-access/matchups.integration.test.ts",
+    "test:integration": "node --env-file=.env.local --conditions=react-server --experimental-strip-types --test src/lib/fantasy-engine/draft-engine.integration.test.ts src/lib/fantasy-engine/market-trades.integration.test.ts src/lib/fantasy-engine/season.integration.test.ts src/lib/fantasy-engine/multi-season-lifecycle.integration.test.ts src/data-access/players.integration.test.ts src/data-access/matchups.integration.test.ts",
     "football:check": "node --env-file=.env.local --conditions=react-server --experimental-strip-types src/lib/football-providers/api-football/check-connectivity.ts",
     "football:sync": "node --env-file=.env.local --conditions=react-server --experimental-strip-types src/lib/football-ingestion/cli.ts",
     "scoring:backfill": "node --env-file=.env.local --conditions=react-server --experimental-strip-types src/lib/scoring/cli.ts",

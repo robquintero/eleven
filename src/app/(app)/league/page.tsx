@@ -14,7 +14,8 @@ import { getDraftStatus } from "@/data-access/drafts";
 import { getLeagueDetail, getUserLeagues } from "@/data-access/leagues";
 import { getLeagueCompetitionSummary, getStandings } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
-import { getSeasonSummary } from "@/data-access/seasons";
+import { getSeasonSummary, listSeasons } from "@/data-access/seasons";
+import { SeasonArchiveList } from "@/components/league/season-archive-list";
 import { getTeamRosterPlayers, type RosterPlayerOption } from "@/data-access/roster";
 import { getLeagueTeams, getUserTeamInLeague } from "@/data-access/teams";
 import { getRecentActivity } from "@/data-access/transactions";
@@ -59,7 +60,7 @@ export default async function LeaguePage() {
   const leagues = await getUserLeagues();
   const activeLeagueId = await getActiveLeagueId(leagues);
 
-  const [activeDetail, draftStatus, standings, activity, myTeam, competition, season] = activeLeagueId
+  const [activeDetail, draftStatus, standings, activity, myTeam, competition, season, pastSeasons] = activeLeagueId
     ? await Promise.all([
         getLeagueDetail(activeLeagueId),
         getDraftStatus(activeLeagueId),
@@ -68,8 +69,9 @@ export default async function LeaguePage() {
         getUserTeamInLeague(activeLeagueId),
         getLeagueCompetitionSummary(activeLeagueId),
         getSeasonSummary(activeLeagueId),
+        listSeasons(activeLeagueId),
       ])
-    : [null, null, [], [], null, null, null];
+    : [null, null, [], [], null, null, null, []];
 
   let tradeCenterProps: {
     myTeamId: string;
@@ -254,6 +256,15 @@ export default async function LeaguePage() {
                   ))}
                 </div>
               </div>
+
+              {pastSeasons.length > 1 && (
+                <div className="border border-border">
+                  <div className="border-b border-border px-4 py-2.5">
+                    <span className="label-system text-[11px] text-foreground-secondary">SEASON_ARCHIVE</span>
+                  </div>
+                  <SeasonArchiveList seasons={pastSeasons} />
+                </div>
+              )}
 
               <div className="border border-border p-4">
                 <p className="label-system text-[11px] text-foreground-tertiary">DRAFT</p>
