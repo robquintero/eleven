@@ -56,26 +56,34 @@ export default async function MatchupPage() {
         <p className="mt-1.5 text-sm text-foreground-secondary">{league.name}</p>
       </div>
 
-      <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={myStarters} />
+      {/* Pass 13 (§5): tighter rhythm (gap-3, not the page's own gap-6)
+          between the score module and the XI below it -- proximity is the
+          cheapest, safest way to read "these belong to one matchday
+          surface" without merging independently-rendered borders between
+          sibling components (DESIGN.md §5's hierarchy order puts
+          whitespace ahead of borders for exactly this reason). */}
+      <div className="flex flex-col gap-3">
+        <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={myStarters} />
 
-      {matchup && squads && (
-        <>
-          <MatchupPlayerCounts
-            myTeamName={matchup.isUserHome ? matchup.homeTeamName : matchup.awayTeamName}
-            opponentTeamName={matchup.isUserHome ? matchup.awayTeamName : matchup.homeTeamName}
-            mySquad={matchup.isUserHome ? squads.home : squads.away}
-            opponentSquad={matchup.isUserHome ? squads.away : squads.home}
-          />
+        {matchup && squads && (
+          <>
+            <MatchupPlayerCounts
+              myTeamName={matchup.isUserHome ? matchup.homeTeamName : matchup.awayTeamName}
+              opponentTeamName={matchup.isUserHome ? matchup.awayTeamName : matchup.homeTeamName}
+              mySquad={matchup.isUserHome ? squads.home : squads.away}
+              opponentSquad={matchup.isUserHome ? squads.away : squads.home}
+            />
 
-          <MatchupLineups
-            homeTeamName={matchup.homeTeamName}
-            awayTeamName={matchup.awayTeamName}
-            isUserHome={matchup.isUserHome}
-            homeSquad={squads.home}
-            awaySquad={squads.away}
-          />
-        </>
-      )}
+            <MatchupLineups
+              homeTeamName={matchup.homeTeamName}
+              awayTeamName={matchup.awayTeamName}
+              isUserHome={matchup.isUserHome}
+              homeSquad={squads.home}
+              awaySquad={squads.away}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 }

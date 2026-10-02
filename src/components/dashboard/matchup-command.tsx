@@ -92,10 +92,16 @@ export function MatchupCommand({
         </span>
       </div>
 
-      <div className="p-5 sm:p-6">
-        <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between sm:gap-4">
-          <div className="min-w-0 text-left">
-            <p className="truncate text-[15px] font-semibold text-foreground sm:text-base">
+      <div className="p-4 sm:p-6">
+        {/* Pass 13 (§5): one row at every breakpoint, not three blocks
+            stacked vertically on mobile (name / gap / score / gap / name)
+            -- that stacking was the real source of "the score area is too
+            tall relative to the player battle below it." The score scales
+            up with the viewport instead (text-3xl -> text-6xl) so mobile
+            still reads as a confident scoreboard, just in one compact row. */}
+        <div className="flex items-center justify-between gap-2 sm:gap-4">
+          <div className="min-w-0 flex-1 text-left">
+            <p className="truncate text-[13px] font-semibold text-foreground sm:text-[15px] md:text-base">
               {matchup.homeTeamName}
             </p>
             {matchup.isUserHome && (
@@ -103,24 +109,24 @@ export function MatchupCommand({
             )}
           </div>
 
-          <div className="flex items-center gap-3 sm:gap-5">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-5">
             {isScheduled ? (
-              <p className="label-system text-xl text-foreground-tertiary sm:text-2xl">VS</p>
+              <p className="label-system text-lg text-foreground-tertiary sm:text-xl md:text-2xl">VS</p>
             ) : (
               <>
-                <p className="text-5xl font-semibold tracking-tight tabular-nums text-foreground sm:text-6xl">
+                <p className="text-3xl font-semibold tracking-tight tabular-nums text-foreground sm:text-5xl md:text-6xl">
                   {homeScore}
                 </p>
-                <span className="text-lg font-medium text-foreground-tertiary sm:text-xl">–</span>
-                <p className="text-5xl font-semibold tracking-tight tabular-nums text-foreground sm:text-6xl">
+                <span className="text-base font-medium text-foreground-tertiary sm:text-lg md:text-xl">–</span>
+                <p className="text-3xl font-semibold tracking-tight tabular-nums text-foreground sm:text-5xl md:text-6xl">
                   {awayScore}
                 </p>
               </>
             )}
           </div>
 
-          <div className="min-w-0 text-right">
-            <p className="truncate text-[15px] font-semibold text-foreground sm:text-base">
+          <div className="min-w-0 flex-1 text-right">
+            <p className="truncate text-[13px] font-semibold text-foreground sm:text-[15px] md:text-base">
               {matchup.awayTeamName}
             </p>
             {!matchup.isUserHome && (
@@ -130,7 +136,7 @@ export function MatchupCommand({
         </div>
 
         {isScheduled ? (
-          <div className="mt-6 flex flex-col items-center gap-1 border-t border-border pt-4 text-center">
+          <div className="mt-4 flex flex-col items-center gap-1 border-t border-border pt-4 text-center sm:mt-6">
             {nextFixture ? (
               <>
                 <p className="label-system text-[10px] text-foreground-tertiary">NEXT KICKOFF</p>
@@ -152,7 +158,7 @@ export function MatchupCommand({
           </div>
         ) : (
           <>
-            <div className="relative mt-6 h-1.5 overflow-hidden border border-border bg-muted">
+            <div className="relative mt-4 h-1.5 overflow-hidden border border-border bg-muted sm:mt-6">
               <div className="h-full bg-accent transition-all" style={{ width: `${homeShare}%` }} />
             </div>
 
