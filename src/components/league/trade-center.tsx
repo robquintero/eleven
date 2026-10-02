@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Check } from "lucide-react";
 import {
   acceptTradeAction,
   cancelTradeAction,
@@ -312,37 +313,33 @@ export function ProposeTradeDialog({
           <div className="grid max-h-80 grid-cols-2 gap-3 overflow-y-auto">
             <div>
               <p className="label-system text-[10px] text-foreground-tertiary">YOU SEND</p>
-              <div className="mt-1 flex flex-col gap-1">
+              <div className="mt-1.5 flex flex-col gap-1">
                 {myRoster.length === 0 && (
                   <p className="text-xs text-foreground-tertiary">No players on your roster.</p>
                 )}
                 {myRoster.map((p) => (
-                  <label key={p.id} className="flex items-center gap-1.5 text-xs text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={offeredIds.includes(p.id)}
-                      onChange={() => toggle(offeredIds, setOfferedIds, p.id)}
-                    />
-                    {p.name} <span className="text-foreground-tertiary">{p.position}</span>
-                  </label>
+                  <TradePlayerRow
+                    key={p.id}
+                    player={p}
+                    selected={offeredIds.includes(p.id)}
+                    onToggle={() => toggle(offeredIds, setOfferedIds, p.id)}
+                  />
                 ))}
               </div>
             </div>
             <div>
               <p className="label-system text-[10px] text-foreground-tertiary">YOU RECEIVE</p>
-              <div className="mt-1 flex flex-col gap-1">
+              <div className="mt-1.5 flex flex-col gap-1">
                 {targetRoster.length === 0 && (
                   <p className="text-xs text-foreground-tertiary">No players on their roster.</p>
                 )}
                 {targetRoster.map((p) => (
-                  <label key={p.id} className="flex items-center gap-1.5 text-xs text-foreground">
-                    <input
-                      type="checkbox"
-                      checked={requestedIds.includes(p.id)}
-                      onChange={() => toggle(requestedIds, setRequestedIds, p.id)}
-                    />
-                    {p.name} <span className="text-foreground-tertiary">{p.position}</span>
-                  </label>
+                  <TradePlayerRow
+                    key={p.id}
+                    player={p}
+                    selected={requestedIds.includes(p.id)}
+                    onToggle={() => toggle(requestedIds, setRequestedIds, p.id)}
+                  />
                 ))}
               </div>
             </div>
@@ -400,6 +397,44 @@ export function ProposeTradeDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Pass 12F (§8): a trade player pick, styled like the rest of Eleven's
+ * operational surfaces (position badge + label-system type + accent
+ * selected state — see the DRAFT board's row pattern in
+ * draft-workspace.tsx and the selected-state Check used in
+ * shell/league-switcher.tsx) instead of a bare browser checkbox.
+ */
+function TradePlayerRow({
+  player,
+  selected,
+  onToggle,
+}: {
+  player: RosterPlayerOption;
+  selected: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={selected}
+      onClick={onToggle}
+      className={`flex w-full items-center gap-2 rounded-control border px-2 py-1.5 text-left transition-colors ${
+        selected ? "border-accent bg-accent/10" : "border-border hover:bg-muted"
+      }`}
+    >
+      <span className="label-system w-8 shrink-0 rounded-md bg-muted py-0.5 text-center text-[10px] font-semibold text-foreground-secondary">
+        {player.position}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{player.name}</span>
+      <Check
+        className={`size-3.5 shrink-0 text-accent transition-opacity ${selected ? "opacity-100" : "opacity-0"}`}
+        aria-hidden="true"
+      />
+    </button>
   );
 }
 
