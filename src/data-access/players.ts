@@ -310,7 +310,7 @@ export async function queryPlayerDatabase(
     const { data: pageRows, error: pageError } = await supabase
       .from("players")
       .select(
-        "id, name, position, shirt_number, nationality, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code))"
+        "id, name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))"
       )
       .in("id", pageIds);
     if (pageError || !pageRows) return empty;
@@ -322,7 +322,7 @@ export async function queryPlayerDatabase(
       supabase
         .from("players")
         .select(
-          "id, name, position, shirt_number, nationality, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code))",
+          "id, name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))",
           { count: "exact" }
         )
         .eq("active", true)

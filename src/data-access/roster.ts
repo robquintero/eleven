@@ -78,7 +78,7 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
   const { data: entries, error } = await supabase
     .from("roster_entries")
     .select(
-      "id, player_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code)))"
+      "id, player_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code)))"
     )
     .eq("league_id", leagueId)
     .eq("fantasy_team_id", fantasyTeamId)

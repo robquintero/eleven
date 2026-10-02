@@ -119,7 +119,7 @@ export async function getDraftState(leagueId: string): Promise<DraftState | null
 
   const { data: pickRows } = await supabase
     .from("draft_picks")
-    .select("pick_number, round, fantasy_team_id, picked_at, fantasy_teams(name), players(id, name, position, clubs(short_name))")
+    .select("pick_number, round, fantasy_team_id, picked_at, fantasy_teams(name), players(id, name, position, clubs!players_club_id_fkey(short_name))")
     .eq("draft_id", draftRow.id)
     .order("pick_number", { ascending: true });
 

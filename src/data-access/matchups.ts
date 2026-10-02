@@ -298,7 +298,7 @@ async function buildMatchupTeamSquad(
   const { data: slotRows } = await supabase
     .from("lineup_slots")
     .select(
-      "roster_entry_id, starter, locked_at, roster_entries!inner(id, player_id, fantasy_team_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs(id, name, short_name, competition_id, competitions(code))))"
+      "roster_entry_id, starter, locked_at, roster_entries!inner(id, player_id, fantasy_team_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))))"
     )
     .eq("fantasy_round_id", roundId)
     .eq("roster_entries.fantasy_team_id", fantasyTeamId);
