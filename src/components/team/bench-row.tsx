@@ -1,31 +1,8 @@
 import { Ban } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
-import { availabilityLabel, playerFixtureCode } from "@/lib/team-fixture";
+import { playerFixtureCode, playerStatusLabel } from "@/lib/team-fixture";
 import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
-
-function statusLabel(player: Player) {
-  if (player.availability === "injured" || player.availability === "suspended") {
-    return { text: availabilityLabel[player.availability], tone: "destructive" as const };
-  }
-  if (player.availability === "doubtful") {
-    return { text: availabilityLabel.doubtful, tone: "warning" as const };
-  }
-
-  const fixture = player.fixture;
-  if (!fixture) return { text: availabilityLabel.available, tone: "neutral" as const };
-
-  if (fixture.state === "live") {
-    return { text: `LIVE ${player.fantasyPoints}`, tone: "live" as const };
-  }
-  if (fixture.state === "locked") {
-    return { text: "LOCKED", tone: "neutral" as const };
-  }
-  if (fixture.state === "final") {
-    return { text: `FT · ${player.fantasyPoints}`, tone: "neutral" as const };
-  }
-  return { text: availabilityLabel.available, tone: "neutral" as const };
-}
 
 const toneClass = {
   destructive: "text-destructive",
@@ -55,7 +32,7 @@ export function BenchRow({
   const isFlagged =
     player.availability === "injured" || player.availability === "suspended";
   const isDoubtful = player.availability === "doubtful";
-  const status = statusLabel(player);
+  const status = playerStatusLabel(player);
   const isLive = status.tone === "live";
 
   return (

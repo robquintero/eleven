@@ -39,6 +39,41 @@ export function playerFixtureCode(player: Player) {
   return `${player.fixture.opponent} (${player.fixture.isHome ? "H" : "A"})`;
 }
 
+export interface PlayerStatusLabel {
+  text: string;
+  tone: "destructive" | "warning" | "live" | "neutral";
+}
+
+/**
+ * One player's real-time status for a dense row — availability flag first
+ * (injured/suspended/doubtful), else the real fixture state (live points,
+ * locked, final points, or just "available"). Pulled out of `BenchRow`
+ * (Pass 12F) so the Matchup page's compact mobile rows can show the exact
+ * same truth, never a second, possibly-divergent status derivation.
+ */
+export function playerStatusLabel(player: Player): PlayerStatusLabel {
+  if (player.availability === "injured" || player.availability === "suspended") {
+    return { text: availabilityLabel[player.availability], tone: "destructive" };
+  }
+  if (player.availability === "doubtful") {
+    return { text: availabilityLabel.doubtful, tone: "warning" };
+  }
+
+  const fixture = player.fixture;
+  if (!fixture) return { text: availabilityLabel.available, tone: "neutral" };
+
+  if (fixture.state === "live") {
+    return { text: `LIVE ${player.fantasyPoints}`, tone: "live" };
+  }
+  if (fixture.state === "locked") {
+    return { text: "LOCKED", tone: "neutral" };
+  }
+  if (fixture.state === "final") {
+    return { text: `FT · ${player.fantasyPoints}`, tone: "neutral" };
+  }
+  return { text: availabilityLabel.available, tone: "neutral" };
+}
+
 const namePrefixes = new Set(["van", "von", "de", "der", "den", "du", "la", "le", "el"]);
 
 export function surnameFor(name: string) {
