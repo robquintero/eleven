@@ -684,3 +684,82 @@ test("GATE 8/epoch: an international fixture BEFORE the scoring epoch never scor
     await tearDownNationalTeams(admin, ctx);
   }
 });
+
+/**
+ * Gate 7 (FT + corrections): a later provider correction to an
+ * international fixture's stats must RECONCILE the stored
+ * fantasy_player_scores row, never duplicate it. backfillScores always
+ * recomputes the full score from current canonical raw stats and upserts
+ * on the natural key (player_id, fixture_id, scoring_rule_version) --
+ * the same mechanism club fixtures already rely on (proven generically
+ * at the pure-function level in scoring/replay.test.ts's own correction
+ * scenarios); this test is the one piece not yet proven specifically for
+ * an international fixture: running it twice, with different stats,
+ * against a real database.
+ */
+test("GATE 7: a later stat correction to an international fixture reconciles the stored score -- exactly one row, no duplicate contribution", { skip }, async () => {
+  const admin = createAdminClient();
+  const ctx = await setUpNationalTeams(admin);
+  try {
+    const [gkId] = await admin
+      .from("players")
+      .select("id")
+      .eq("active", true)
+      .eq("position", "GK")
+      .limit(1)
+      .then((r) => (r.data ?? []).map((p) => p.id));
+    assert.ok(gkId, "a real GK must exist to test with");
+    await admin.from("player_national_teams").insert({ player_id: gkId, national_team_club_id: ctx.nationalTeamAId });
+
+    const kickoff = new Date(INTERNATIONAL_SCORING_EPOCH.getTime() + 86_400_000);
+    const fixtureId = await insertFixture(admin, ctx, ctx.eligibleCompetitionId, kickoff, "final");
+    await admin.from("fixtures").update({ home_score: 1, away_score: 0 }).eq("id", fixtureId);
+    await admin.from("player_match_stats").insert({ player_id: gkId, fixture_id: fixtureId, minutes: 90, saves: 2 });
+
+    const firstResult = await backfillScores(admin, { fixtureIds: [fixtureId] });
+    assert.equal(firstResult.failed, 0, firstResult.errors.join("; "));
+    const { data: firstScore } = await admin
+      .from("fantasy_player_scores")
+      .select("id, points")
+      .eq("player_id", gkId)
+      .eq("fixture_id", fixtureId)
+      .eq("scoring_rule_version", SCORING_RULE_VERSION)
+      .single();
+    assert.ok(firstScore, "the initial live/FT score must be stored");
+
+    // A later provider correction -- e.g. a VAR review adds a yellow card
+    // the initial live feed missed. Updates the SAME player_match_stats
+    // row (its own natural key is (player_id, fixture_id)), never inserts
+    // a second one.
+    const { error: correctionError } = await admin
+      .from("player_match_stats")
+      .update({ yellow_cards: 1 })
+      .eq("player_id", gkId)
+      .eq("fixture_id", fixtureId);
+    assert.equal(correctionError, null);
+
+    const secondResult = await backfillScores(admin, { fixtureIds: [fixtureId] });
+    assert.equal(secondResult.failed, 0, secondResult.errors.join("; "));
+
+    const { data: allScoreRows } = await admin
+      .from("fantasy_player_scores")
+      .select("id, points")
+      .eq("player_id", gkId)
+      .eq("fixture_id", fixtureId)
+      .eq("scoring_rule_version", SCORING_RULE_VERSION);
+    assert.equal(allScoreRows!.length, 1, "reconciliation must update the SAME row, never insert a second (duplicate) contribution");
+    assert.equal(allScoreRows![0]!.id, firstScore!.id, "it must be the literal same row, not a delete+recreate");
+    assert.notEqual(allScoreRows![0]!.points, firstScore!.points, "the correction (a new yellow card) must actually change the stored points");
+    assert.equal(
+      allScoreRows![0]!.points,
+      firstScore!.points - 1,
+      "a yellow card costs exactly 1 point (DISCIPLINE.yellowCard), and nothing else changed"
+    );
+
+    await admin.from("player_match_stats").delete().eq("player_id", gkId).eq("fixture_id", fixtureId);
+    await admin.from("fantasy_player_scores").delete().eq("player_id", gkId).eq("fixture_id", fixtureId);
+    await admin.from("player_national_teams").delete().eq("player_id", gkId).eq("national_team_club_id", ctx.nationalTeamAId);
+  } finally {
+    await tearDownNationalTeams(admin, ctx);
+  }
+});
