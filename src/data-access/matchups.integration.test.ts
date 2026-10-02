@@ -213,3 +213,89 @@ test("getLeagueCompetitionSummary surfaces the real current-round matchup league
     await cleanupTestLeague(admin, league);
   }
 });
+
+/**
+ * Regression test for the production incident where `player_national_teams`
+ * gave PostgREST two relationship paths between `players` and `clubs`,
+ * making the nested `players(...clubs(...))` embed inside
+ * `buildMatchupTeamSquad`'s `lineup_slots` query fail with `PGRST201` --
+ * silently emptying the Matchup page's squads. The fix is the explicit
+ * `clubs!players_club_id_fkey(...)` hint. This test proves the squad still
+ * resolves, with the rostered player's REAL club, even while a
+ * `player_national_teams` row exists for them.
+ */
+test("getMatchupSquads resolves the canonical club for a rostered player who also has a player_national_teams association", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  let nationalTeamId: string | null = null;
+  try {
+    const { data: gks } = await admin.from("players").select("id, club_id").eq("active", true).eq("position", "GK").order("name").limit(1);
+    const playerId = gks![0]!.id;
+    const { data: realClub } = await admin.from("clubs").select("id, short_name").eq("id", gks![0]!.club_id).single();
+
+    const { data: anyCompetition } = await admin.from("competitions").select("id").limit(1).single();
+    const { data: nationalTeam, error: nationalTeamError } = await admin
+      .from("clubs")
+      .insert({
+        competition_id: anyCompetition!.id,
+        code: `REGRESS-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name: "Regression Test National Team",
+        short_name: "RGT",
+        is_national_team: true,
+      })
+      .select("id")
+      .single();
+    assert.equal(nationalTeamError, null);
+    nationalTeamId = nationalTeam!.id;
+
+    const { error: assocError } = await admin.from("player_national_teams").insert({ player_id: playerId, national_team_club_id: nationalTeamId });
+    assert.equal(assocError, null);
+
+    const { error: signError } = await league.clients[0].rpc("sign_player", { p_league_id: league.leagueId, p_player_id: playerId });
+    assert.equal(signError, null);
+
+    const opened = await openNextRound(admin, league.leagueId, new Date());
+    assert.ok(opened.ok);
+    if (!opened.ok) return;
+
+    const { data: matchupRow } = await admin
+      .from("matchups")
+      .select("home_fantasy_team_id, away_fantasy_team_id")
+      .eq("fantasy_round_id", opened.roundId)
+      .single();
+    const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at, number").eq("id", opened.roundId).single();
+
+    const matchup: CurrentMatchup = {
+      id: "test-matchup",
+      roundId: opened.roundId,
+      roundNumber: round!.number,
+      roundStartsAt: round!.starts_at,
+      roundEndsAt: round!.ends_at,
+      status: "live",
+      homeFantasyTeamId: matchupRow!.home_fantasy_team_id,
+      awayFantasyTeamId: matchupRow!.away_fantasy_team_id,
+      homeTeamName: "Home",
+      awayTeamName: "Away",
+      homeLivePoints: 0,
+      awayLivePoints: 0,
+      homeFinalPoints: null,
+      awayFinalPoints: null,
+      isUserHome: true,
+      scoresUpdatedAt: null,
+    };
+
+    const squads = await queryMatchupSquads(admin, matchup);
+    const team0Squad = matchup.homeFantasyTeamId === league.teamIds[0] ? squads.home : squads.away;
+    const allPlayers = [...team0Squad.starters.map((s) => s.player), ...team0Squad.bench];
+
+    assert.ok(allPlayers.length > 0, "the squad must not silently come back empty (the PGRST201 regression)");
+    const found = allPlayers.find((p) => p.id === playerId);
+    assert.ok(found, "the player with a national-team association must still appear in their fantasy squad");
+    assert.equal(found!.club.id, realClub!.id, "the squad must show the player's REAL club, never the national team, and never fail to resolve it");
+
+    await admin.from("player_national_teams").delete().eq("player_id", playerId).eq("national_team_club_id", nationalTeamId);
+  } finally {
+    if (nationalTeamId) await admin.from("clubs").delete().eq("id", nationalTeamId);
+    await cleanupTestLeague(admin, league);
+  }
+});

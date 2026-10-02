@@ -186,6 +186,13 @@ test("getTeamIdsByPlayer: a player WITH a national-team association resolves to 
     const result = await getTeamIdsByPlayer(admin, [playerId]);
     assert.deepEqual(new Set(result.get(playerId)), new Set([player!.club_id, ctx.nationalTeamAId]));
 
+    // The association is additive, never a replacement: the player's
+    // canonical club membership (the field every draftable-universe,
+    // ownership, and scoring rule actually keys on) must be byte-identical
+    // before and after a national-team association exists.
+    const { data: playerAfter } = await admin.from("players").select("club_id").eq("id", playerId).single();
+    assert.equal(playerAfter!.club_id, player!.club_id, "a national-team association must never overwrite or replace players.club_id");
+
     await admin.from("player_national_teams").delete().eq("player_id", playerId).eq("national_team_club_id", ctx.nationalTeamAId);
   } finally {
     await tearDownNationalTeams(admin, ctx);

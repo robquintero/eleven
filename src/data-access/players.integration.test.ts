@@ -163,3 +163,57 @@ test("name sort (A-Z) and club sort still work unchanged", { skip }, async () =>
     );
   }
 });
+
+/**
+ * Regression test for the production incident where `player_national_teams`
+ * (added by the international-scoring migration) gave PostgREST two
+ * relationship paths between `players` and `clubs` (the direct
+ * `players.club_id` FK, and the new many-to-many via
+ * `player_national_teams`), which made every unqualified `clubs(...)`
+ * embed under `players` fail with `PGRST201` -- silently turning the
+ * entire 2,767-player catalog into "0 PLAYERS" for every caller, logged
+ * in or not. The fix is the explicit `clubs!players_club_id_fkey(...)`
+ * hint in `queryPlayerDatabase`'s two select strings. This test exists so
+ * that if that hint is ever removed (or a future relationship introduces
+ * the same ambiguity again), this test fails loudly instead of the
+ * catalog silently going empty in production.
+ */
+test("queryPlayerDatabase resolves the canonical (players.club_id) club, never ambiguously, even when the player also has a player_national_teams association", { skip }, async () => {
+  const admin = createAdminClient();
+  const { data: realPlayer } = await admin.from("players").select("id, name, club_id").eq("active", true).limit(1).single();
+  assert.ok(realPlayer, "a real active player must exist to test with");
+  const { data: realClub } = await admin.from("clubs").select("id, short_name").eq("id", realPlayer!.club_id).single();
+
+  const { data: anyCompetition } = await admin.from("competitions").select("id").limit(1).single();
+  const { data: nationalTeam, error: nationalTeamError } = await admin
+    .from("clubs")
+    .insert({
+      competition_id: anyCompetition!.id,
+      code: `REGRESS-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: "Regression Test National Team",
+      short_name: "RGT",
+      is_national_team: true,
+    })
+    .select("id")
+    .single();
+  assert.equal(nationalTeamError, null);
+
+  try {
+    const { error: assocError } = await admin
+      .from("player_national_teams")
+      .insert({ player_id: realPlayer!.id, national_team_club_id: nationalTeam!.id });
+    assert.equal(assocError, null);
+
+    const result = await queryPlayerDatabase(admin, { query: realPlayer!.name, page: 1, pageSize: 10 });
+    assert.ok(result.players.length > 0, "the player search must not silently return empty (the PGRST201 regression)");
+
+    const found = result.players.find((p) => p.id === realPlayer!.id);
+    assert.ok(found, "the player must still be found by name search");
+    assert.equal(found!.club.id, realClub!.id, "the resolved club must be the player's REAL club (players.club_id), never the national team");
+    assert.equal(found!.club.shortName, realClub!.short_name);
+
+    await admin.from("player_national_teams").delete().eq("player_id", realPlayer!.id).eq("national_team_club_id", nationalTeam!.id);
+  } finally {
+    await admin.from("clubs").delete().eq("id", nationalTeam!.id);
+  }
+});

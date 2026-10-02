@@ -88,6 +88,7 @@ async function fetchAllRows<T>(
   let from = 0;
   for (;;) {
     const { data, error } = await queryFactory(from, from + batchSize - 1);
+    if (error) console.error(`fetchAllRows: page fetch failed at offset ${from}:`, error);
     if (error || !data) break;
     all.push(...data);
     if (data.length < batchSize) break;
@@ -314,6 +315,7 @@ export async function queryPlayerDatabase(
         "id, name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))"
       )
       .in("id", pageIds);
+    if (pageError) console.error(`queryPlayerDatabase: page fetch failed for sort="${query.sort}":`, pageError);
     if (pageError || !pageRows) return empty;
 
     const rowById = new Map(pageRows.map((row) => [row.id, row]));
@@ -333,6 +335,7 @@ export async function queryPlayerDatabase(
     builder = builder.range(from, from + pageSize - 1);
 
     const result = await builder;
+    if (result.error) console.error("queryPlayerDatabase: main page query failed:", result.error);
     if (result.error || !result.data) return empty;
     data = result.data;
     count = result.count ?? result.data.length;

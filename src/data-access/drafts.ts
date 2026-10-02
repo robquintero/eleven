@@ -1,9 +1,20 @@
 import "server-only";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
-import { toDraftActionError } from "@/lib/errors/draft-action-error";
-import { teamPositionForPick } from "@/domain/fantasy/draft-order";
-import type { PlayerPosition } from "@/lib/types/fantasy";
+// Relative imports (not the usual `@/...` aliases) -- same reasoning as
+// src/data-access/players.ts's own import-block comment: keeps
+// `queryDraftState` importable from a plain Node integration test.
+// `../lib/supabase/server.ts` itself is NOT statically imported (see
+// `resolveClient` below) since it pulls in `next/headers`.
+import { isSupabaseConfigured } from "../lib/supabase/config.ts";
+import type { createClient } from "../lib/supabase/server.ts";
+import { toDraftActionError } from "../lib/errors/draft-action-error.ts";
+import { teamPositionForPick } from "../domain/fantasy/draft-order.ts";
+import type { PlayerPosition } from "../lib/types/fantasy.ts";
+
+/** Dynamically imported so this module -- specifically `queryDraftState` -- stays importable from a plain Node integration test; see this file's own import-block comment. */
+async function resolveClient() {
+  const { createClient } = await import("../lib/supabase/server.ts");
+  return createClient();
+}
 
 export type DraftStatus = "scheduled" | "in_progress" | "completed";
 
@@ -25,7 +36,7 @@ export type DraftStatus = "scheduled" | "in_progress" | "completed";
 export async function getDraftStatus(leagueId: string): Promise<DraftStatus | null> {
   if (!isSupabaseConfigured()) return null;
 
-  const supabase = await createClient();
+  const supabase = await resolveClient();
   const { data, error } = await supabase
     .from("drafts")
     .select("status")
@@ -85,8 +96,21 @@ export interface DraftState {
  */
 export async function getDraftState(leagueId: string): Promise<DraftState | null> {
   if (!isSupabaseConfigured()) return null;
-  const supabase = await createClient();
+  const supabase = await resolveClient();
+  return queryDraftState(supabase, leagueId);
+}
 
+/**
+ * The actual query logic behind `getDraftState`, parameterized by an
+ * already-resolved Supabase client — same split as `queryPlayerDatabase`/
+ * `getPlayerDatabase`, `queryMatchupSquads`/`getMatchupSquads`, and
+ * `querySquad`/`getUserSquad`. Exported so an integration test can drive
+ * it with a real admin client (an admin client's `auth.getUser()` simply
+ * resolves to no user, which is a legitimate "not signed in as a manager"
+ * state this function already handles — `myFantasyTeamId`/`isMyTurn`
+ * just come back `null`/`false`).
+ */
+export async function queryDraftState(supabase: Awaited<ReturnType<typeof createClient>>, leagueId: string): Promise<DraftState | null> {
   const { data: draftRow } = await supabase
     .from("drafts")
     .select("id, status, current_round, current_pick, current_pick_started_at")
@@ -117,11 +141,12 @@ export async function getDraftState(leagueId: string): Promise<DraftState | null
     };
   });
 
-  const { data: pickRows } = await supabase
+  const { data: pickRows, error: pickRowsError } = await supabase
     .from("draft_picks")
     .select("pick_number, round, fantasy_team_id, picked_at, fantasy_teams(name), players(id, name, position, clubs!players_club_id_fkey(short_name))")
     .eq("draft_id", draftRow.id)
     .order("pick_number", { ascending: true });
+  if (pickRowsError) console.error(`getDraftState: draft_picks fetch failed for draft ${draftRow.id}:`, pickRowsError);
 
   const picks: DraftPickRecord[] = (pickRows ?? []).map((row) => {
     const team = row.fantasy_teams as unknown as { name: string } | null;
@@ -188,7 +213,7 @@ export interface StartDraftResult {
 
 /** Commissioner-only. Calls the atomic `start_draft` RPC — see supabase/migrations/20260930024807_draft_engine.sql. */
 export async function startDraft(leagueId: string): Promise<StartDraftResult> {
-  const supabase = await createClient();
+  const supabase = await resolveClient();
   const { data, error } = await supabase.rpc("start_draft", { p_league_id: leagueId });
   if (error || !data || data.length === 0) throw toDraftActionError(error?.message);
   return { draftId: data[0].draft_id };
@@ -202,7 +227,7 @@ export interface MakeDraftPickResult {
 
 /** Calls the atomic `make_draft_pick` RPC. Never trust a client's claim about whose turn it is or whether a player is free — the database re-validates both. */
 export async function makeDraftPick(draftId: string, playerId: string): Promise<MakeDraftPickResult> {
-  const supabase = await createClient();
+  const supabase = await resolveClient();
   const { data, error } = await supabase.rpc("make_draft_pick", { p_draft_id: draftId, p_player_id: playerId });
   if (error || !data || data.length === 0) throw toDraftActionError(error?.message);
   return { pickNumber: data[0].pick_number, round: data[0].round, fantasyTeamId: data[0].fantasy_team_id };

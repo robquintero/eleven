@@ -312,7 +312,7 @@ async function buildMatchupTeamSquad(
 ): Promise<Squad> {
   const empty: Squad = { formation: "—", starters: [], bench: [] };
 
-  const { data: slotRows } = await supabase
+  const { data: slotRows, error } = await supabase
     .from("lineup_slots")
     .select(
       "roster_entry_id, starter, locked_at, roster_entries!inner(id, player_id, fantasy_team_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))))"
@@ -320,6 +320,7 @@ async function buildMatchupTeamSquad(
     .eq("fantasy_round_id", roundId)
     .eq("roster_entries.fantasy_team_id", fantasyTeamId);
 
+  if (error) console.error(`buildMatchupTeamSquad: lineup_slots fetch failed for team ${fantasyTeamId}, round ${roundId}:`, error);
   if (!slotRows || slotRows.length === 0) return empty;
 
   function toPlayer(row: MatchupSlotRow): Player {

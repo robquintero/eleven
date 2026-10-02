@@ -1,11 +1,23 @@
 import "server-only";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
-import { bigFiveLeagueFromCompetitionCode } from "@/lib/leagues";
-import { deriveFormationLabel } from "@/domain/fantasy/constants";
-import { isLocked } from "@/domain/fantasy/lineup-lock";
-import { layoutStartingXi } from "@/lib/selectors/pitch-layout";
-import type { Player, PlayerPosition, Squad } from "@/lib/types/fantasy";
+import type { SupabaseClient } from "@supabase/supabase-js";
+// Relative imports (not the usual `@/...` aliases) -- same reasoning as
+// src/data-access/players.ts's own import-block comment: keeps
+// `querySquad` importable from a plain Node integration test.
+// `../lib/supabase/server.ts` itself is NOT statically imported (see
+// `resolveClient` below) since it pulls in `next/headers`.
+import { isSupabaseConfigured } from "../lib/supabase/config.ts";
+import { bigFiveLeagueFromCompetitionCode } from "../lib/leagues.ts";
+import { deriveFormationLabel } from "../domain/fantasy/constants.ts";
+import { isLocked } from "../domain/fantasy/lineup-lock.ts";
+import { layoutStartingXi } from "../lib/selectors/pitch-layout.ts";
+import type { Database } from "../lib/supabase/database.types.ts";
+import type { Player, PlayerPosition, Squad } from "../lib/types/fantasy.ts";
+
+/** Dynamically imported so this module -- specifically `querySquad` -- stays importable from a plain Node integration test; see this file's own import-block comment. */
+async function resolveClient() {
+  const { createClient } = await import("../lib/supabase/server.ts");
+  return createClient();
+}
 
 interface RosterRow {
   id: string;
@@ -70,10 +82,25 @@ function toPlayer(row: RosterRow): Player | null {
  * correct, truthful state, not a bug to work around.
  */
 export async function getUserSquad(leagueId: string, fantasyTeamId: string): Promise<Squad> {
-  const empty: Squad = { formation: "—", starters: [], bench: [] };
-  if (!isSupabaseConfigured()) return empty;
+  if (!isSupabaseConfigured()) return { formation: "—", starters: [], bench: [] };
+  const supabase = await resolveClient();
+  return querySquad(supabase, leagueId, fantasyTeamId);
+}
 
-  const supabase = await createClient();
+/**
+ * The actual query logic behind `getUserSquad`, parameterized by an
+ * already-resolved Supabase client — same split as `queryPlayerDatabase`/
+ * `getPlayerDatabase` and `queryMatchupSquads`/`getMatchupSquads`, and for
+ * the same reason: `getUserSquad` itself needs a live Next.js request's
+ * cookies and can't be called from a plain integration test, but this can,
+ * against the real database, via an admin client.
+ */
+export async function querySquad(
+  supabase: SupabaseClient<Database>,
+  leagueId: string,
+  fantasyTeamId: string
+): Promise<Squad> {
+  const empty: Squad = { formation: "—", starters: [], bench: [] };
 
   const { data: entries, error } = await supabase
     .from("roster_entries")
@@ -84,6 +111,7 @@ export async function getUserSquad(leagueId: string, fantasyTeamId: string): Pro
     .eq("fantasy_team_id", fantasyTeamId)
     .eq("status", "active");
 
+  if (error) console.error(`getUserSquad: roster_entries fetch failed for team ${fantasyTeamId}:`, error);
   if (error || !entries || entries.length === 0) return empty;
 
   const playerByRosterEntryId = new Map<string, Player>();
@@ -186,7 +214,7 @@ export async function getTeamRosterPlayers(
 ): Promise<RosterPlayerOption[]> {
   if (!isSupabaseConfigured()) return [];
 
-  const supabase = await createClient();
+  const supabase = await resolveClient();
 
   const { data, error } = await supabase
     .from("roster_entries")
