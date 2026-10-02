@@ -4,6 +4,12 @@ import { signIn } from "@/data-access/auth";
 
 export const metadata: Metadata = { title: "Sign in — Eleven" };
 
-export default function LoginPage() {
-  return <AuthForm mode="sign-in" action={signIn} />;
+/** `authError`, when present, comes only from `/auth/callback` (never user-typed) — already mapped to friendly copy there, never a raw Supabase message. */
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ authError?: string }>;
+}) {
+  const { authError } = await searchParams;
+  return <AuthForm mode="sign-in" action={signIn} callbackError={authError} />;
 }

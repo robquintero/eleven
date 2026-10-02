@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { LogOut, UserRound } from "lucide-react";
+import { ChangePasswordForm } from "@/components/account/change-password-form";
+import { DeleteAccountSection } from "@/components/account/delete-account-section";
 import { DisplayNameForm } from "@/components/account/display-name-form";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { signOut } from "@/data-access/auth";
@@ -48,6 +50,13 @@ export default async function AccountPage() {
       </section>
 
       <section>
+        <ModuleHeader title="PASSWORD" />
+        <div className="mt-3 border border-border p-4">
+          <ChangePasswordForm />
+        </div>
+      </section>
+
+      <section>
         <ModuleHeader title="YOUR_LEAGUES" meta={leagues.length} />
         {leagues.length === 0 ? (
           <p className="mt-3 text-sm text-foreground-secondary">You haven&apos;t joined or created a league yet.</p>
@@ -85,6 +94,20 @@ export default async function AccountPage() {
             Sign out
           </button>
         </form>
+      </section>
+
+      <section>
+        <ModuleHeader title="DANGER_ZONE" />
+        <div className="mt-3">
+          <DeleteAccountSection
+            email={identity.email ?? ""}
+            blockedReason={
+              identity.leaguesCreatedCount > 0
+                ? `You're the commissioner of ${identity.leaguesCreatedCount} league${identity.leaguesCreatedCount === 1 ? "" : "s"}. Transfer commissionership or delete ${identity.leaguesCreatedCount === 1 ? "that league" : "those leagues"} first.`
+                : null
+            }
+          />
+        </div>
       </section>
     </div>
   );

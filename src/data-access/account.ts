@@ -6,6 +6,8 @@ export interface AccountIdentity {
   userId: string;
   email: string | null;
   displayName: string;
+  /** Pass 12F: how many leagues this account created — the exact gate `deleteOwnAccount` enforces (see docs/auth-deletion-contract.md). Surfaced here so the Account page can explain a blocked deletion proactively, before the user even tries. */
+  leaguesCreatedCount: number;
 }
 
 /**
@@ -27,12 +29,16 @@ export async function getAccountIdentity(): Promise<AccountIdentity | null> {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile } = await supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle();
+  const [{ data: profile }, { count }] = await Promise.all([
+    supabase.from("profiles").select("display_name").eq("id", user.id).maybeSingle(),
+    supabase.from("fantasy_leagues").select("id", { count: "exact", head: true }).eq("created_by_user_id", user.id),
+  ]);
 
   return {
     userId: user.id,
     email: user.email ?? null,
     displayName: profile?.display_name ?? "Manager",
+    leaguesCreatedCount: count ?? 0,
   };
 }
 

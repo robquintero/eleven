@@ -2,15 +2,18 @@
 
 import { useActionState } from "react";
 import Link from "next/link";
-import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-panel";
-import type { AuthActionState } from "@/data-access/auth";
+import { CheckYourEmail } from "@/components/auth/check-your-email";
+import { resendConfirmationEmail, type AuthActionState, type ResendConfirmationState } from "@/data-access/auth";
 
 interface AuthFormProps {
   mode: "sign-in" | "sign-up";
   action: (state: AuthActionState, formData: FormData) => Promise<AuthActionState>;
+  /** Pre-mapped, already-friendly copy forwarded from `/auth/callback`'s `authError` query param (e.g. an expired confirmation/recovery link) — never a raw Supabase message. */
+  callbackError?: string;
 }
 
 const copy = {
@@ -32,12 +35,16 @@ const copy = {
   },
 } as const;
 
-export function AuthForm({ mode, action }: AuthFormProps) {
+export function AuthForm({ mode, action, callbackError }: AuthFormProps) {
   const [state, formAction, pending] = useActionState<AuthActionState, FormData>(
     action,
     undefined
   );
   const text = copy[mode];
+
+  if (state && "awaitingConfirmation" in state) {
+    return <CheckYourEmail email={state.email} />;
+  }
 
   return (
     <TerminalPanel header={text.header}>
@@ -47,6 +54,13 @@ export function AuthForm({ mode, action }: AuthFormProps) {
         </h1>
 
         <form action={formAction} className="mt-5 space-y-4">
+          {callbackError && (
+            <p className="flex items-start gap-2 text-xs text-destructive">
+              <AlertCircle className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
+              {callbackError}
+            </p>
+          )}
+
           {mode === "sign-up" && (
             <label className="block">
               <span className="label-system text-[11px] text-foreground-tertiary">
@@ -76,9 +90,16 @@ export function AuthForm({ mode, action }: AuthFormProps) {
           </label>
 
           <label className="block">
-            <span className="label-system text-[11px] text-foreground-tertiary">
-              Password
-            </span>
+            <div className="flex items-baseline justify-between">
+              <span className="label-system text-[11px] text-foreground-tertiary">
+                Password
+              </span>
+              {mode === "sign-in" && (
+                <Link href="/forgot-password" className="label-system text-[11px] text-accent hover:underline">
+                  Forgot password?
+                </Link>
+              )}
+            </div>
             <Input
               name="password"
               type="password"
@@ -97,17 +118,12 @@ export function AuthForm({ mode, action }: AuthFormProps) {
             </p>
           )}
 
-          {state?.message && (
-            <p className="flex items-start gap-2 text-xs text-live">
-              <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
-              {state.message}
-            </p>
-          )}
-
           <Button type="submit" disabled={pending} className="w-full rounded-control">
             {pending ? "Working…" : text.submitLabel}
           </Button>
         </form>
+
+        {state?.unconfirmedEmail && <ResendInline email={state.unconfirmedEmail} />}
       </TerminalPanelSection>
 
       <TerminalPanelSection>
@@ -119,5 +135,29 @@ export function AuthForm({ mode, action }: AuthFormProps) {
         </p>
       </TerminalPanelSection>
     </TerminalPanel>
+  );
+}
+
+/**
+ * Pass 12F: shown inline under a sign-in attempt that failed specifically
+ * because the account's email isn't confirmed yet — never for a plain
+ * wrong-password failure. Reuses the exact same `resendConfirmationEmail`
+ * action the dedicated Check Your Email page uses, with the same
+ * client-side cooldown courtesy.
+ */
+function ResendInline({ email }: { email: string }) {
+  const [state, formAction, pending] = useActionState<ResendConfirmationState, FormData>(
+    resendConfirmationEmail,
+    undefined
+  );
+
+  return (
+    <form action={formAction} className="mt-3 border-t border-border pt-3">
+      <input type="hidden" name="email" value={email} />
+      <Button type="submit" disabled={pending || state?.sent} variant="outline" size="sm" className="w-full rounded-control">
+        {pending ? "Sending…" : state?.sent ? "Sent — check your inbox" : "Resend confirmation email"}
+      </Button>
+      {state?.error && <p className="mt-2 text-xs text-destructive">{state.error}</p>}
+    </form>
   );
 }
