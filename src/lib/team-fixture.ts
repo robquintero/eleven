@@ -154,3 +154,23 @@ export function starterBuckets(starters: LineupSlot[]) {
   }
   return buckets;
 }
+
+/**
+ * Pass 13 (§4): how many of a manager's own starters belong to either club
+ * in a given fixture -- real "telemetry," the brief's own anticipation-
+ * state example ("4 OF YOUR XI INVOLVED"), never a fabricated number. Used
+ * against `MatchupFixtureIntelligence.nextFixture`
+ * (`src/data-access/matchups.ts`), which only ever contains a fixture that
+ * genuinely exists in stored data.
+ */
+export function countStartersInFixture(
+  starters: LineupSlot[],
+  fixture: { homeClubShortName: string; awayClubShortName: string } | null
+): number {
+  if (!fixture) return 0;
+  return starters.filter(
+    (slot) =>
+      slot.player.club.shortName === fixture.homeClubShortName ||
+      slot.player.club.shortName === fixture.awayClubShortName
+  ).length;
+}

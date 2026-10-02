@@ -7,7 +7,7 @@ import { MatchupPlayerCounts } from "@/components/matchup/matchup-player-counts"
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
-import { getCurrentMatchup, getMatchupSquads } from "@/data-access/matchups";
+import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads } from "@/data-access/matchups";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
 
@@ -44,6 +44,8 @@ export default async function MatchupPage() {
   const matchup = team ? await getCurrentMatchup(league.id, team.id) : null;
   const squads = matchup ? await getMatchupSquads(matchup) : null;
   const now = new Date();
+  const fixtureIntel = matchup ? await getMatchupFixtureIntelligence(matchup, now) : null;
+  const myStarters = squads ? (matchup!.isUserHome ? squads.home.starters : squads.away.starters) : undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -54,7 +56,7 @@ export default async function MatchupPage() {
         <p className="mt-1.5 text-sm text-foreground-secondary">{league.name}</p>
       </div>
 
-      <MatchupCommand matchup={matchup} hasLeague now={now} />
+      <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={myStarters} />
 
       {matchup && squads && (
         <>

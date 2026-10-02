@@ -150,7 +150,7 @@ export default async function HomePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="flex flex-col gap-6">
-          <MatchupCommand matchup={matchup} hasLeague now={now} />
+          <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={squad.starters} />
 
           {matchup && matchupSquads && (matchup.status === "live" || matchup.status === "final") && (
             <MatchupPlayerCounts
