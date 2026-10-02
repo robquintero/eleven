@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { Trophy } from "lucide-react";
 import type { SeasonListEntry } from "@/data-access/seasons";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { SCHEDULE_CYCLES_LABEL } from "@/domain/fantasy/season";
 import { cn } from "@/lib/utils";
 
@@ -19,9 +19,10 @@ export function SeasonArchiveList({ seasons }: { seasons: SeasonListEntry[] }) {
   return (
     <div className="divide-y divide-border">
       {seasons.map((season) => (
-        <Link
+        <TransitionLink
           key={season.id}
           href={`/league/seasons/${season.seasonNumber}`}
+          label={`Season ${season.seasonNumber}`}
           className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-muted/50"
         >
           <div className="min-w-0">
@@ -51,7 +52,7 @@ export function SeasonArchiveList({ seasons }: { seasons: SeasonListEntry[] }) {
               {season.status}
             </span>
           </div>
-        </Link>
+        </TransitionLink>
       ))}
     </div>
   );

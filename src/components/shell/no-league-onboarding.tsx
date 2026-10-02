@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { Trophy } from "lucide-react";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -21,10 +21,10 @@ export function NoLeagueOnboarding() {
         You aren&rsquo;t currently competing in a league.
       </p>
       <div className="mt-5 flex items-center gap-3">
-        <Button nativeButton={false} render={<Link href="/league" />}>
+        <Button nativeButton={false} render={<TransitionLink href="/league" label="League" />}>
           Create league
         </Button>
-        <Button nativeButton={false} variant="outline" render={<Link href="/league" />}>
+        <Button nativeButton={false} variant="outline" render={<TransitionLink href="/league" label="League" />}>
           Join league
         </Button>
       </div>

@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Check, ChevronDown, Trophy } from "lucide-react";
 import { setActiveLeagueAction } from "@/app/(app)/actions";
+import { TransitionLink } from "@/components/shell/transition-link";
 import type { LeagueSummary } from "@/data-access/leagues";
 import { cn } from "@/lib/utils";
 
@@ -26,13 +26,14 @@ export function LeagueSwitcher({
 
   if (leagues.length === 0) {
     return (
-      <Link
+      <TransitionLink
         href="/league"
+        label="League"
         className="flex items-center gap-2 rounded-control border border-border bg-surface px-2.5 py-1.5 text-sm font-medium text-foreground-secondary transition-colors hover:bg-surface-elevated"
       >
         <Trophy className="size-3.5 text-foreground-tertiary" strokeWidth={2} />
         <span className="label-system text-[11px]">NO ACTIVE LEAGUE</span>
-      </Link>
+      </TransitionLink>
     );
   }
 

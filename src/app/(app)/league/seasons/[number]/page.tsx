@@ -1,8 +1,8 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Trophy } from "lucide-react";
 import { StandingsTable } from "@/components/league/standings-table";
 import { LeagueMatchups } from "@/components/league/league-matchups";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getSeasonArchiveDetail } from "@/data-access/seasons";
@@ -38,10 +38,14 @@ export default async function SeasonArchiveDetailPage({ params }: { params: Prom
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <Link href="/league" className="label-system flex items-center gap-1.5 text-[11px] text-foreground-tertiary hover:text-foreground">
+        <TransitionLink
+          href="/league"
+          label="League"
+          className="label-system flex items-center gap-1.5 text-[11px] text-foreground-tertiary hover:text-foreground"
+        >
           <ArrowLeft className="size-3.5" strokeWidth={1.75} />
           BACK TO LEAGUE
-        </Link>
+        </TransitionLink>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Season {detail.seasonNumber}</h1>
           <span className="label-system text-[11px] text-foreground-tertiary">

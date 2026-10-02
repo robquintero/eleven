@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { OperationalRow } from "@/components/football/operational-row";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { RailModule } from "@/components/ui/rail-module";
 import type { MatchupFixtureIntelligence, StandingsRow } from "@/data-access/matchups";
 import { formatKickoff, pad2, starterBuckets } from "@/lib/team-fixture";
@@ -81,9 +81,9 @@ export function OperationsRail({
       <RailModule
         header="LEAGUE_TABLE"
         meta={
-          <Link href="/league" className="hover:text-foreground-secondary">
+          <TransitionLink href="/league" label="League" className="hover:text-foreground-secondary">
             FULL TABLE ↗
-          </Link>
+          </TransitionLink>
         }
       >
         {standings.length === 0 ? (

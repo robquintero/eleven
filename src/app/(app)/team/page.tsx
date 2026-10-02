@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { TeamWorkspace } from "@/components/team/team-workspace";
 import { ensureFirstRoundOpenedAction } from "@/app/(app)/team/actions";
@@ -81,12 +81,13 @@ export default async function TeamPage() {
               replacements from the free market whenever you&apos;re ready.
             </p>
           </div>
-          <Link
+          <TransitionLink
             href="/players"
+            label="Players"
             className="label-system shrink-0 text-[11px] text-accent hover:underline"
           >
             BROWSE MARKET →
-          </Link>
+          </TransitionLink>
         </div>
       )}
 

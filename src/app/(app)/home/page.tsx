@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { Greeting } from "@/components/dashboard/greeting";
 import { LeagueStatusPanel } from "@/components/dashboard/league-status-panel";
@@ -175,9 +175,9 @@ export default async function HomePage() {
                   Short on {vacancies.map((v) => `${v.short} ${v.position}`).join(", ")}.
                 </p>
               </div>
-              <Link href="/players" className="label-system shrink-0 text-[11px] text-accent hover:underline">
+              <TransitionLink href="/players" label="Players" className="label-system shrink-0 text-[11px] text-accent hover:underline">
                 BROWSE MARKET →
-              </Link>
+              </TransitionLink>
             </div>
           )}
 

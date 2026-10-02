@@ -1,5 +1,5 @@
-import Link from "next/link";
 import type { LeagueMatchupSummary } from "@/data-access/matchups";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { pad2 } from "@/lib/team-fixture";
 import { cn } from "@/lib/utils";
 
@@ -58,9 +58,9 @@ function MatchupRow({ matchup, myTeamId }: { matchup: LeagueMatchupSummary; myTe
 
   if (isMine) {
     return (
-      <Link href="/matchup" className="block bg-accent/5 transition-colors hover:bg-accent/10">
+      <TransitionLink href="/matchup" label="My Matchup" className="block bg-accent/5 transition-colors hover:bg-accent/10">
         {content}
-      </Link>
+      </TransitionLink>
     );
   }
   return content;

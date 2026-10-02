@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { Trophy } from "lucide-react";
 import { setActiveLeagueAction } from "@/app/(app)/actions";
 import { LeagueMatchups } from "@/components/league/league-matchups";
@@ -189,9 +190,13 @@ export default async function LeaguePage() {
                 <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
                   <span className="label-system text-[11px] text-foreground-secondary">CURRENT_MATCHUPS</span>
                   {myTeam && (
-                    <Link href="/matchup" className="label-system text-[10px] text-accent hover:underline">
+                    <TransitionLink
+                      href="/matchup"
+                      label="My Matchup"
+                      className="label-system text-[10px] text-accent hover:underline"
+                    >
                       MY MATCHUP ↗
-                    </Link>
+                    </TransitionLink>
                   )}
                 </div>
                 <LeagueMatchups
@@ -276,9 +281,13 @@ export default async function LeaguePage() {
                       : "Not yet available"}
                 </p>
                 {draftStatus && (
-                  <Link href="/draft" className="label-system mt-1.5 inline-block text-[11px] text-accent hover:underline">
+                  <TransitionLink
+                    href="/draft"
+                    label="Draft"
+                    className="label-system mt-1.5 inline-block text-[11px] text-accent hover:underline"
+                  >
                     OPEN DRAFT ROOM ↗
-                  </Link>
+                  </TransitionLink>
                 )}
               </div>
 

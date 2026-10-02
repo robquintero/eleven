@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TransitionLink } from "@/components/shell/transition-link";
 
 /**
  * Pass 11.5: the generated geometric "11" mark (formerly public/brand/
@@ -9,8 +10,24 @@ import Link from "next/link";
  * accessible name distinct from the visible lowercase text (so a screen
  * reader still announces it as "Eleven," not the literal lowercase
  * string).
+ *
+ * Pass 12F (§9): the authenticated app shell renders this via
+ * `authenticated` — outside AppShell (marketing/auth pages) it stays a
+ * bare Link since there's no NavigationTransitionProvider there.
  */
-export function Wordmark() {
+export function Wordmark({ authenticated = false }: { authenticated?: boolean }) {
+  if (authenticated) {
+    return (
+      <TransitionLink
+        href="/"
+        label="Home"
+        aria-label="Eleven — home"
+        className="flex items-center text-[15px] font-semibold tracking-tight text-foreground"
+      >
+        eleven
+      </TransitionLink>
+    );
+  }
   return (
     <Link
       href="/"

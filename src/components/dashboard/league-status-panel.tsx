@@ -1,5 +1,5 @@
-import Link from "next/link";
 import { OperationalRow } from "@/components/football/operational-row";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { Button } from "@/components/ui/button";
 import { MIN_MANAGERS_TO_START_DRAFT } from "@/domain/fantasy/constants";
 import type { LeagueLifecycleState } from "@/domain/fantasy/league-lifecycle";
@@ -52,7 +52,7 @@ export function LeagueStatusPanel({
         <p className="mt-3 text-sm text-foreground-secondary">{nextActionCopy[lifecycle]}</p>
 
         <div className="mt-4">
-          <Button nativeButton={false} variant="outline" size="sm" render={<Link href="/league" />}>
+          <Button nativeButton={false} variant="outline" size="sm" render={<TransitionLink href="/league" label="League" />}>
             Manage league
           </Button>
         </div>

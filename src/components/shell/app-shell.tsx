@@ -35,7 +35,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
             explicit stacking order to stay visually un-dimmed above it,
             same as the header/MobileNav already have. */}
         <aside className="hidden lg:sticky lg:top-0 lg:z-30 lg:flex lg:h-dvh lg:flex-col lg:gap-8 lg:border-r lg:border-border lg:px-5 lg:py-7">
-          <Wordmark />
+          <Wordmark authenticated />
           <div className="border-t border-border" />
           <DesktopNav />
 
@@ -59,7 +59,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
             <div className="flex items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
               <div className="flex items-center gap-3">
                 <div className="lg:hidden">
-                  <Wordmark />
+                  <Wordmark authenticated />
                 </div>
                 <LeagueSwitcher leagues={leagues} activeLeagueId={activeLeagueId} />
               </div>
