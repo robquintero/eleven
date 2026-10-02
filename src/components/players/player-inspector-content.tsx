@@ -7,9 +7,10 @@ import { FormSparkline } from "@/components/football/form-sparkline";
 import { AvailabilityStatus } from "@/components/players/availability-status";
 import { OwnershipStatus } from "@/components/players/ownership-status";
 import { PlayerAvatar } from "@/components/players/player-avatar";
+import { ScoringBreakdown } from "@/components/players/scoring-breakdown";
 import { Button } from "@/components/ui/button";
 import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-panel";
-import type { RecentMatchRow } from "@/data-access/players";
+import type { PlayerScoreBreakdown, RecentMatchRow } from "@/data-access/players";
 import { getUsageTrend } from "@/lib/selectors/usage-trend";
 import { getFormWindows } from "@/lib/selectors/form-tracker";
 import { availabilityLabel, formatKickoff, formatKickoffTime } from "@/lib/team-fixture";
@@ -83,6 +84,7 @@ export function PlayerInspectorContent({
   player,
   index,
   recentMatches,
+  scoreBreakdown,
   lineupContext,
   onRequestDrop,
   onClose,
@@ -92,6 +94,8 @@ export function PlayerInspectorContent({
   index?: number;
   /** `null` while loading, `[]` for INSUFFICIENT MATCH DATA, real rows otherwise — see src/data-access/players.ts. */
   recentMatches?: RecentMatchRow[] | null;
+  /** `undefined`/`null` while loading or if this player has no current-version scored match yet — see getPlayerLatestScoreBreakdown. */
+  scoreBreakdown?: PlayerScoreBreakdown | null;
   lineupContext?: LineupInspectorContext;
   /** Pass 11.5: present only from the Team page, for the caller's own roster player — opens the same drop confirmation Team/Players already share (see team-workspace.tsx). Never pre-blocked here for a locked player; `drop_player`'s own Pass 11 semantics decide what happens server-side. */
   onRequestDrop?: () => void;
@@ -258,6 +262,17 @@ export function PlayerInspectorContent({
             </div>
           </>
         )}
+      </TerminalPanelSection>
+
+      <TerminalPanelSection>
+        <p className="label-system text-[11px] text-foreground-tertiary">Scoring_breakdown</p>
+        <div className="mt-2">
+          {scoreBreakdown === undefined ? (
+            <p className="text-xs text-foreground-tertiary">Loading…</p>
+          ) : (
+            <ScoringBreakdown breakdown={scoreBreakdown} />
+          )}
+        </div>
       </TerminalPanelSection>
 
       <TerminalPanelSection>

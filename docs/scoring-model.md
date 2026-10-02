@@ -1,5 +1,12 @@
 # Eleven — Scoring Model (ELEVEN_STANDARD_V1)
 
+> **Superseded as the live formula.** `ELEVEN_STANDARD_V2` (Pass 12C) is
+> now the current `SCORING_RULE_VERSION` — see `docs/scoring-model-v2.md`
+> for the current formula, its milestone bonuses, and calibration. This
+> document remains the authoritative audit/record of V1, since V1's own
+> stored `fantasy_player_scores` rows are never deleted or rewritten (see
+> "Why recompute, never increment" below) — it is history, not stale.
+
 This is the scoring-analysis artifact the Pass 9 brief asks for: what raw
 data is actually available, what was selected, what was rejected, the
 empirical distributions the real 2026/27 dataset produces, and the

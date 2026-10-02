@@ -111,8 +111,8 @@ const FIXTURE_STATUS_TO_MATCH_STATE: Record<string, PlayerMatchState> = {
  * given scope; this never falls back to a mock roster.
  *
  * `totalPoints`/`averagePoints` come from real `fantasy_player_scores`
- * aggregates (Pass 9's `ELEVEN_STANDARD_V1` engine — see
- * docs/scoring-model.md); `undefined` means no scored performance exists
+ * aggregates (Eleven's versioned scoring engine, currently
+ * `ELEVEN_STANDARD_V2` — see docs/scoring-model-v2.md); `undefined` means no scored performance exists
  * yet for that player, rendered as "—", never as 0 (0 is a real,
  * meaningfully bad score; "no data" is a different, honest state). MIN and
  * STARTS come from real `player_match_stats` aggregates; ownership comes
@@ -427,7 +427,7 @@ async function getUsageAggregates(
 }
 
 /**
- * Cumulative current-season `ELEVEN_STANDARD_V1` fantasy points per player
+ * Cumulative current-season fantasy points per player (current `SCORING_RULE_VERSION`)
  * (Pass 9). `fantasy_player_scores` doesn't store a season column itself —
  * scoped to the current season via its `fixtures!inner(season)` join
  * rather than assuming every stored score is automatically current, so
@@ -548,7 +548,7 @@ async function getClubShortNames(supabase: SupabaseClientType, clubIds: string[]
   return new Map((data ?? []).map((c) => [c.id, c.short_name]));
 }
 
-/** One player's ELEVEN_STANDARD_V1 points for a specific set of fixtures, keyed by fixture id. Missing from the map means not yet scored — the caller renders that as `null`, never 0. */
+/** One player's current-version (`SCORING_RULE_VERSION`) points for a specific set of fixtures, keyed by fixture id. Missing from the map means not yet scored — the caller renders that as `null`, never 0. */
 async function getScoresByFixtureId(
   supabase: SupabaseClientType,
   playerId: string,
@@ -606,7 +606,7 @@ export interface RecentMatchRow {
   started: boolean;
   goals: number;
   assists: number;
-  /** ELEVEN_STANDARD_V1 points for this specific match, or `null` if not yet scored (e.g. scoring hasn't been backfilled for this fixture) — never fabricated as 0. */
+  /** Current-version (SCORING_RULE_VERSION) points for this specific match, or `null` if not yet scored (e.g. scoring hasn't been backfilled for this fixture) — never fabricated as 0. */
   fantasyPoints: number | null;
 }
 
@@ -673,4 +673,58 @@ export async function getPlayerRecentMatches(playerId: string, limit = 10): Prom
       assists: row.assists,
     };
   });
+}
+
+export interface PlayerScoreBreakdown {
+  fixtureId: string;
+  opponent: string;
+  isHome: boolean;
+  kickoffAt: string;
+  total: number;
+  /** `FantasyScoreBreakdown.components` (src/domain/fantasy/scoring.ts), stored verbatim as jsonb at scoring time — read back exactly as computed, never recomputed in the UI layer. */
+  components: Record<string, number>;
+}
+
+/**
+ * Pass 12C: the player's most recently scored match's full breakdown —
+ * powers the Player Inspector's modest new Scoring Breakdown panel
+ * (brief: "do not make the UI reverse-engineer a score; backend scoring
+ * remains authoritative"). `null` means this player has no CURRENT
+ * (`SCORING_RULE_VERSION`) scored performance yet. Fetches every scored
+ * row for this player rather than filtering fixtures server-side first —
+ * a full season's appearances is well under 100 rows, and this avoids the
+ * same "PostgREST can't order outer rows by an embedded relation's
+ * column" gotcha `getPlayerRecentMatches` already documents, by sorting
+ * in JS instead.
+ */
+export async function getPlayerLatestScoreBreakdown(playerId: string): Promise<PlayerScoreBreakdown | null> {
+  if (!isSupabaseConfigured()) return null;
+  const supabase = await resolveClient();
+
+  const { data: player } = await supabase.from("players").select("club_id").eq("id", playerId).maybeSingle();
+  if (!player) return null;
+
+  const { data } = await supabase
+    .from("fantasy_player_scores")
+    .select("fixture_id, points, breakdown, fixtures(kickoff_at, home_club_id, away_club_id)")
+    .eq("player_id", playerId)
+    .eq("scoring_rule_version", SCORING_RULE_VERSION);
+
+  const rows = (data ?? []).filter((row) => row.fixtures);
+  if (rows.length === 0) return null;
+
+  const latest = rows.sort((a, b) => new Date(b.fixtures!.kickoff_at).getTime() - new Date(a.fixtures!.kickoff_at).getTime())[0];
+  const fixture = latest.fixtures!;
+  const isHome = fixture.home_club_id === player.club_id;
+  const opponentId = isHome ? fixture.away_club_id : fixture.home_club_id;
+  const clubShortNames = await getClubShortNames(supabase, [opponentId]);
+
+  return {
+    fixtureId: latest.fixture_id,
+    opponent: clubShortNames.get(opponentId) ?? "—",
+    isHome,
+    kickoffAt: fixture.kickoff_at,
+    total: latest.points,
+    components: (latest.breakdown as Record<string, number> | null) ?? {},
+  };
 }

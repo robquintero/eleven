@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getPlayerRecentMatches, type RecentMatchRow } from "@/data-access/players";
+import { getPlayerRecentMatches, getPlayerLatestScoreBreakdown, type RecentMatchRow, type PlayerScoreBreakdown } from "@/data-access/players";
 import { toMarketActionError } from "@/lib/errors/market-action-error";
 import { MARKET_ACTION_ERROR_COPY } from "@/lib/errors/market-action-error-copy";
 
@@ -11,6 +11,11 @@ export type MarketActionState = { error?: string } | undefined;
 /** Thin server-action wrapper so the client-side Player Inspector can fetch one player's real recent matches on demand, without ever calling Supabase directly. */
 export async function getPlayerRecentMatchesAction(playerId: string): Promise<RecentMatchRow[]> {
   return getPlayerRecentMatches(playerId);
+}
+
+/** Pass 12C: thin server-action wrapper for the Player Inspector's Scoring Breakdown panel. `null` means this player has no current-version scored performance yet. */
+export async function getPlayerScoreBreakdownAction(playerId: string): Promise<PlayerScoreBreakdown | null> {
+  return getPlayerLatestScoreBreakdown(playerId);
 }
 
 /**

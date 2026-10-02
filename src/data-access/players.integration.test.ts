@@ -29,10 +29,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createAdminClient, isSupabaseAdminConfigured } from "../lib/supabase/admin.ts";
 import { queryPlayerDatabase } from "./players.ts";
+import { SCORING_RULE_VERSION } from "../domain/fantasy/scoring.ts";
 
 const skip = !isSupabaseAdminConfigured();
 
-const SCORING_RULE_VERSION = "ELEVEN_STANDARD_V1";
 const CURRENT_SEASON = 2026;
 
 /**

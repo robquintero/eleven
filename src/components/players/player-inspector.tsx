@@ -6,7 +6,7 @@ import {
   PlayerInspectorContent,
   type LineupInspectorContext,
 } from "@/components/players/player-inspector-content";
-import { getPlayerRecentMatchesAction } from "@/app/(app)/players/actions";
+import { getPlayerRecentMatchesAction, getPlayerScoreBreakdownAction } from "@/app/(app)/players/actions";
 import {
   Sheet,
   SheetContent,
@@ -14,7 +14,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import type { RecentMatchRow } from "@/data-access/players";
+import type { PlayerScoreBreakdown, RecentMatchRow } from "@/data-access/players";
 import type { Player } from "@/lib/types/fantasy";
 
 export function PlayerInspector({
@@ -44,6 +44,7 @@ export function PlayerInspector({
   // synchronously in the effect body) — the loading state is *derived*
   // below by comparing this to the current player, not tracked separately.
   const [loadedMatches, setLoadedMatches] = useState<{ playerId: string; matches: RecentMatchRow[] } | null>(null);
+  const [loadedBreakdown, setLoadedBreakdown] = useState<{ playerId: string; breakdown: PlayerScoreBreakdown | null } | null>(null);
 
   useEffect(() => {
     if (!player) return;
@@ -51,6 +52,9 @@ export function PlayerInspector({
     const playerId = player.id;
     getPlayerRecentMatchesAction(playerId).then((matches) => {
       if (!cancelled) setLoadedMatches({ playerId, matches });
+    });
+    getPlayerScoreBreakdownAction(playerId).then((breakdown) => {
+      if (!cancelled) setLoadedBreakdown({ playerId, breakdown });
     });
     return () => {
       cancelled = true;
@@ -60,6 +64,11 @@ export function PlayerInspector({
 
   const recentMatches =
     loadedMatches && player && loadedMatches.playerId === player.id ? loadedMatches.matches : null;
+  // `undefined` = not yet fetched for this player (distinct from a
+  // resolved-but-null "no scored match yet" result) — mirrors
+  // `recentMatches`'s own loading-vs-empty distinction above.
+  const scoreBreakdown =
+    loadedBreakdown && player && loadedBreakdown.playerId === player.id ? loadedBreakdown.breakdown : undefined;
 
   if (variant === "inline") {
     if (!player) return null;
@@ -70,6 +79,7 @@ export function PlayerInspector({
           player={player}
           index={index}
           recentMatches={recentMatches}
+          scoreBreakdown={scoreBreakdown}
           lineupContext={lineupContext}
           onRequestDrop={onRequestDrop}
         />
@@ -102,6 +112,7 @@ export function PlayerInspector({
               player={player}
               index={index}
               recentMatches={recentMatches}
+              scoreBreakdown={scoreBreakdown}
               lineupContext={lineupContext}
               onRequestDrop={onRequestDrop}
               onClose={() => onOpenChange(false)}
