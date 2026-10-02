@@ -1045,6 +1045,116 @@ only the section's own label moved to the system register.
 
 ---
 
+## 23. Pass 13 — Premium Visual System Refinements
+
+Pass 13's own audit (read the actual current source, not just this file —
+DESIGN.md had drifted from implementation in several places) found the
+core system sound: dual typography, terminal geometry, and semantic color
+were applied with real discipline almost everywhere. The drift was
+concentrated in a handful of concrete spots, documented here so future
+passes don't reintroduce them.
+
+**Confirmed drift from this file's own rules, fixed this pass:**
+
+- `.label-system` was being applied to full human-readable sentences
+  (activity-feed entries, league transaction summaries), uppercasing
+  prose — forbidden by §18. `.label-system` is for the label/status
+  *around* a sentence, never the sentence itself.
+- A literal 🔒 emoji glyph had crept into one compact status row — §9/§18
+  forbid emoji as interface icons; replaced with the existing `Lock`
+  Lucide icon already used elsewhere for the same state.
+- The permanent "ELEVEN · BETA" attribution tag was a `rounded-full`
+  pill around static text — §20 reserves `rounded-full` for human/
+  football identity only; this is inline metadata, not an identity
+  marker or a control.
+- `ui/dialog.tsx` (shadcn default, unmodified) was a **second,
+  un-terminal-ized dialog language**: `rounded-xl`, a `ring-1
+  ring-foreground/10`, and a `rounded-b-xl bg-muted/50` footer strip,
+  with plain human-register `DialogTitle` text used for operational
+  strings like "PROPOSE TRADE" / "DROP {name}". Squared up to the
+  terminal system: `rounded-soft` (4px, matching the command palette's
+  own popup radius — not `rounded-terminal`/0, a dialog is a floating
+  overlay not a flush workspace pane), a hard `border-t` footer instead
+  of a rounded muted strip, and `DialogTitle` given `.label-system`
+  styling so every real usage (all of which already pass uppercase
+  operational strings) renders correctly instead of accidentally
+  uppercasing human-register type.
+- Roster-row selection (`bench-row.tsx`) used a `rounded-lg` box +
+  `ring-1 ring-accent` instead of the `border-l-accent` left-edge
+  indicator every other roster list (`player-table.tsx`,
+  `standings-table.tsx`) already uses — reconciled onto the one
+  documented pattern (§20).
+- The Players desktop filter bar — cited in the Pass 13 brief itself as
+  a reference pattern — was actually the one clearest remaining generic
+  control: six bare native `<select>` elements with default browser
+  chrome inside an otherwise bespoke bordered strip. New
+  `ui/select-trigger.tsx` (`SelectTrigger`, a styled `<select>` wrapper:
+  `rounded-control` border, a `.label-system` current-value label, and a
+  fixed Lucide `ChevronDown`) replaces all six — same native `<select>`
+  underneath for zero-JS-cost accessibility and keyboard behavior, fully
+  restyled chrome. This is now the one control to reach for anywhere
+  Eleven needs a dropdown trigger (§17 inventory).
+
+**Formalized control grammar (§17 addition):** `SelectTrigger`
+(`ui/select-trigger.tsx`) joins `Button`/`Input`/`TerminalPanel` as a
+base primitive — a native `<select>` for behavior, Eleven's own square
+chrome and chevron for visuals. Never reach for a bare `<select>` again;
+never build a custom listbox/combobox for a single-choice filter where
+a native select is sufficient.
+
+**Color semantics** — no changes. The audit found the existing §3 table
+(blue = interaction, green = live/positive, amber = doubtful/caution,
+red = destructive/injured/suspended, gray = locked/neutral) already
+applied with unusual discipline across every surface audited; the Pass
+13 brief's own semantics are a restatement of what's already true here,
+not a change. The one real gap found was DRY, not semantic: the
+destructive/warning/live/neutral tone map was independently
+hand-written in three places (`team-fixture.ts`, `availability-status.
+tsx`, `ownership-status.tsx`, `matchup-compact-row.tsx`) instead of
+sharing one source — left as a known follow-up, not fixed this pass
+(pure refactor risk/reward didn't justify touching four files of
+already-correct logic under this pass's time budget).
+
+**Surface/border reduction** — League (`/league`) was the one screen
+that genuinely matched the brief's "heading → bordered rectangle →
+heading → bordered rectangle" complaint: roughly a dozen independently
+bordered, identically-weighted sections with no focal hero (textbook
+§21 "dashboard tile overload"). Recomposed per §21's three surface
+levels — see the League section of the Pass 13 completion report in
+HANDOFF.md for the concrete before/after structure. Home and Matchup
+were already reasonably well-composed (one clear hero module each,
+3-4 bordered regions total) and did not need the same treatment.
+
+**Known, intentionally-deferred items** (documented rather than fixed,
+with reasons):
+
+- `crestColor` (the `Club` type field) is wired through every
+  data-access layer but hardcoded to flat gray everywhere it's read —
+  club color never actually reaches the UI, and no club crest imagery
+  exists anywhere in the codebase (`team-crest.tsx`, referenced in an
+  older version of §17, does not exist). The Pass 13 brief explicitly
+  prohibits introducing crest imagery without confirming asset policy
+  first — this pass did not do that, so crest/color identity stays
+  exactly as it was. A real decision (source real club crests under a
+  confirmed license, or formally retire `crestColor` as dead code) is a
+  separate product call, not a visual-polish one.
+- `ui/badge.tsx`'s `rounded-4xl` pill variant is dead code (unused
+  anywhere in the app) but a landmine for a future author who assumes
+  it's the house style. Left in place rather than rewritten, since
+  fixing an unused component's styling has no visible product effect
+  this pass — flagged here so the next author restyles it to the §20
+  scale before ever actually using it.
+- Several `Button` call sites in Account/Auth (`change-password-form.
+  tsx`, `delete-account-section.tsx`, `display-name-form.tsx`,
+  throughout `components/auth/*`) manually override to `rounded-control`
+  (2px) against `Button`'s own default `rounded-lg` (4px). The override
+  is applied consistently across every instance found, so it reads as a
+  deliberate (if undocumented) choice rather than drift — left as-is
+  rather than force-changed in either direction without knowing which
+  one was intended.
+
+---
+
 ## Quality Check
 
 Before shipping any new screen or component, ask:
