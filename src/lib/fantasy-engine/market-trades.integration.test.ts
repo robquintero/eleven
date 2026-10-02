@@ -454,7 +454,9 @@ test("lock integrity: a trade that moves a LOCKED starter away leaves that locke
   const league = await createTestLeague(admin, 2, 16);
   try {
     const [playerD] = await findFreeAgents(admin, league.leagueId, "DEF", 1);
+    const [playerReturn] = await findFreeAgents(admin, league.leagueId, "MID", 1, new Set([playerD]));
     const [rosterEntryD] = await signPlayers(league.clients[0], league.leagueId, [playerD]);
+    await signPlayers(league.clients[1], league.leagueId, [playerReturn]);
 
     const opened = await openNextRound(admin, league.leagueId, new Date());
     assert.ok(opened.ok);
@@ -467,11 +469,15 @@ test("lock integrity: a trade that moves a LOCKED starter away leaves that locke
       .eq("roster_entry_id", rosterEntryD)
       .eq("fantasy_round_id", opened.roundId);
 
+    // Pass 12F: trades must be equal-count on both sides -- a 1-for-1
+    // here (never a bare 1-for-0 "give away"), which doesn't change what
+    // this test is actually verifying (what happens to playerD's own
+    // locked slot specifically).
     const { data: proposed, error: proposeError } = await league.clients[0].rpc("propose_trade", {
       p_league_id: league.leagueId,
       p_receiving_team_id: league.teamIds[1],
       p_offered_player_ids: [playerD],
-      p_requested_player_ids: [],
+      p_requested_player_ids: [playerReturn],
     });
     assert.equal(proposeError, null);
 
@@ -571,11 +577,17 @@ test("propose_trade: offering a player the proposer doesn't actually own fails w
   const league = await createTestLeague(admin, 2, 16);
   try {
     const [notOwned] = await findFreeAgents(admin, league.leagueId, "MID", 1);
+    // Pass 12F: equal-count (1-for-1, a real player team1 owns on the
+    // requested side) -- isolates this test to the OFFERED-side ownership
+    // check specifically, rather than tripping the (separately tested)
+    // UNEVEN_TRADE check first.
+    const [requested] = await findFreeAgents(admin, league.leagueId, "FWD", 1, new Set([notOwned]));
+    await signPlayers(league.clients[1], league.leagueId, [requested]);
     const { error } = await league.clients[0].rpc("propose_trade", {
       p_league_id: league.leagueId,
       p_receiving_team_id: league.teamIds[1],
       p_offered_player_ids: [notOwned],
-      p_requested_player_ids: [],
+      p_requested_player_ids: [requested],
     });
     assert.equal(error?.message, "INVALID_TRADE_ASSET");
 
@@ -586,18 +598,135 @@ test("propose_trade: offering a player the proposer doesn't actually own fails w
   }
 });
 
+// ---------------------------------------------------------------------
+// Pass 12F: trades must contain the same number of players on both sides
+// (supabase/migrations/20261003000100_trade_equal_player_counts.sql).
+// Every test here calls `propose_trade` DIRECTLY through the real
+// RLS-gated RPC, the exact same path (and the ONLY path — neither
+// `trades` nor `trade_assets` has an INSERT policy for `authenticated`)
+// a client UI uses — proving the rule is authoritative at the database
+// layer itself, never merely a frontend/UI-level restriction a client
+// could bypass.
+// ---------------------------------------------------------------------
+
+test("propose_trade: a 2-for-2 trade is accepted -- equal counts are valid at any size, not just 1-for-1", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const offered = await findFreeAgents(admin, league.leagueId, "DEF", 2);
+    const requested = await findFreeAgents(admin, league.leagueId, "FWD", 2, new Set(offered));
+    await signPlayers(league.clients[0], league.leagueId, offered);
+    await signPlayers(league.clients[1], league.leagueId, requested);
+
+    const { data, error } = await league.clients[0].rpc("propose_trade", {
+      p_league_id: league.leagueId,
+      p_receiving_team_id: league.teamIds[1],
+      p_offered_player_ids: offered,
+      p_requested_player_ids: requested,
+    });
+    assert.equal(error, null);
+    assert.ok(data?.[0]?.trade_id);
+
+    const { data: assets } = await admin.from("trade_assets").select("player_id").eq("trade_id", data![0]!.trade_id);
+    assert.equal(assets?.length, 4, "2 offered + 2 requested = 4 trade_assets rows");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("propose_trade: a 2-for-1 trade is rejected with UNEVEN_TRADE, and no trade row is created", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const offered = await findFreeAgents(admin, league.leagueId, "DEF", 2);
+    const [requested] = await findFreeAgents(admin, league.leagueId, "FWD", 1, new Set(offered));
+    await signPlayers(league.clients[0], league.leagueId, offered);
+    await signPlayers(league.clients[1], league.leagueId, [requested]);
+
+    const { error } = await league.clients[0].rpc("propose_trade", {
+      p_league_id: league.leagueId,
+      p_receiving_team_id: league.teamIds[1],
+      p_offered_player_ids: offered,
+      p_requested_player_ids: [requested],
+    });
+    assert.equal(error?.message, "UNEVEN_TRADE");
+
+    const { data: trades } = await admin.from("trades").select("id").eq("league_id", league.leagueId);
+    assert.equal(trades?.length ?? 0, 0, "an uneven trade must never create a trades row, even partially");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("propose_trade: a 3-for-2 trade is rejected with UNEVEN_TRADE", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const offered = await findFreeAgents(admin, league.leagueId, "DEF", 3);
+    const requested = await findFreeAgents(admin, league.leagueId, "FWD", 2, new Set(offered));
+    await signPlayers(league.clients[0], league.leagueId, offered);
+    await signPlayers(league.clients[1], league.leagueId, requested);
+
+    const { error } = await league.clients[0].rpc("propose_trade", {
+      p_league_id: league.leagueId,
+      p_receiving_team_id: league.teamIds[1],
+      p_offered_player_ids: offered,
+      p_requested_player_ids: requested,
+    });
+    assert.equal(error?.message, "UNEVEN_TRADE");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
+test("propose_trade: the uneven-count rejection is authoritative at the RPC/database layer -- calling it directly with mismatched arrays (no client-side UI involved at all) is still rejected", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const offered = await findFreeAgents(admin, league.leagueId, "MID", 3);
+    const [requested] = await findFreeAgents(admin, league.leagueId, "GK", 1, new Set(offered));
+    await signPlayers(league.clients[0], league.leagueId, offered);
+    await signPlayers(league.clients[1], league.leagueId, [requested]);
+
+    // Deliberately a 3-for-1 "bypass" attempt -- a hypothetical client
+    // that skipped its own validation entirely. The database itself must
+    // still refuse this, not merely decline to render a "Review" button.
+    const { error } = await league.clients[0].rpc("propose_trade", {
+      p_league_id: league.leagueId,
+      p_receiving_team_id: league.teamIds[1],
+      p_offered_player_ids: offered,
+      p_requested_player_ids: [requested],
+    });
+    assert.equal(error?.message, "UNEVEN_TRADE", "the RPC itself is the enforcement point -- there is no client-side-only version of this rule");
+
+    const { data: leagueTrades } = await admin.from("trades").select("id").eq("league_id", league.leagueId);
+    assert.equal(leagueTrades?.length ?? 0, 0, "the rejected attempt left no trades row for this league at all");
+    const { data: assets } = await admin
+      .from("trade_assets")
+      .select("id")
+      .in("trade_id", (leagueTrades ?? []).map((t) => t.id));
+    assert.equal(assets?.length ?? 0, 0, "and therefore no trade_assets rows either -- the rejected attempt left no partial trace");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
 test("cancel_trade and reject_trade: the proposer can cancel their own pending trade, the receiver can reject an incoming one, and neither changes ownership", { skip }, async () => {
   const admin = createAdminClient();
   const league = await createTestLeague(admin, 2, 16);
   try {
     const [playerA] = await findFreeAgents(admin, league.leagueId, "DEF", 1);
+    const [playerB] = await findFreeAgents(admin, league.leagueId, "FWD", 1, new Set([playerA]));
     await signPlayers(league.clients[0], league.leagueId, [playerA]);
+    await signPlayers(league.clients[1], league.leagueId, [playerB]);
 
+    // Pass 12F: equal-count (1-for-1) on both proposals below -- cancel/
+    // reject behavior itself doesn't depend on trade size.
     const { data: proposed1 } = await league.clients[0].rpc("propose_trade", {
       p_league_id: league.leagueId,
       p_receiving_team_id: league.teamIds[1],
       p_offered_player_ids: [playerA],
-      p_requested_player_ids: [],
+      p_requested_player_ids: [playerB],
     });
     const { error: cancelError } = await league.clients[0].rpc("cancel_trade", { p_trade_id: proposed1![0]!.trade_id });
     assert.equal(cancelError, null);
@@ -608,7 +737,7 @@ test("cancel_trade and reject_trade: the proposer can cancel their own pending t
       p_league_id: league.leagueId,
       p_receiving_team_id: league.teamIds[1],
       p_offered_player_ids: [playerA],
-      p_requested_player_ids: [],
+      p_requested_player_ids: [playerB],
     });
     const { error: rejectError } = await league.clients[1].rpc("reject_trade", { p_trade_id: proposed2![0]!.trade_id });
     assert.equal(rejectError, null);
@@ -680,17 +809,23 @@ test("accept_trade: two trades offering the SAME player to two different teams -
     const [contested] = await findFreeAgents(admin, league.leagueId, "MID", 1);
     await signPlayers(league.clients[0], league.leagueId, [contested]);
 
+    // Pass 12F: equal-count on both proposals below -- the race being
+    // tested is about ownership of `contested`, not trade size.
+    const [returnFromB, returnFromC] = await findFreeAgents(admin, league.leagueId, "FWD", 2, new Set([contested]));
+    await signPlayers(league.clients[1], league.leagueId, [returnFromB]);
+    await signPlayers(league.clients[2], league.leagueId, [returnFromC]);
+
     const { data: tradeToB } = await league.clients[0].rpc("propose_trade", {
       p_league_id: league.leagueId,
       p_receiving_team_id: league.teamIds[1],
       p_offered_player_ids: [contested],
-      p_requested_player_ids: [],
+      p_requested_player_ids: [returnFromB],
     });
     const { data: tradeToC } = await league.clients[0].rpc("propose_trade", {
       p_league_id: league.leagueId,
       p_receiving_team_id: league.teamIds[2],
       p_offered_player_ids: [contested],
-      p_requested_player_ids: [],
+      p_requested_player_ids: [returnFromC],
     });
 
     const [resultB, resultC] = await Promise.all([
@@ -730,11 +865,16 @@ test("accept_trade: an acceptance that would push the receiving team's position 
     const [thirdGk] = await findFreeAgents(admin, league.leagueId, "GK", 1, new Set(gksForReceiver));
     await signPlayers(league.clients[0], league.leagueId, [thirdGk]);
 
+    // Pass 12F: equal-count -- the receiving team sends back a non-GK so
+    // the GK-limit check under test is unaffected by the other side.
+    const [returnPlayer] = await findFreeAgents(admin, league.leagueId, "FWD", 1);
+    await signPlayers(league.clients[1], league.leagueId, [returnPlayer]);
+
     const { data: proposed } = await league.clients[0].rpc("propose_trade", {
       p_league_id: league.leagueId,
       p_receiving_team_id: league.teamIds[1],
       p_offered_player_ids: [thirdGk],
-      p_requested_player_ids: [],
+      p_requested_player_ids: [returnPlayer],
     });
     const { error } = await league.clients[1].rpc("accept_trade", { p_trade_id: proposed![0]!.trade_id });
     assert.equal(error?.message, "ROSTER_LIMIT_EXCEEDED");
@@ -764,13 +904,15 @@ test("security: a manager cannot accept, reject, or cancel a trade in a role the
   const league = await createTestLeague(admin, 2, 16);
   try {
     const [playerA] = await findFreeAgents(admin, league.leagueId, "DEF", 1);
+    const [playerB] = await findFreeAgents(admin, league.leagueId, "FWD", 1, new Set([playerA]));
     await signPlayers(league.clients[0], league.leagueId, [playerA]);
+    await signPlayers(league.clients[1], league.leagueId, [playerB]);
 
     const { data: proposed } = await league.clients[0].rpc("propose_trade", {
       p_league_id: league.leagueId,
       p_receiving_team_id: league.teamIds[1],
       p_offered_player_ids: [playerA],
-      p_requested_player_ids: [],
+      p_requested_player_ids: [playerB],
     });
     const tradeId = proposed![0]!.trade_id;
 

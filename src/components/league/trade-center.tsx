@@ -349,6 +349,8 @@ export function ProposeTradeDialog({
           </div>
         )}
 
+        {step === "players" && targetTeam && <TradeCountHint offeredCount={offeredIds.length} requestedCount={requestedIds.length} />}
+
         {step === "review" && targetTeam && (
           <div className="text-xs">
             <p className="label-system text-[11px] text-foreground-tertiary">TO {targetTeam.name.toUpperCase()}</p>
@@ -378,7 +380,7 @@ export function ProposeTradeDialog({
                 Back
               </Button>
               <Button
-                disabled={offeredIds.length === 0 && requestedIds.length === 0}
+                disabled={offeredIds.length === 0 || offeredIds.length !== requestedIds.length}
                 onClick={() => setStep("review")}
               >
                 Review
@@ -398,5 +400,36 @@ export function ProposeTradeDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+/**
+ * Pass 12F (§7): live feedback for the canonical "equal player counts on
+ * both sides" rule (`propose_trade`'s own authoritative UNEVEN_TRADE
+ * check — this is a courtesy mirror of that rule, never the enforcement
+ * itself). Shows the real counts on both sides and, while they differ,
+ * exactly how many more players from which side would balance the trade.
+ */
+function TradeCountHint({ offeredCount, requestedCount }: { offeredCount: number; requestedCount: number }) {
+  const difference = offeredCount - requestedCount;
+
+  return (
+    <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3 text-xs">
+      <div className="flex items-center gap-4">
+        <span className="label-system text-[10px] text-foreground-tertiary">
+          YOUR SIDE <span className="font-semibold text-foreground">{offeredCount}</span>
+        </span>
+        <span className="label-system text-[10px] text-foreground-tertiary">
+          THEIR SIDE <span className="font-semibold text-foreground">{requestedCount}</span>
+        </span>
+      </div>
+      {difference !== 0 && (offeredCount > 0 || requestedCount > 0) && (
+        <span className="label-system text-[10px] text-accent">
+          {difference > 0
+            ? `ADD ${difference} PLAYER${difference === 1 ? "" : "S"} FROM THEIR TEAM`
+            : `ADD ${-difference} PLAYER${-difference === 1 ? "" : "S"} FROM YOUR TEAM`}
+        </span>
+      )}
+    </div>
   );
 }
