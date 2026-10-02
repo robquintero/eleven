@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { determineFixtureSyncCadence } from "../../domain/football/sync-cadence.ts";
+import { determineFixtureSyncCadence, isDueForSync } from "../../domain/football/sync-cadence.ts";
 import type { FixtureStatus } from "../../domain/football/types.ts";
 import { syncFixtures } from "./sync-fixtures.ts";
 import { syncFixtureStats } from "./sync-fixture-stats.ts";
@@ -10,6 +10,7 @@ import { shouldStopForQuota } from "./quota.ts";
 import { PROVIDER } from "./identity.ts";
 import { backfillScores } from "../scoring/backfill.ts";
 import type { Database } from "../supabase/database.types.ts";
+import type { ProviderQuota } from "../football-providers/types.ts";
 
 export interface LiveSyncTickResult {
   now: string;
@@ -66,6 +67,14 @@ export async function runLiveSyncTick(
   const errors: string[] = [];
   let requestsUsed = 0;
   let stoppedForQuota = false;
+  // Gate 1 finding: real quota IS parsed from every provider response
+  // (client.ts's parseQuotaHeaders) and used live for the circuit breaker
+  // below, but this tick's own recorded domain_events row previously
+  // hardcoded `quota: {}` -- the real numbers were never actually
+  // observable after the fact from the automatic cron's own history, only
+  // from a manual CLI run. Tracked here so the LAST real quota seen this
+  // tick (if any provider call was made at all) gets persisted.
+  let lastQuota: ProviderQuota = {};
 
   // Paginated explicitly: a full season across 7 competitions comfortably
   // exceeds PostgREST's default 1000-row page (found live while first
@@ -77,6 +86,7 @@ export async function runLiveSyncTick(
     status: string;
     kickoff_at: string;
     competition_id: string;
+    last_live_sync_at: string | null;
     competitions: { code: string } | null;
   };
   let candidates: CandidateFixture[] = [];
@@ -85,7 +95,7 @@ export async function runLiveSyncTick(
     for (;;) {
       const { data, error } = await admin
         .from("fixtures")
-        .select("id, status, kickoff_at, competition_id, competitions(code)")
+        .select("id, status, kickoff_at, competition_id, last_live_sync_at, competitions(code)")
         .in("status", ["scheduled", "live", "ht", "final"])
         .range(from, from + 999);
       if (error) {
@@ -107,8 +117,24 @@ export async function runLiveSyncTick(
     }
   }
 
-  const needingSync = (candidates ?? []).filter((f) =>
-    determineFixtureSyncCadence({ status: f.status as FixtureStatus, kickoffAt: f.kickoff_at }, now).shouldSync
+  // Pass 14 go-live Gate 1 fix: `determineFixtureSyncCadence`'s own
+  // `suggestedIntervalMinutes` was never enforced before this -- every
+  // fixture within its approaching-kickoff/recently-final window got
+  // re-synced on literally every one-minute tick for the window's entire
+  // duration (a real Big Five matchday was calculated at 16,000+
+  // provider requests/day this way, over double the 7,500/day budget,
+  // before any international load). `isDueForSync` applies the already-
+  // intended interval on top of the phase decision, using the persisted
+  // `last_live_sync_at` column (a cron invocation has no in-memory state
+  // to carry an interval across ticks on its own) -- see sync-cadence.ts.
+  const decisionByFixtureId = new Map(
+    candidates.map((f) => [
+      f.id,
+      determineFixtureSyncCadence({ status: f.status as FixtureStatus, kickoffAt: f.kickoff_at }, now),
+    ])
+  );
+  const needingSync = candidates.filter((f) =>
+    isDueForSync(decisionByFixtureId.get(f.id)!, f.last_live_sync_at ? new Date(f.last_live_sync_at) : null, now)
   );
 
   const competitionCodes = Array.from(
@@ -117,16 +143,34 @@ export async function runLiveSyncTick(
 
   const today = now.toISOString().slice(0, 10);
 
+  // Only the approaching-kickoff phase needs its throttle marked here --
+  // live/ht and recently-final fixtures get their own individual
+  // `syncFixtureStats` call below, which is what actually refreshes their
+  // data and is where their `last_live_sync_at` gets updated instead.
+  // Marked ONLY after this competition's own syncFixtures call actually
+  // succeeds, so a failed/quota-stopped competition correctly stays due
+  // on the very next tick rather than silently going quiet for 30 minutes.
+  const approachingFixtureIdsToMark: string[] = [];
+
   for (const code of competitionCodes) {
     if (stoppedForQuota) break;
     try {
       const result = await syncFixtures(admin, resolveCompetition(code), { from: today, to: today });
       requestsUsed += result.requestsUsed;
       errors.push(...result.errors);
+      lastQuota = result.quota;
       if (shouldStopForQuota(result.quota)) stoppedForQuota = true;
+      for (const f of needingSync) {
+        if ((f.competitions as { code: string } | null)?.code !== code) continue;
+        if (decisionByFixtureId.get(f.id)?.reason === "approaching-kickoff") approachingFixtureIdsToMark.push(f.id);
+      }
     } catch (err) {
       errors.push(`syncFixtures failed for ${code}: ${err instanceof Error ? err.message : String(err)}`);
     }
+  }
+
+  if (approachingFixtureIdsToMark.length > 0) {
+    await admin.from("fixtures").update({ last_live_sync_at: now.toISOString() }).in("id", approachingFixtureIdsToMark);
   }
 
   // Re-read status after the refresh above — a fixture in `needingSync`
@@ -158,6 +202,7 @@ export async function runLiveSyncTick(
           const result = await syncFixtureStats(admin, mapping.external_id);
           requestsUsed += result.requestsUsed;
           errors.push(...result.errors);
+          lastQuota = result.quota;
           if (result.counts.failed === 0) {
             fixtureStatsSynced += 1;
             touchedFixtureIds.push(mapping.internal_entity_id);
@@ -175,6 +220,14 @@ export async function runLiveSyncTick(
     const backfillResult = await backfillScores(admin, { fixtureIds: touchedFixtureIds });
     scoresRecomputed = backfillResult.scored;
     errors.push(...backfillResult.errors);
+
+    // Marks exactly the fixtures that just got a REAL, successful stats
+    // refresh -- live/ht fixtures land here every tick (their interval
+    // bypasses the throttle, see isDueForSync), and recently-final
+    // fixtures land here at most once per POST_FINAL_RECONCILIATION_INTERVAL_MINUTES,
+    // which is the actual fix for the quota overage this Gate 1 finding
+    // describes.
+    await admin.from("fixtures").update({ last_live_sync_at: now.toISOString() }).in("id", touchedFixtureIds);
   }
 
   const result: LiveSyncTickResult = {
@@ -199,7 +252,7 @@ export async function runLiveSyncTick(
       failed: errors.length > 0 ? 1 : 0,
     },
     requestsUsed,
-    quota: {},
+    quota: lastQuota,
     errors,
     stoppedForQuota,
   });

@@ -102,3 +102,39 @@ export function determineFixtureSyncCadence(
   }
   return { shouldSync: false, reason: "too-far-from-kickoff", suggestedIntervalMinutes: 24 * 60 };
 }
+
+/**
+ * Pass 14 go-live Gate 1 finding: `suggestedIntervalMinutes` above was
+ * computed but never actually enforced anywhere — every fixture in the
+ * "approaching-kickoff" or "recently-final-reconciliation" phase got
+ * re-synced on literally every one-minute cron tick for the ENTIRE
+ * duration of that phase (up to ~22 hours of redundant per-minute
+ * `GET /fixtures/players` calls per finished fixture), which a single
+ * real Big Five matchday showed costs 16,000+ provider requests against
+ * the 7,500/day budget — over double the daily allowance from one
+ * league's one day, before any international load. This is the actual
+ * enforcement, applied on top of `determineFixtureSyncCadence`'s
+ * decision by the caller (`live-sync.ts`), which also persists
+ * `lastSyncedAt` per fixture across ticks (a Vercel cron invocation has
+ * no in-memory state to carry an interval across ticks itself).
+ *
+ * The "live"/"ht" phase's `suggestedIntervalMinutes` (1) is a no-op
+ * here by design — live fixtures must still sync every tick; this
+ * function only ever makes an already-due decision LESS frequent, never
+ * more frequent, so it can safely wrap every phase without a special
+ * case for "live" at the call site.
+ */
+export function isDueForSync(decision: FixtureSyncCadenceDecision, lastSyncedAt: Date | null, now: Date): boolean {
+  if (!decision.shouldSync) return false;
+  // The live/ht phase's 1-minute "suggested" interval must behave as
+  // "always sync," not "at most once per 60.000 seconds" -- the cron
+  // itself already only ticks once a minute, so a strict >= comparison
+  // here would risk skipping a live fixture on a tick that lands even a
+  // few seconds under a minute after the previous one (cron jitter,
+  // variable function duration), which is exactly the live-score
+  // freshness this fix must never regress.
+  if (decision.suggestedIntervalMinutes <= 1) return true;
+  if (!lastSyncedAt) return true;
+  const minutesSinceLastSync = (now.getTime() - lastSyncedAt.getTime()) / 60_000;
+  return minutesSinceLastSync >= decision.suggestedIntervalMinutes;
+}
