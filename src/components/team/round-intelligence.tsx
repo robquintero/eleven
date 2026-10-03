@@ -2,7 +2,14 @@ import { OperationalRow } from "@/components/football/operational-row";
 import { starterBuckets } from "@/lib/team-fixture";
 import type { LineupSlot } from "@/lib/types/fantasy";
 
-/** `hasActiveRound` is false for every league today — no round scheduler exists yet (Pass 8+). */
+/**
+ * Pass 14.6: canonical LIVE/LOCKED/REMAINING vocabulary (see
+ * team-fixture.ts's own doc comment) -- was "ACTIVE n / 11", which read
+ * as "n of 11 are currently selectable/active," not "n are currently
+ * live." Same exclusive three-way split `MatchupPlayerCounts` and the
+ * global status bar use: LOCKED = `locked + final` (immovable, whether or
+ * not the real fixture has finished), REMAINING = `upcoming`.
+ */
 export function RoundIntelligence({
   starters,
   hasActiveRound,
@@ -18,9 +25,9 @@ export function RoundIntelligence({
 
   return (
     <div>
-      <OperationalRow label="ACTIVE" value={`${buckets.live} / ${starters.length}`} />
-      <OperationalRow label="REMAINING" value={buckets.upcoming} />
+      <OperationalRow label="LIVE" value={buckets.live} />
       <OperationalRow label="LOCKED" value={buckets.locked + buckets.final} />
+      <OperationalRow label="REMAINING" value={buckets.upcoming} />
     </div>
   );
 }

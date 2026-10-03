@@ -1,4 +1,4 @@
-import { Ban, Lock } from "lucide-react";
+import { Ban, Lock, Plus } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import {
   formatRoundPoints,
@@ -6,8 +6,9 @@ import {
   playerFixtureCode,
   playerFixtureParticipantLabel,
   playerStateWord,
+  POSITION_BADGE_CLASS,
 } from "@/lib/team-fixture";
-import type { Player } from "@/lib/types/fantasy";
+import type { Player, PlayerPosition } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
 const toneClass = {
@@ -47,14 +48,20 @@ export function BenchRow({
   // state about this slot specifically, unrelated to this player's own
   // lock).
   const locked = isPlayerLocked(player);
+  // Pass 14.6: a locked player while editing is NOT given native `disabled`
+  // -- the click must still fire so the parent can show an explanatory
+  // error ("that player's match has already started"), matching how a
+  // locked STARTER already behaves (`handleSelectStarterOrPending`). Only
+  // the externally-passed `disabled` (wrong position for the selected
+  // empty slot / swap) is genuinely inert -- there's nothing useful to
+  // explain beyond the dimmed Ban-icon treatment itself.
   const lockedForEditing = editing && locked;
-  const effectivelyDisabled = disabled || lockedForEditing;
 
   return (
     <button
       type="button"
       onClick={onSelect}
-      disabled={effectivelyDisabled}
+      disabled={disabled}
       aria-label={
         disabled
           ? `${player.name} (wrong position for the selected slot)`
@@ -64,12 +71,12 @@ export function BenchRow({
       }
       className={cn(
         "grid w-full grid-cols-[1.25rem_1.5rem_2.25rem_1fr_auto] items-center gap-2 border-l-2 border-l-transparent py-2 pr-2 pl-1 text-left transition-colors sm:grid-cols-[1.25rem_1.5rem_2rem_1fr_2.25rem_4.25rem]",
-        editing && !effectivelyDisabled && "cursor-pointer",
+        editing && !disabled && !lockedForEditing && "cursor-pointer",
         // Pass 13 (DESIGN.md §20): selection is a left-edge indicator, the
         // same pattern player-table.tsx/standings-table.tsx use -- never a
         // rounded ring highlight.
         selected && "border-l-accent bg-accent/10",
-        swapTarget && !selected && !effectivelyDisabled && "border-l-accent/30 bg-accent/5",
+        swapTarget && !selected && !disabled && !lockedForEditing && "border-l-accent/30 bg-accent/5",
         disabled && "cursor-not-allowed opacity-40",
         !disabled && locked && "bg-foreground/2",
         !disabled && lockedForEditing && "cursor-not-allowed"
@@ -87,7 +94,12 @@ export function BenchRow({
 
       <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
 
-      <span className="label-system flex w-7 shrink-0 items-center justify-center rounded-md bg-muted py-1 text-[10px] font-semibold text-foreground-secondary sm:w-8">
+      <span
+        className={cn(
+          "label-system flex w-7 shrink-0 items-center justify-center rounded-md py-1 text-[10px] font-semibold sm:w-8",
+          POSITION_BADGE_CLASS[player.position]
+        )}
+      >
         {player.position}
       </span>
 
@@ -124,10 +136,63 @@ export function BenchRow({
               <span className="relative inline-flex size-1.5 rounded-full bg-live" />
             </span>
           )}
-          {locked && !isLive && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
+          {locked && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
           {state.text}
         </span>
+        {Boolean(player.preAcquisitionPoints) && (
+          <span
+            className="label-system text-[9px] text-warning"
+            title="Points earned before this player joined your squad do not count toward your matchup."
+          >
+            +{formatRoundPoints(player.preAcquisitionPoints!)} PRE-ACQUISITION
+          </span>
+        )}
       </div>
+    </button>
+  );
+}
+
+/**
+ * Pass 14.6: the empty-slot row for Team's new row-based Starting XI --
+ * same dense grid shape as `BenchRow` (so a section's occupied and empty
+ * rows line up identically), replacing `pitch.tsx`'s `EmptySlotNode`. An
+ * editable empty slot activates editing on click directly (no separate
+ * "Edit lineup" click first), same affordance the pitch version had.
+ */
+export function EmptySlotRow({
+  position,
+  editing,
+  selected = false,
+  fillTarget = false,
+  onSelect,
+}: {
+  position: PlayerPosition;
+  editing: boolean;
+  selected?: boolean;
+  fillTarget?: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      disabled={!editing}
+      aria-label={`Empty ${position} slot`}
+      className={cn(
+        "grid w-full grid-cols-[1.25rem_1.5rem_2.25rem_1fr_auto] items-center gap-2 border-l-2 border-l-transparent py-2 pr-2 pl-1 text-left transition-colors sm:grid-cols-[1.25rem_1.5rem_2rem_1fr_2.25rem_4.25rem]",
+        editing && "cursor-pointer",
+        selected && "border-l-accent bg-accent/10",
+        fillTarget && !selected && "border-l-accent/30 bg-accent/5"
+      )}
+    >
+      <span />
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-full border-[1.5px] border-dashed border-foreground/20 bg-foreground/3">
+        <Plus className="size-3 text-foreground-tertiary" strokeWidth={2} />
+      </span>
+      <span className={cn("label-system flex w-7 shrink-0 items-center justify-center rounded-md py-1 text-[10px] font-semibold sm:w-8", POSITION_BADGE_CLASS[position])}>
+        {position}
+      </span>
+      <span className="label-system text-sm text-foreground-tertiary">EMPTY {position} SLOT</span>
     </button>
   );
 }

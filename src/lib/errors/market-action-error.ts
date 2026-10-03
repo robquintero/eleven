@@ -13,6 +13,8 @@ export type MarketActionErrorCode =
   | "PLAYER_NOT_OWNED_BY_TEAM"
   | "ROSTER_FULL"
   | "ROSTER_LIMIT_EXCEEDED"
+  /** Pass 14.6: the player's current-fantasy-round lineup slot has already locked (kickoff of their first eligible fixture has passed) -- see supabase/migrations/20261006000000_drop_lock_enforcement.sql. */
+  | "PLAYER_LOCKED"
   | "UNKNOWN";
 
 const KNOWN_CODES: readonly MarketActionErrorCode[] = [
@@ -24,6 +26,7 @@ const KNOWN_CODES: readonly MarketActionErrorCode[] = [
   "PLAYER_NOT_OWNED_BY_TEAM",
   "ROSTER_FULL",
   "ROSTER_LIMIT_EXCEEDED",
+  "PLAYER_LOCKED",
 ];
 
 export class MarketActionError extends Error {

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calculateFantasyScoreV3, SCORING_RULE_VERSION_V3, calculateFantasyScore, SCORING_RULE_VERSION } from "./scoring.ts";
+import { calculateFantasyScoreV3, SCORING_RULE_VERSION_V3, calculateFantasyScore, SCORING_RULE_VERSION, SCORING_V3_WEIGHTS } from "./scoring.ts";
 import type { ScoringInput } from "./scoring.ts";
 
 function baseInput(overrides: Partial<ScoringInput> = {}): ScoringInput {
@@ -226,4 +226,32 @@ test("the real Olise France v Italy performance scores higher under V3 than the 
   assert.equal(v3.total, 16.5);
   assert.ok(v3.total > 12.7, "V3 must score this real, good-but-not-elite performance higher than V2's 12.7");
   assert.ok(v3.total < 25, "the increase must stay proportionate -- not absurd inflation for a single goal + solid defensive work");
+});
+
+// ---------------------------------------------------------------------
+// Pass 14.6 AE: the Game Rules UI (game-rules-dialog.tsx) renders
+// SCORING_V3_WEIGHTS directly -- these assertions prove that object
+// actually matches what the real engine computes, so the UI can never
+// silently drift from the formula it claims to document.
+// ---------------------------------------------------------------------
+
+test("SCORING_V3_WEIGHTS matches calculateFantasyScoreV3's real output for one weight of every category", () => {
+  const w = SCORING_V3_WEIGHTS;
+
+  assert.equal(calculateFantasyScoreV3(baseInput({ minutes: 45 })).components.minutes, w.minutes.appearance);
+  assert.equal(calculateFantasyScoreV3(baseInput({ minutes: 75 })).components.minutes, w.minutes.significant);
+  assert.equal(calculateFantasyScoreV3(baseInput({ minutes: 90 })).components.minutes, w.minutes.fullMatch);
+
+  for (const position of ["GK", "DEF", "MID", "FWD"] as const) {
+    assert.equal(calculateFantasyScoreV3(baseInput({ position, goals: 1 })).components.goals, w.goalsByPosition[position]);
+    assert.equal(calculateFantasyScoreV3(baseInput({ position, minutes: 90, concededByOwnClub: 0 })).components.cleanSheet, w.cleanSheetByPosition[position]);
+  }
+
+  assert.equal(calculateFantasyScoreV3(baseInput({ assists: 1 })).components.assists, w.assist);
+  assert.equal(calculateFantasyScoreV3(baseInput({ shotsOnTarget: 1 })).components.shotsOnTarget, w.shotOnTarget);
+  assert.equal(calculateFantasyScoreV3(baseInput({ chancesCreated: 1 })).components.chancesCreated, w.chanceCreated);
+  assert.equal(calculateFantasyScoreV3(baseInput({ tackles: 1 })).components.defensiveActions, w.defensiveAction);
+  assert.equal(calculateFantasyScoreV3(baseInput({ saves: 1 })).components.saves, w.save);
+  assert.equal(calculateFantasyScoreV3(baseInput({ yellowCards: 1 })).components.cards, w.yellowCard);
+  assert.equal(calculateFantasyScoreV3(baseInput({ redCards: 1 })).components.cards, w.redCard);
 });

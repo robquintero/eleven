@@ -24,6 +24,8 @@ async function resolveClient() {
 interface RosterRow {
   id: string;
   player_id: string;
+  /** Pass 14.6: when THIS roster entry acquired the player -- the "no retroactive point inheritance" cutoff, see getRoundPlayerState. */
+  acquired_at: string;
   players: {
     id: string;
     name: string;
@@ -46,7 +48,8 @@ interface RosterRow {
 function toPlayer(
   row: RosterRow,
   pointsByPlayerId: Map<string, number>,
-  fixtureByPlayerId: Map<string, Player["fixture"]>
+  fixtureByPlayerId: Map<string, Player["fixture"]>,
+  preAcquisitionPointsByPlayerId: Map<string, number>
 ): Player | null {
   if (!row.players) return null;
   const player = row.players;
@@ -73,6 +76,9 @@ function toPlayer(
     // round-player-state lookup ran, never a placeholder masquerading as
     // "no data."
     fantasyPoints: Math.round((pointsByPlayerId.get(player.id) ?? 0) * 100) / 100,
+    preAcquisitionPoints: preAcquisitionPointsByPlayerId.has(player.id)
+      ? Math.round(preAcquisitionPointsByPlayerId.get(player.id)! * 100) / 100
+      : undefined,
     availability: (player.availability_status as Player["availability"]) ?? "available",
     fixture: fixtureByPlayerId.get(player.id),
     // Every player this function returns is, by construction, on the
@@ -117,7 +123,7 @@ export async function querySquad(
   const { data: entries, error } = await supabase
     .from("roster_entries")
     .select(
-      "id, player_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code)))"
+      "id, player_id, acquired_at, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code)))"
     )
     .eq("league_id", leagueId)
     .eq("fantasy_team_id", fantasyTeamId)
@@ -143,16 +149,23 @@ export async function querySquad(
   // truth. Empty maps (honest zero/no-fixture) whenever no round has
   // opened for this league yet.
   const playerIds = rosterRows.map((r) => r.player_id);
-  const { pointsByPlayerId, fixtureByPlayerId } = currentRound
-    ? await getRoundPlayerState(supabase, playerIds, {
-        startsAt: new Date(currentRound.starts_at),
-        endsAt: new Date(currentRound.ends_at),
-      } satisfies RoundWindow)
-    : { pointsByPlayerId: new Map<string, number>(), fixtureByPlayerId: new Map<string, Player["fixture"]>() };
+  const acquiredAtByPlayerId = new Map(rosterRows.map((r) => [r.player_id, r.acquired_at]));
+  const { pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId } = currentRound
+    ? await getRoundPlayerState(
+        supabase,
+        playerIds,
+        { startsAt: new Date(currentRound.starts_at), endsAt: new Date(currentRound.ends_at) } satisfies RoundWindow,
+        acquiredAtByPlayerId
+      )
+    : {
+        pointsByPlayerId: new Map<string, number>(),
+        preAcquisitionPointsByPlayerId: new Map<string, number>(),
+        fixtureByPlayerId: new Map<string, Player["fixture"]>(),
+      };
 
   const playerByRosterEntryId = new Map<string, Player>();
   for (const entry of rosterRows) {
-    const player = toPlayer(entry, pointsByPlayerId, fixtureByPlayerId);
+    const player = toPlayer(entry, pointsByPlayerId, fixtureByPlayerId, preAcquisitionPointsByPlayerId);
     if (player) playerByRosterEntryId.set(entry.id, player);
   }
 

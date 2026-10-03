@@ -225,6 +225,35 @@ const V3_SAVE_POINTS = 0.5;
 const V3_YELLOW_CARD_POINTS = -1;
 const V3_RED_CARD_POINTS = -4;
 
+/**
+ * Pass 14.6: the single source of truth the Game Rules UI
+ * (`src/components/shell/game-rules-dialog.tsx`) reads to explain "why did
+ * this player score X" — bundles the SAME constants `calculateFantasyScoreV3`
+ * computes from, never a second, hand-copied table that could silently
+ * drift from the real formula. Deliberately excludes the goal/assist
+ * milestone bonus FORMULAS (not simple weights) — the UI explains those
+ * in prose instead of trying to render a closed-form function.
+ */
+export const SCORING_V3_WEIGHTS = {
+  minutes: {
+    appearance: V3_MINUTES_APPEARANCE_POINTS,
+    significant: V3_MINUTES_SIGNIFICANT_POINTS,
+    fullMatch: V3_MINUTES_FULL_MATCH_POINTS,
+    significantThreshold: V3_MINUTES_SIGNIFICANT_THRESHOLD,
+    fullMatchThreshold: V3_MINUTES_FULL_MATCH_THRESHOLD,
+  },
+  goalsByPosition: V3_GOALS_BY_POSITION,
+  assist: V3_ASSIST_POINTS,
+  shotOnTarget: V3_SHOT_ON_TARGET_POINTS,
+  chanceCreated: V3_CHANCE_CREATED_POINTS,
+  defensiveAction: V3_DEFENSIVE_ACTION_POINTS,
+  save: V3_SAVE_POINTS,
+  cleanSheetByPosition: V3_CLEAN_SHEET_BY_POSITION,
+  cleanSheetMinutesThreshold: V3_CLEAN_SHEET_MINUTES_THRESHOLD,
+  yellowCard: V3_YELLOW_CARD_POINTS,
+  redCard: V3_RED_CARD_POINTS,
+} as const;
+
 /** ELEVEN_STANDARD_V3 — see this section's own doc comment and docs/scoring-model-v3.md. */
 export function calculateFantasyScoreV3(input: ScoringInput): FantasyScoreBreakdown {
   const minutesPoints =

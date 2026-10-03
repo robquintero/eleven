@@ -3,9 +3,8 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Pencil, X } from "lucide-react";
-import { BenchRow } from "@/components/team/bench-row";
+import { BenchRow, EmptySlotRow } from "@/components/team/bench-row";
 import { NextLock } from "@/components/team/next-lock";
-import { Pitch, type EmptyPitchSlot, type PitchItem } from "@/components/team/pitch";
 import { RoundIntelligence } from "@/components/team/round-intelligence";
 import { SquadAvailability } from "@/components/team/squad-availability";
 import { PlayerInspector } from "@/components/players/player-inspector";
@@ -24,43 +23,51 @@ import { swapLineupAction, fillEmptySlotsAction } from "@/app/(app)/team/actions
 import { dropPlayerAction } from "@/app/(app)/players/actions";
 import { FORMATION_RULES } from "@/domain/fantasy/constants";
 import { assignToSlots, formationSlots, type FormationSlot } from "@/lib/selectors/pitch-layout";
-import { nextLock, pad2 } from "@/lib/team-fixture";
+import { isPlayerLocked, nextLock, pad2, starterBuckets } from "@/lib/team-fixture";
 import type { LineupSlot, Player, PlayerAvailability, PlayerPosition, Squad } from "@/lib/types/fantasy";
 
 const availabilityOrder: PlayerAvailability[] = ["available", "doubtful", "injured", "suspended"];
-
-/**
- * One `PitchItem` per formation slot, in a fixed priority per slot:
- * a locally-queued (unsaved) fill first, then the real persisted
- * starter, then empty. `Pitch` itself only distinguishes "player" vs
- * "empty" by whether a `player` field is present — pending fills are
- * rendered as ordinary `PlayerNode`s, using the SAME slot id as their
- * target slot, so clicking one is unambiguous (see
- * `handleSelectStarterOrPending`).
- */
-function buildPitchItems(
-  slots: FormationSlot[],
-  occupancy: Map<string, LineupSlot>,
-  pendingAssignments: Map<string, Player>
-): PitchItem[] {
-  return slots.map((slot): PitchItem => {
-    const pendingPlayer = pendingAssignments.get(slot.id);
-    if (pendingPlayer) {
-      return { id: slot.id, position: slot.position, x: slot.x, y: slot.y, player: pendingPlayer, locked: false };
-    }
-    const real = occupancy.get(slot.id);
-    if (real) {
-      return { id: slot.id, position: slot.position, x: slot.x, y: slot.y, player: real.player, locked: real.locked };
-    }
-    return { id: slot.id, position: slot.position, x: slot.x, y: slot.y } satisfies EmptyPitchSlot;
-  });
-}
 
 type Selection =
   | { kind: "starter"; slotId: string; player: Player }
   | { kind: "emptySlot"; slotId: string; position: PlayerPosition }
   | { kind: "bench"; player: Player }
   | null;
+
+interface XiRow {
+  slotId: string;
+  position: PlayerPosition;
+  /** Real starter or a locally-queued (unsaved) fill; `null` for a genuinely empty slot. */
+  player: Player | null;
+  /** Only meaningful for a REAL persisted starter -- a pending fill or empty slot is always movable. */
+  locked: boolean;
+}
+
+/**
+ * Pass 14.6: replaces `buildPitchItems` -- same priority per formation
+ * slot (a locally-queued fill first, then the real persisted starter,
+ * then empty), now producing plain rows instead of pitch-positioned
+ * nodes. `formationSlots()`'s STABLE slot ids ("DEF-0".."DEF-3", etc.) are
+ * unchanged and still what keeps a player in the same row for the rest of
+ * an editing session regardless of what else gets assigned afterward.
+ */
+function buildXiRows(slots: FormationSlot[], occupancy: Map<string, LineupSlot>, pendingAssignments: Map<string, Player>): XiRow[] {
+  return slots.map((slot): XiRow => {
+    const pendingPlayer = pendingAssignments.get(slot.id);
+    if (pendingPlayer) return { slotId: slot.id, position: slot.position, player: pendingPlayer, locked: false };
+    const real = occupancy.get(slot.id);
+    if (real) return { slotId: slot.id, position: slot.position, player: real.player, locked: real.locked ?? false };
+    return { slotId: slot.id, position: slot.position, player: null, locked: false };
+  });
+}
+
+/** Attacking-to-defensive section order, matching the brief's own example structure -- "who occupies each positional slot" should be obvious at a glance. */
+const XI_SECTIONS: { label: string; position: PlayerPosition }[] = [
+  { label: "FORWARDS", position: "FWD" },
+  { label: "MIDFIELD", position: "MID" },
+  { label: "DEFENCE", position: "DEF" },
+  { label: "GOALKEEPER", position: "GK" },
+];
 
 /**
  * Real lineup editing (Pass 10.5C.2 — see the pass's own report for the
@@ -125,19 +132,14 @@ export function TeamWorkspace({
   const [pendingAssignments, setPendingAssignments] = useState<Map<string, Player>>(new Map());
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Pass 10.5C.5A: which pitch slot's authenticated write is in flight, if
-  // any -- NEVER reset back to null (trySwap only ever overwrites it at
-  // the start of its next call), so wherever this is rendered it must be
-  // gated by `substitutionBusy` below, not read raw (see the <Pitch>
-  // usage's own comment -- Pass 10.5C.5B fixed a bug where it wasn't).
   // `isRefreshing` tracks the router.refresh() that follows a successful
-  // write via useTransition. `substitutionBusy` stays true across BOTH
-  // the action call (`pending`) and that follow-up refresh, so the
-  // processing state -- and the guard against a second, conflicting
-  // lineup mutation -- lasts until the NEW server-confirmed squad has
-  // actually landed, never just the instant the action call itself
-  // returns.
-  const [substitutingSlotId, setSubstitutingSlotId] = useState<string | null>(null);
+  // write via useTransition. `substitutionBusy` stays true across BOTH the
+  // action call (`pending`) and that follow-up refresh, so the processing
+  // state -- and the guard against a second, conflicting lineup mutation --
+  // lasts until the NEW server-confirmed squad has actually landed, never
+  // just the instant the action call itself returns. Every row's handler
+  // early-returns on `substitutionBusy`, and the Done/Edit button itself
+  // shows "Saving…" for the duration.
   const [isRefreshing, startRefreshTransition] = useTransition();
   const substitutionBusy = pending || isRefreshing;
 
@@ -165,9 +167,14 @@ export function TeamWorkspace({
   const occupancy = assignToSlots(squad.starters, slots);
   const pendingPlayerIds = new Set(Array.from(pendingAssignments.values()).map((p) => p.id));
   const visibleBench = squad.bench.filter((p) => !pendingPlayerIds.has(p.id));
-  const pitchItems = buildPitchItems(slots, occupancy, pendingAssignments);
+  const xiRows = buildXiRows(slots, occupancy, pendingAssignments);
   const totalAssigned = occupancy.size + pendingAssignments.size;
-  const benchFilterPosition = selected?.kind === "emptySlot" ? selected.position : null;
+  // Pass 14.6: the position a bench row must match to be an ELIGIBLE swap
+  // target, whichever kind of thing is currently selected (an empty slot
+  // to fill, or an occupied starter to swap out) -- used to give bench AND
+  // starter rows symmetric, position-aware swapTarget/disabled treatment
+  // ("clearly indicate eligible swap targets, never make users guess").
+  const activeSwapPosition = selected?.kind === "emptySlot" ? selected.position : selected?.kind === "starter" ? selected.player.position : null;
 
   const availabilityCounts = allPlayers.reduce(
     (acc, player) => {
@@ -181,22 +188,19 @@ export function TeamWorkspace({
   /**
    * Pass 10.5C.5A: immediate processing feedback for the authenticated
    * write's real (roughly 1-2s) latency, without ever showing the
-   * replacement before the server confirms it. `outSlotId` is the
-   * OUTGOING starter's pitch slot -- the one `PlayerNode` that shows the
-   * restrained spinner/pulse treatment while this resolves. The picker
-   * (`selected`) closes immediately, before the request even starts.
-   * `substitutionBusy` (`pending || isRefreshing`) stays true until the
-   * POST-success `router.refresh()` transition itself settles, so the
-   * processing state stays visible through the full round-trip, not just
-   * the action call -- see this component's own state-declaration comment
-   * for why no effect is needed to "clear" it afterward.
+   * replacement before the server confirms it -- the picker (`selected`)
+   * closes immediately, before the request even starts, and the Done/Edit
+   * button shows "Saving…" for the duration. `substitutionBusy` (`pending
+   * || isRefreshing`) stays true until the POST-success `router.refresh()`
+   * transition itself settles, so every row's handler stays guarded
+   * against a second, conflicting lineup mutation through the full
+   * round-trip, not just the action call.
    */
-  async function trySwap(outSlotId: string, starterOut: string, benchIn: string) {
+  async function trySwap(starterOut: string, benchIn: string) {
     if (!fantasyTeamId || substitutionBusy) return;
     setSelected(null);
     setError(null);
     setPending(true);
-    setSubstitutingSlotId(outSlotId);
     const result = await swapLineupAction(leagueId, fantasyTeamId, starterOut, benchIn);
     setPending(false);
     if (result?.error) {
@@ -227,33 +231,37 @@ export function TeamWorkspace({
     });
   }
 
-  function handleSelectStarterOrPending(item: LineupSlot) {
+  function handleSelectStarterOrPending(row: XiRow & { player: Player }) {
     if (!editing && !substitutionBusy) {
-      openPlayer(item.player);
+      openPlayer(row.player);
       return;
     }
     // Pass 10.5C.5A: a substitution write (or its follow-up refresh) is
     // already in flight -- never a conflicting second lineup mutation
-    // while it resolves. The pitch itself isn't visually frozen (only the
-    // one node mid-substitution shows processing), this just makes every
-    // OTHER click a no-op until the authoritative result lands.
+    // while it resolves. Only the one row mid-substitution shows
+    // processing, this just makes every OTHER click a no-op until the
+    // authoritative result lands.
     if (substitutionBusy) return;
-    if (pendingAssignments.has(item.id)) {
-      unqueueFill(item.id);
+    if (pendingAssignments.has(row.slotId)) {
+      unqueueFill(row.slotId);
       return;
     }
-    if (item.locked) {
+    if (row.locked) {
       setError("That player's match has already started — their lineup slot is locked.");
       return;
     }
     if (selected?.kind === "bench") {
-      trySwap(item.id, item.player.id, selected.player.id);
+      if (selected.player.position !== row.position) {
+        setError(`${selected.player.name} is a ${selected.player.position} and can't fill a ${row.position} slot.`);
+        return;
+      }
+      trySwap(row.player.id, selected.player.id);
       return;
     }
-    setSelected(selected?.kind === "starter" && selected.slotId === item.id ? null : { kind: "starter", slotId: item.id, player: item.player });
+    setSelected(selected?.kind === "starter" && selected.slotId === row.slotId ? null : { kind: "starter", slotId: row.slotId, player: row.player });
   }
 
-  function handleSelectEmptySlot(emptySlot: EmptyPitchSlot) {
+  function handleSelectEmptySlot(emptySlot: { slotId: string; position: PlayerPosition }) {
     if (!canEdit || substitutionBusy) return;
     // An obviously-interactive empty slot doesn't require "Edit lineup"
     // first (Pass 10.5C.2) -- clicking it activates editing directly.
@@ -263,13 +271,13 @@ export function TeamWorkspace({
         setError(`That slot needs a ${emptySlot.position}.`);
         return;
       }
-      queueFill(emptySlot.id, selected.player);
+      queueFill(emptySlot.slotId, selected.player);
       return;
     }
     setSelected(
-      selected?.kind === "emptySlot" && selected.slotId === emptySlot.id
+      selected?.kind === "emptySlot" && selected.slotId === emptySlot.slotId
         ? null
-        : { kind: "emptySlot", slotId: emptySlot.id, position: emptySlot.position }
+        : { kind: "emptySlot", slotId: emptySlot.slotId, position: emptySlot.position }
     );
   }
 
@@ -279,8 +287,18 @@ export function TeamWorkspace({
       return;
     }
     if (substitutionBusy) return;
+    // Pass 14.6: a locked bench player cannot enter the lineup -- same
+    // "immovable for the rest of the round" fact as a locked starter, with
+    // the same explicit, non-guessable error (`handleSelectStarterOrPending`
+    // already does this for starters; `BenchRow` deliberately still lets
+    // this click fire for a locked player rather than silently no-op'ing
+    // via native `disabled`, specifically so this message can show).
+    if (editing && isPlayerLocked(player)) {
+      setError("That player's match has already started — they can't enter your lineup until the round ends.");
+      return;
+    }
     if (selected?.kind === "starter") {
-      trySwap(selected.slotId, selected.player.id, player.id);
+      trySwap(selected.player.id, player.id);
       return;
     }
     if (selected?.kind === "emptySlot") {
@@ -383,7 +401,7 @@ export function TeamWorkspace({
               ? pendingAssignments.size > 0
                 ? `Building lineup — ${totalAssigned} / ${FORMATION_RULES.startersTotal} selected. Click Done to save.`
                 : "Select a starter, then a bench player (or vice versa) to swap them — or select an empty slot to fill it from the bench."
-              : "Selecting a footballer opens their record. Select an empty pitch slot to start building your XI."}
+              : "Selecting a footballer opens their record. Select an empty slot to start building your XI."}
           </p>
           <Button
             variant={editing ? "outline" : "default"}
@@ -408,33 +426,53 @@ export function TeamWorkspace({
       <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_0.5fr] lg:items-start">
         <section>
           <ModuleHeader title="STARTING_XI" meta={squad.formation} />
-          <div className="mt-3">
-            <Pitch
-              slots={pitchItems}
-              formation={squad.formation}
-              editing={editing}
-              selectedSlotId={selected?.kind === "starter" ? selected.slotId : null}
-              swapTargetPosition={selected?.kind === "bench" ? selected.player.position : null}
-              onSelectSlot={handleSelectStarterOrPending}
-              selectedEmptySlotId={selected?.kind === "emptySlot" ? selected.slotId : null}
-              fillTargetPosition={selected?.kind === "bench" ? selected.player.position : null}
-              onSelectEmptySlot={handleSelectEmptySlot}
-              // Gated by substitutionBusy, not the raw state: `substitutingSlotId`
-              // itself is never reset to null anywhere (see its own
-              // declaration comment -- trySwap overwrites it the next
-              // time it runs, nothing clears it after success). Passing
-              // it unconditionally to Pitch left the just-substituted
-              // slot showing the processing animation forever once
-              // substitutionBusy went false. This is the actual
-              // authoritative-success boundary: the moment pending AND
-              // isRefreshing are both false, the refreshed squad prop has
-              // already landed (startRefreshTransition keeps isRefreshing
-              // true until that commit), so clearing the DISPLAYED value
-              // here is correct without any extra effect/cleanup.
-              substitutingSlotId={substitutionBusy ? substitutingSlotId : null}
-            />
+          {/* Pass 14.6: the pitch concept is removed entirely -- a dense,
+              row-based squad workspace, consistent with every other list
+              in Eleven (BenchRow, PlayerRow), grouped into the 4 formation
+              sections so "who occupies each positional slot" is obvious at
+              a glance without a spatial field metaphor. */}
+          <div className="mt-3 flex flex-col gap-4">
+            {XI_SECTIONS.map(({ label, position }) => {
+              const rows = xiRows.filter((r) => r.position === position);
+              const occupied = rows.filter((r) => r.player !== null).length;
+              return (
+                <div key={position} className="border border-border">
+                  <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
+                    <span className="label-system text-[10px] font-semibold text-foreground-secondary">{label}</span>
+                    <span className="label-system text-[10px] text-foreground-tertiary">
+                      {occupied} / {rows.length}
+                    </span>
+                  </div>
+                  <div className="divide-y divide-border">
+                    {rows.map((row, i) =>
+                      row.player ? (
+                        <BenchRow
+                          key={row.slotId}
+                          index={i}
+                          player={row.player}
+                          editing={editing}
+                          selected={selected?.kind === "starter" && selected.slotId === row.slotId}
+                          swapTarget={selected?.kind === "bench" && selected.player.position === row.position}
+                          disabled={selected?.kind === "bench" && selected.player.position !== row.position}
+                          onSelect={() => handleSelectStarterOrPending(row as XiRow & { player: Player })}
+                        />
+                      ) : (
+                        <EmptySlotRow
+                          key={row.slotId}
+                          position={row.position}
+                          editing={editing}
+                          selected={selected?.kind === "emptySlot" && selected.slotId === row.slotId}
+                          fillTarget={selected?.kind === "bench" && selected.player.position === row.position}
+                          onSelect={() => handleSelectEmptySlot({ slotId: row.slotId, position: row.position })}
+                        />
+                      )
+                    )}
+                  </div>
+                </div>
+              );
+            })}
             {!fantasyTeamId && (
-              <p className="mt-3 text-center text-sm text-foreground-tertiary">
+              <p className="text-center text-sm text-foreground-tertiary">
                 NO SQUAD — complete your league draft to build your squad.
               </p>
             )}
@@ -459,8 +497,8 @@ export function TeamWorkspace({
                     player={player}
                     editing={editing}
                     selected={selected?.kind === "bench" && selected.player.id === player.id}
-                    swapTarget={selected?.kind === "starter" || selected?.kind === "emptySlot"}
-                    disabled={benchFilterPosition !== null && player.position !== benchFilterPosition}
+                    swapTarget={activeSwapPosition !== null && player.position === activeSwapPosition}
+                    disabled={activeSwapPosition !== null && player.position !== activeSwapPosition}
                     onSelect={() => handleSelectBench(player)}
                   />
                 ))}
@@ -481,7 +519,11 @@ export function TeamWorkspace({
           </RailModule>
 
           <RailModule header="NEXT_LOCK" className="lg:py-2.5">
-            <NextLock slot={nextLock(squad.starters)} hasStarters={squad.starters.length > 0} />
+            <NextLock
+              slot={nextLock(squad.starters)}
+              hasStarters={squad.starters.length > 0}
+              remainingCount={starterBuckets(squad.starters).upcoming}
+            />
           </RailModule>
 
           <RailModule

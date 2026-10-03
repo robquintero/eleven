@@ -501,13 +501,19 @@ test("GATE 6: a club performance and an international performance in the same ro
       .limit(1)
       .single();
 
-    // Same real round window the end-to-end test above uses -- both
-    // fixtures' kickoffs must fall inside the round openNextRound is
-    // about to create, since buildMatchupTeamSquad composes the squad
-    // from that round's real lineup_slots rows, not from roster_entries
-    // directly (a nonexistent/arbitrary roundId legitimately returns a
-    // completely empty squad, not a bench fallback).
-    const window = roundWindowContaining(new Date());
+    // Pass 14.6: an ISOLATED future window, not the real current one --
+    // this test's "club performance" fixture uses the player's REAL
+    // permanent club (needed to exercise the real club-lookup path), and
+    // a real-"now"-based window previously let that fixture's kickoff
+    // land inside whatever real production league's round happens to be
+    // open RIGHT NOW (discovered live: this produced real-looking "final"
+    // fixtures for real clubs inside a real league's actual round window,
+    // a production-data-pollution risk this file's own module doc comment
+    // explicitly promises never happens here). `openNextRound` is given
+    // this same synthetic `now` so the round it opens uses the identical
+    // isolated window these fixtures' kickoffs fall inside.
+    const syntheticNow = new Date(Date.UTC(2095, 0, 7));
+    const window = roundWindowContaining(syntheticNow);
     const clubKickoff = new Date(window.startsAt.getTime() + (window.endsAt.getTime() - window.startsAt.getTime()) / 3);
     const intlKickoff = new Date(window.startsAt.getTime() + (2 * (window.endsAt.getTime() - window.startsAt.getTime())) / 3);
 
@@ -535,7 +541,7 @@ test("GATE 6: a club performance and an international performance in the same ro
     await admin.from("fixtures").update({ home_score: 2, away_score: 1 }).eq("id", intlFixtureId);
     await admin.from("player_national_teams").insert({ player_id: playerId, national_team_club_id: ctx.nationalTeamAId });
 
-    const opened = await openNextRound(admin, league.leagueId, new Date());
+    const opened = await openNextRound(admin, league.leagueId, syntheticNow);
     assert.ok(opened.ok, `round must open: ${!opened.ok ? opened.error : ""}`);
     if (!opened.ok) return;
 
@@ -564,14 +570,12 @@ test("GATE 6: a club performance and an international performance in the same ro
       return allPlayers.find((p) => p.id === playerId);
     }
 
-    // Baseline BEFORE either synthetic stat line exists -- the real
-    // player chosen here may legitimately already have other real
-    // fixtures/scores inside this same real current round (their actual
-    // club's real schedule, or, since Pass 14 go-live Gate 2's real
-    // bootstrap, a real national-team call-up of their own). The claim
-    // this test proves is about the INCREMENT two new performances add,
-    // not the player's absolute total, which this isolates correctly
-    // regardless of whatever else already contributes to it.
+    // Baseline BEFORE either synthetic stat line exists -- isolated to
+    // `syntheticNow`'s window, so (unlike a real-"now"-based window) the
+    // real player chosen here cannot have any other real fixture/score
+    // already inside it. Computed anyway, not assumed zero, purely as
+    // defense in depth. The claim this test proves is about the
+    // INCREMENT two new performances add, not the player's absolute total.
     const before = findPlayer(await queryMatchupSquads(admin, matchup));
     assert.ok(before, "the signed player must appear in the matchup squad even before either synthetic performance is scored");
     const baselinePoints = before!.fantasyPoints;

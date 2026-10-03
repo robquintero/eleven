@@ -12,6 +12,7 @@ const ALL_CODES = [
   "PLAYER_NOT_OWNED_BY_TEAM",
   "ROSTER_FULL",
   "ROSTER_LIMIT_EXCEEDED",
+  "PLAYER_LOCKED",
 ] as const;
 
 test("toMarketActionError maps every known Postgres exception message to its code", () => {

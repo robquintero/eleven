@@ -5,6 +5,7 @@ import { CommandTransitionOverlay } from "@/components/shell/command-transition-
 import { DesktopNav } from "@/components/shell/desktop-nav";
 import { MobileNav } from "@/components/shell/mobile-nav";
 import { NavigationTransitionProvider } from "@/components/shell/navigation-transition";
+import { GameRulesDialog } from "@/components/shell/game-rules-dialog";
 import { LeagueSwitcher } from "@/components/shell/league-switcher";
 import { ProfileControl } from "@/components/shell/profile-control";
 import { StatusBar, type StatusBarData } from "@/components/shell/status-bar";
@@ -95,6 +96,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
                   <Wordmark authenticated />
                 </div>
                 <LeagueSwitcher leagues={leagues} activeLeagueId={activeLeagueId} />
+                {leagues.length > 0 && <GameRulesDialog />}
               </div>
               <div className="flex items-center gap-3">
                 <CommandPalette />

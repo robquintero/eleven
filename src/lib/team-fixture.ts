@@ -3,6 +3,7 @@ import type {
   Player,
   PlayerAvailability,
   PlayerMatchState,
+  PlayerPosition,
   RoundFixture,
 } from "@/lib/types/fantasy";
 
@@ -183,6 +184,49 @@ export const matchStateLabel: Record<PlayerMatchState, string> = {
   live: "LIVE",
   locked: "LOCKED",
   final: "FT",
+};
+
+/**
+ * Pass 14.6: Eleven's ONE canonical player-state vocabulary — every page
+ * (Home, Matchup, Team, the global status bar, Round Intelligence) must
+ * read off this, never invent a second grouping (the exact bug this pass
+ * fixes: a "LIVE/DONE/LEFT" summary that silently meant something
+ * different from the "LIVE/LOCKED/REMAINING" readout right above it).
+ *
+ * LOCK STATE and FIXTURE STATE are related but different dimensions:
+ *   - READY:   the player's first eligible lock instant has not occurred
+ *              yet. Movable.
+ *   - LOCKED:  the lock instant has occurred. Immovable for the rest of
+ *              the round. Does NOT by itself imply the real match is
+ *              currently live or has finished.
+ *   - LIVE:    a locked player's eligible fixture is currently in
+ *              progress. A player is never "live" without also being
+ *              locked (kickoff already happened).
+ *   - FT:      a locked player's eligible fixture has completed. The
+ *              player remains exactly as locked as any other locked
+ *              player — FT describes the FIXTURE, never a lesser degree
+ *              of immovability.
+ *
+ * `PlayerMatchState` ("upcoming"/"live"/"locked"/"final") already encodes
+ * exactly these four states one-to-one; this block is the formal
+ * definition other code/comments should point back to instead of
+ * re-deriving the vocabulary ad hoc.
+ */
+
+/**
+ * Pass 14.6: restrained, position-specific accent for the position badge
+ * every row (Home, Matchup, Team) shows -- "extremely easy to scan," but
+ * never the only signal: the GK/DEF/MID/FWD text itself already identifies
+ * the position with zero reliance on color (brief: "position must be
+ * readable even without color"). Low-opacity tints only, consistent with
+ * Eleven's restrained graphite/warm-white system -- never a saturated
+ * rainbow badge.
+ */
+export const POSITION_BADGE_CLASS: Record<PlayerPosition, string> = {
+  GK: "bg-amber-500/12 text-amber-700 dark:text-amber-400",
+  DEF: "bg-red-500/10 text-red-700 dark:text-red-400",
+  MID: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+  FWD: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
 };
 
 /** Zero-pads a matchday/index number for operational labels, e.g. "MATCHDAY 05". */

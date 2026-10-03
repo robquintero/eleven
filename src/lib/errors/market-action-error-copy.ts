@@ -10,5 +10,6 @@ export const MARKET_ACTION_ERROR_COPY: Record<MarketActionErrorCode, string> = {
   PLAYER_NOT_OWNED_BY_TEAM: "That player isn't on your roster.",
   ROSTER_FULL: "Your roster is already full (16 players) — drop a player first.",
   ROSTER_LIMIT_EXCEEDED: "Adding that player would exceed the position limit for your roster.",
+  PLAYER_LOCKED: "This player is locked for the current matchday and can't be dropped until the round ends.",
   UNKNOWN: "Something went wrong. Try again.",
 };

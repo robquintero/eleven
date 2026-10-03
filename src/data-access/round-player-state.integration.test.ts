@@ -72,6 +72,18 @@ test("querySquad: starter shows real round points + FINAL state, bench shows rea
       assert.equal(error, null);
     }
 
+    // Pass 14.6: `sign_player` always sets `roster_entries.acquired_at` to
+    // the REAL current time -- backdated here (a direct, after-the-fact
+    // test-data adjustment, same convention as manually setting
+    // `locked_at` elsewhere in this suite) so these 2015-windowed
+    // synthetic performances aren't excluded by the new "no retroactive
+    // point inheritance" acquisition cutoff this test isn't about.
+    await admin
+      .from("roster_entries")
+      .update({ acquired_at: "2015-01-01T00:00:00Z" })
+      .eq("fantasy_team_id", league.teamIds[0])
+      .in("player_id", [starterPlayerId, benchPlayerId]);
+
     // Deliberately NON-canonical window: Wednesday noon -> Sunday noon,
     // nowhere near a Tuesday 00:00 UTC boundary -- proves no code here
     // assumes/relies on the standard calendar alignment. Set safely in
@@ -173,6 +185,18 @@ test("querySquad: starter shows real round points + FINAL state, bench shows rea
     // (non-Tuesday-aligned) round window -- no special-casing of the
     // standard calendar or of any specific league was needed anywhere in
     // this path for it to derive correctly.
+
+    // Pass 14.6: explicit cleanup of the two fixtures (+ their stats) this
+    // test inserts directly into real clubs' fixture history -- the 2015
+    // window already makes a collision with any real round impossible, but
+    // leaving them in place with no cleanup is still real-table bloat on
+    // every run (found live: a sibling file's own missing-window-isolation
+    // version of this mistake leaked real "final" fixtures into a real
+    // league's actual round, see international-scoring.integration.test.ts's
+    // GATE 6 fix this same pass).
+    await admin.from("fantasy_player_scores").delete().in("fixture_id", [finalFixture!.id, liveFixture!.id]);
+    await admin.from("player_match_stats").delete().in("fixture_id", [finalFixture!.id, liveFixture!.id]);
+    await admin.from("fixtures").delete().in("id", [finalFixture!.id, liveFixture!.id]);
   } finally {
     await cleanupTestLeague(admin, league);
   }

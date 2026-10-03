@@ -13,7 +13,7 @@ import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-pa
 import type { PlayerScoreBreakdown, RecentMatchRow } from "@/data-access/players";
 import { getUsageTrend } from "@/lib/selectors/usage-trend";
 import { getFormWindows } from "@/lib/selectors/form-tracker";
-import { availabilityLabel, formatKickoff, formatKickoffTime } from "@/lib/team-fixture";
+import { availabilityLabel, formatKickoff, formatKickoffTime, isPlayerLocked } from "@/lib/team-fixture";
 import type { Player, PlayerOwnership } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
@@ -97,7 +97,7 @@ export function PlayerInspectorContent({
   /** `undefined`/`null` while loading or if this player has no current-version scored match yet — see getPlayerLatestScoreBreakdown. */
   scoreBreakdown?: PlayerScoreBreakdown | null;
   lineupContext?: LineupInspectorContext;
-  /** Pass 11.5: present only from the Team page, for the caller's own roster player — opens the same drop confirmation Team/Players already share (see team-workspace.tsx). Never pre-blocked here for a locked player; `drop_player`'s own Pass 11 semantics decide what happens server-side. */
+  /** Pass 11.5: present only from the Team page, for the caller's own roster player — opens the same drop confirmation Team/Players already share (see team-workspace.tsx). Pass 14.6: proactively disabled here when `player.fixture` shows the player is already locked for the current round (real data when opened from the Team page's own squad; `drop_player` itself is the actual authoritative enforcement either way — see its own migration). */
   onRequestDrop?: () => void;
   /** Pass 11.5: present only for the overlay (Sheet) variant — renders a close control integrated into this component's own "PLAYER_RECORD" header row (via TerminalPanel's `meta` slot) rather than a separate button floating at the viewport edge. Omitted entirely for the `inline` variant, which has no overlay to close. */
   onClose?: () => void;
@@ -300,13 +300,22 @@ export function PlayerInspectorContent({
               Manage starters from the Team page.
             </p>
             {onRequestDrop && (
-              <Button
-                className="mt-2.5 w-full rounded-control"
-                variant="ghost"
-                onClick={onRequestDrop}
-              >
-                Drop player
-              </Button>
+              <>
+                <Button
+                  className="mt-2.5 w-full rounded-control"
+                  variant="destructive"
+                  disabled={isPlayerLocked(player)}
+                  onClick={onRequestDrop}
+                >
+                  Drop player
+                </Button>
+                {isPlayerLocked(player) && (
+                  <p className="mt-1.5 flex items-start gap-1.5 text-left text-xs text-foreground-tertiary">
+                    <Lock className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
+                    Locked for the current matchday — can&apos;t be dropped until the round ends.
+                  </p>
+                )}
+              </>
             )}
           </div>
         ) : ownership === "owned" ? (

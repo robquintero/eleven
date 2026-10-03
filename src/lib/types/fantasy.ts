@@ -76,8 +76,17 @@ export interface Player {
   number?: number;
   /** Real country name as API-Football reports it (e.g. "Spain", "England") — used for the circular flag avatar (Pass 10.5C.5, see src/lib/countries.ts). `undefined`/`null`/unrecognized falls back to the initials avatar. */
   nationality?: string | null;
-  /** Points for the active fantasy round. Eventually derived by the scoring engine. */
+  /** Points for the active fantasy round that count toward the owning fantasy team's matchup — i.e. AFTER the Pass 14.6 "no retroactive point inheritance" cutoff is applied. */
   fantasyPoints: number;
+  /**
+   * Pass 14.6: the portion of this round's REAL, objective performance
+   * (same `fantasy_player_scores` the engine already computed) that does
+   * NOT count toward the current owner's matchup, because it was earned
+   * before this roster entry's `acquired_at`. `undefined`/`0` means
+   * nothing is being withheld. Always shown for informational context,
+   * never hidden — see docs/game-rules.md "Acquisition points."
+   */
+  preAcquisitionPoints?: number;
   /** Cumulative points for the season so far. */
   totalPoints?: number;
   /** Points per round this season. */

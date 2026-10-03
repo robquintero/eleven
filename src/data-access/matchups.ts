@@ -322,7 +322,8 @@ async function buildMatchupTeamSquad(
   fantasyTeamId: string,
   roundId: string,
   pointsByPlayerId: Map<string, number>,
-  fixtureByPlayerId: Map<string, { opponent: string; isHome: boolean; kickoff: string; state: PlayerMatchState; homeLabel: string; awayLabel: string }>
+  fixtureByPlayerId: Map<string, { opponent: string; isHome: boolean; kickoff: string; state: PlayerMatchState; homeLabel: string; awayLabel: string }>,
+  preAcquisitionPointsByPlayerId: Map<string, number> = new Map()
 ): Promise<Squad> {
   const empty: Squad = { formation: "—", starters: [], bench: [] };
 
@@ -361,6 +362,9 @@ async function buildMatchupTeamSquad(
       // refreshMatchupScores uses to populate matchup_scores.live_points.
       // Never the season total (that's totalPoints, Players-market-only).
       fantasyPoints: Math.round((pointsByPlayerId.get(player.id) ?? 0) * 100) / 100,
+      preAcquisitionPoints: preAcquisitionPointsByPlayerId.has(player.id)
+        ? Math.round(preAcquisitionPointsByPlayerId.get(player.id)! * 100) / 100
+        : undefined,
       availability: (player.availability_status as Player["availability"]) ?? "available",
       fixture,
     };
@@ -372,27 +376,28 @@ async function buildMatchupTeamSquad(
 
   for (const row of slotRows as MatchupSlotRow[]) {
     const player = toPlayer(row);
+    const locked = isLocked(row.locked_at ? new Date(row.locked_at) : null, now);
+    // `BenchRow`/`starterBuckets` (src/lib/team-fixture.ts) read "locked"
+    // directly off `player.fixture.state`, which the raw fixture-status
+    // mapping above never produces on its own (a lock is a LINEUP
+    // concept, not a real-world match state). Only overridden when the
+    // real fixture is STILL "upcoming" -- i.e. kickoff has technically
+    // passed (locked_at <= now) but the stored fixture data hasn't
+    // caught up to "live" yet, a brief sync-lag window. Once the real
+    // fixture state is already "live" or "final", that is strictly MORE
+    // informative than a generic "locked" label on a live-scoring page
+    // (unlike the Team page, nothing here is being edited), so it is
+    // never suppressed. Pass 14.6: applies to BENCH rows too -- a bench
+    // player's OWN lineup slot can lock independently of whether they're
+    // starting (brief: "bench rows use the same semantics"), and this is
+    // what `lineup_slots.locked_at` already tracks for every slot,
+    // starter or not.
+    const shouldShowLocked = locked && player.fixture?.state === "upcoming";
+    const displayPlayer = shouldShowLocked ? { ...player, fixture: { ...player.fixture!, state: "locked" as const } } : player;
     if (row.starter) {
-      const locked = isLocked(row.locked_at ? new Date(row.locked_at) : null, now);
-      // `PlayerNode`/`BenchRow`/`starterBuckets` (src/lib/team-fixture.ts)
-      // read "locked" directly off `player.fixture.state`, which the raw
-      // fixture-status mapping above never produces on its own (a lock is
-      // a LINEUP concept, not a real-world match state). Only overridden
-      // when the real fixture is STILL "upcoming" -- i.e. kickoff has
-      // technically passed (locked_at <= now) but the stored fixture data
-      // hasn't caught up to "live" yet, a brief sync-lag window. Once the
-      // real fixture state is already "live" or "final", that is strictly
-      // MORE informative than a generic "locked" label on a live-scoring
-      // page (unlike the Team page, nothing here is being edited), so it
-      // is never suppressed.
-      const shouldShowLocked = locked && player.fixture?.state === "upcoming";
-      starterEntries.push({
-        rosterEntryId: row.roster_entry_id,
-        player: shouldShowLocked ? { ...player, fixture: { ...player.fixture!, state: "locked" } } : player,
-        locked,
-      });
+      starterEntries.push({ rosterEntryId: row.roster_entry_id, player: displayPlayer, locked });
     } else {
-      bench.push(player);
+      bench.push(displayPlayer);
     }
   }
 
@@ -455,6 +460,8 @@ export async function getMatchupSquads(matchup: CurrentMatchup): Promise<Matchup
  */
 export interface RoundPlayerState {
   pointsByPlayerId: Map<string, number>;
+  /** Pass 14.6: the portion of each player's real round performance that was EXCLUDED by the acquisition cutoff (earned before `acquired_at`) -- shown to the manager for context, never silently dropped. Absent/0 means nothing was withheld. */
+  preAcquisitionPointsByPlayerId: Map<string, number>;
   fixtureByPlayerId: Map<string, { opponent: string; isHome: boolean; kickoff: string; state: PlayerMatchState; homeLabel: string; awayLabel: string }>;
 }
 
@@ -466,15 +473,28 @@ export interface RoundPlayerState {
  * the EXACT same derivation instead of a second, divergent one. This is
  * what fixes "locked players show 0 points / no lock indicator" outside
  * the Matchup page — those surfaces were never calling this at all.
+ *
+ * Pass 14.6: `acquiredAtByPlayerId` (the CALLER's own already-scoped
+ * `roster_entries.acquired_at`, keyed by player id) is what's compared
+ * against each eligible fixture's kickoff to apply "no retroactive point
+ * inheritance" -- see `refreshMatchupScores` (rounds.ts), which this
+ * mirrors exactly so a displayed per-player round score can never
+ * disagree with the stored team total it rolls up into. Deliberately NOT
+ * re-derived inside this function from `player_id` alone: the same real
+ * player can be rostered on different teams in different leagues
+ * simultaneously, so only the caller (who already scoped its own
+ * `roster_entries` query to one league/team set) can safely supply it.
  */
 export async function getRoundPlayerState(
   supabase: SupabaseClientType,
   playerIds: string[],
-  window: RoundWindow
+  window: RoundWindow,
+  acquiredAtByPlayerId: Map<string, string>
 ): Promise<RoundPlayerState> {
   const pointsByPlayerId = new Map<string, number>();
+  const preAcquisitionPointsByPlayerId = new Map<string, number>();
   const fixtureByPlayerId: RoundPlayerState["fixtureByPlayerId"] = new Map();
-  if (playerIds.length === 0) return { pointsByPlayerId, fixtureByPlayerId };
+  if (playerIds.length === 0) return { pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId };
 
   // Real per-round points -- the exact same fixture-window + scoring-rule
   // scoping refreshMatchupScores uses for matchup_scores.live_points, so a
@@ -484,12 +504,29 @@ export async function getRoundPlayerState(
   if (fixtureIds.length > 0) {
     const { data: scores } = await supabase
       .from("fantasy_player_scores")
-      .select("player_id, points")
+      .select("player_id, fixture_id, points")
       .eq("scoring_rule_version", SCORING_RULE_VERSION)
       .in("player_id", playerIds)
       .in("fixture_id", fixtureIds);
+
+    const { data: fixtureRows } = await supabase.from("fixtures").select("id, kickoff_at").in("id", fixtureIds);
+    const kickoffByFixtureId = new Map((fixtureRows ?? []).map((f) => [f.id, f.kickoff_at]));
+
     for (const row of scores ?? []) {
-      pointsByPlayerId.set(row.player_id, (pointsByPlayerId.get(row.player_id) ?? 0) + row.points);
+      const acquiredAt = acquiredAtByPlayerId.get(row.player_id);
+      const kickoffAt = kickoffByFixtureId.get(row.fixture_id);
+      if (!acquiredAt || !kickoffAt) continue;
+      // Pass 14.6: acquired at or before this fixture's kickoff -> counts;
+      // acquired after -> the real score still exists in
+      // fantasy_player_scores (never touched), it just isn't THIS team's
+      // to count -- tracked separately so the manager can still SEE it
+      // (brief: "pre-acquisition points remain visible as player
+      // performance"), never silently dropped.
+      if (new Date(kickoffAt).getTime() >= new Date(acquiredAt).getTime()) {
+        pointsByPlayerId.set(row.player_id, (pointsByPlayerId.get(row.player_id) ?? 0) + row.points);
+      } else {
+        preAcquisitionPointsByPlayerId.set(row.player_id, (preAcquisitionPointsByPlayerId.get(row.player_id) ?? 0) + row.points);
+      }
     }
   }
 
@@ -537,7 +574,7 @@ export async function getRoundPlayerState(
     });
   }
 
-  return { pointsByPlayerId, fixtureByPlayerId };
+  return { pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId };
 }
 
 export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: CurrentMatchup): Promise<MatchupSquads> {
@@ -545,18 +582,27 @@ export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: 
 
   const { data: entries } = await supabase
     .from("roster_entries")
-    .select("player_id")
+    .select("player_id, acquired_at")
     .in("fantasy_team_id", teamIds)
     .eq("status", "active");
 
   const playerIds = Array.from(new Set((entries ?? []).map((e) => e.player_id)));
+  // Safe keyed by player_id alone: a player can only be actively owned by
+  // ONE of these two teams at a time (league_player_ownership's own
+  // PRIMARY KEY), so there's exactly one acquired_at per id here.
+  const acquiredAtByPlayerId = new Map((entries ?? []).map((e) => [e.player_id, e.acquired_at]));
 
   const window: RoundWindow = { startsAt: new Date(matchup.roundStartsAt), endsAt: new Date(matchup.roundEndsAt) };
-  const { pointsByPlayerId, fixtureByPlayerId } = await getRoundPlayerState(supabase, playerIds, window);
+  const { pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId } = await getRoundPlayerState(
+    supabase,
+    playerIds,
+    window,
+    acquiredAtByPlayerId
+  );
 
   const [home, away] = await Promise.all([
-    buildMatchupTeamSquad(supabase, matchup.homeFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByPlayerId),
-    buildMatchupTeamSquad(supabase, matchup.awayFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByPlayerId),
+    buildMatchupTeamSquad(supabase, matchup.homeFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByPlayerId, preAcquisitionPointsByPlayerId),
+    buildMatchupTeamSquad(supabase, matchup.awayFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByPlayerId, preAcquisitionPointsByPlayerId),
   ]);
 
   return { home, away };

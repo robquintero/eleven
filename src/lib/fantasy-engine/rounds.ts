@@ -421,6 +421,8 @@ async function repairIncompleteRoundOne(admin: SupabaseClient<Database>, leagueI
 interface StarterRow {
   fantasyTeamId: string;
   playerId: string;
+  /** Pass 14.6: when THIS roster_entry (this specific ownership stint) acquired the player -- `roster_entries.acquired_at`, set once at INSERT time (draft/sign/trade), never backfilled. The acquisition-cutoff boundary below. */
+  acquiredAt: string;
 }
 
 /**
@@ -430,6 +432,16 @@ interface StarterRow {
  * points never count; a player's score is the SUM of every eligible
  * fixture they played within the round's window (the double-match-round
  * feature — docs/game-rules.md "Multi-fixture players").
+ *
+ * Pass 14.6: "no retroactive point inheritance" — a fixture's points only
+ * contribute to THIS roster_entry's team if the player was acquired at or
+ * before that fixture's own kickoff. `fantasy_player_scores` itself is
+ * never touched (it remains the player's objective, ownership-independent
+ * performance record, per docs/scoring-model.md) — the cutoff is applied
+ * purely here, at matchup aggregation, the one place that's genuinely
+ * league/team-specific. A player's locked/started fixture BEFORE
+ * acquisition still correctly contributes 0 to the new owner without
+ * needing a second score row or any mutation of the real score.
  */
 export async function refreshMatchupScores(admin: SupabaseClient<Database>, roundId: string): Promise<void> {
   const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at").eq("id", roundId).maybeSingle();
@@ -448,33 +460,55 @@ export async function refreshMatchupScores(admin: SupabaseClient<Database>, roun
 
   const { data: starterSlots } = await admin
     .from("lineup_slots")
-    .select("roster_entries!inner(fantasy_team_id, player_id)")
+    .select("roster_entries!inner(fantasy_team_id, player_id, acquired_at)")
     .eq("fantasy_round_id", roundId)
     .eq("starter", true)
     .in("roster_entries.fantasy_team_id", teamIds);
 
   const starters: StarterRow[] = (starterSlots ?? []).map((s) => {
-    const re = s.roster_entries as unknown as { fantasy_team_id: string; player_id: string };
-    return { fantasyTeamId: re.fantasy_team_id, playerId: re.player_id };
+    const re = s.roster_entries as unknown as { fantasy_team_id: string; player_id: string; acquired_at: string };
+    return { fantasyTeamId: re.fantasy_team_id, playerId: re.player_id, acquiredAt: re.acquired_at };
   });
 
   const playerIds = Array.from(new Set(starters.map((s) => s.playerId)));
-  const pointsByPlayerId = new Map<string, number>();
+  // Per-fixture, not pre-summed -- the acquisition cutoff below is
+  // evaluated per (starter, fixture), since two different starters could
+  // share the same playerId only across different teams, which can't
+  // happen (one owner per player per league), but a STARTER'S cutoff is
+  // its own roster_entry's `acquired_at`, not a global per-player fact.
+  const scoreRowsByPlayerId = new Map<string, Array<{ fixtureId: string; points: number }>>();
   if (playerIds.length > 0 && fixtureIds.length > 0) {
     const { data: scores } = await admin
       .from("fantasy_player_scores")
-      .select("player_id, points")
+      .select("player_id, fixture_id, points")
       .eq("scoring_rule_version", SCORING_RULE_VERSION)
       .in("player_id", playerIds)
       .in("fixture_id", fixtureIds);
     for (const row of scores ?? []) {
-      pointsByPlayerId.set(row.player_id, (pointsByPlayerId.get(row.player_id) ?? 0) + row.points);
+      const list = scoreRowsByPlayerId.get(row.player_id) ?? [];
+      list.push({ fixtureId: row.fixture_id, points: row.points });
+      scoreRowsByPlayerId.set(row.player_id, list);
     }
+  }
+
+  const kickoffByFixtureId = new Map<string, string>();
+  if (fixtureIds.length > 0) {
+    const { data: fixtureRows } = await admin.from("fixtures").select("id, kickoff_at").in("id", fixtureIds);
+    for (const f of fixtureRows ?? []) kickoffByFixtureId.set(f.id, f.kickoff_at);
   }
 
   const pointsByTeamId = new Map<string, number>();
   for (const starter of starters) {
-    const playerPoints = pointsByPlayerId.get(starter.playerId) ?? 0;
+    const acquiredAtMs = new Date(starter.acquiredAt).getTime();
+    const rows = scoreRowsByPlayerId.get(starter.playerId) ?? [];
+    let playerPoints = 0;
+    for (const row of rows) {
+      const kickoffAt = kickoffByFixtureId.get(row.fixtureId);
+      // Acquired at or before kickoff -> counts; acquired after -> the
+      // fixture's real points still exist in fantasy_player_scores, they
+      // just don't belong to THIS team's matchup total.
+      if (kickoffAt && new Date(kickoffAt).getTime() >= acquiredAtMs) playerPoints += row.points;
+    }
     pointsByTeamId.set(starter.fantasyTeamId, (pointsByTeamId.get(starter.fantasyTeamId) ?? 0) + playerPoints);
   }
 

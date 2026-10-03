@@ -2,10 +2,22 @@
  * COMMITTED regression test for Pass 11.5's Matchup "game center": the
  * explicit historical rule that a matchup's lineup must come from that
  * round's real `lineup_slots` records, never from CURRENT roster
- * ownership. A player can be dropped or traded after their round-lineup
- * already locked; the historical matchup must still show them exactly as
- * they were scored, not silently vanish or get replaced by whoever owns
- * the roster spot now.
+ * ownership. A player can leave a roster after their round-lineup already
+ * locked; the historical matchup must still show them exactly as they
+ * were scored, not silently vanish or get replaced by whoever owns the
+ * roster spot now.
+ *
+ * Pass 14.6: the departure here is a TRADE, not a drop -- dropping an
+ * already-LOCKED starter is now rejected outright
+ * (20261006000000_drop_lock_enforcement.sql), so the previous version of
+ * this test (drop a locked starter) is no longer a legal sequence. A
+ * trade of a locked player remains explicitly unrestricted (the brief's
+ * own carve-out: "do not accidentally prohibit trades"), and
+ * `_release_current_round_slot` leaves an already-locked slot completely
+ * untouched either way (same market-trades.integration.test.ts's own
+ * "lock integrity" trade test proves directly) -- so a trade is the
+ * correct, still-legal way to exercise "current ownership changed, the
+ * locked historical slot must not."
  *
  * Uses `queryMatchupSquads` (the client-injectable core of
  * `getMatchupSquads`) with the real admin client, since `getMatchupSquads`
@@ -23,18 +35,25 @@ import { queryMatchupSquads, queryLeagueCompetitionSummary, type CurrentMatchup 
 
 const skip = !isSupabaseAdminConfigured();
 
-test("a historical round's matchup lineup reflects that round's real lineup_slots, not current ownership -- a player dropped AFTER locking still appears, locked", { skip }, async () => {
+test("a historical round's matchup lineup reflects that round's real lineup_slots, not current ownership -- a player TRADED away after locking still appears, locked", { skip }, async () => {
   const admin = createAdminClient();
   const league = await createTestLeague(admin, 2, 16);
   try {
     const { data: gks } = await admin.from("players").select("id").eq("active", true).eq("position", "GK").order("name").limit(1);
     const playerId = gks![0]!.id;
+    const { data: returnCandidates } = await admin.from("players").select("id").eq("active", true).neq("id", playerId).limit(1);
+    const returnPlayerId = returnCandidates![0]!.id;
 
     const { error: signError } = await league.clients[0].rpc("sign_player", {
       p_league_id: league.leagueId,
       p_player_id: playerId,
     });
     assert.equal(signError, null);
+    const { error: signReturnError } = await league.clients[1].rpc("sign_player", {
+      p_league_id: league.leagueId,
+      p_player_id: returnPlayerId,
+    });
+    assert.equal(signReturnError, null);
 
     const { data: rosterEntry } = await admin
       .from("roster_entries")
@@ -82,21 +101,26 @@ test("a historical round's matchup lineup reflects that round's real lineup_slot
       scoresUpdatedAt: null,
     };
 
-    // Drop the player AFTER the round has locked -- current ownership no
-    // longer includes them at all.
-    const { error: dropError } = await league.clients[0].rpc("drop_player", {
+    // Trade the player AFTER the round has locked -- current ownership no
+    // longer includes them at all (a drop here would instead be rejected
+    // outright -- see this test's own header comment).
+    const { data: proposed, error: proposeError } = await league.clients[0].rpc("propose_trade", {
       p_league_id: league.leagueId,
-      p_player_id: playerId,
+      p_receiving_team_id: league.teamIds[1],
+      p_offered_player_ids: [playerId],
+      p_requested_player_ids: [returnPlayerId],
     });
-    assert.equal(dropError, null);
+    assert.equal(proposeError, null);
+    const { error: acceptError } = await league.clients[1].rpc("accept_trade", { p_trade_id: proposed![0]!.trade_id });
+    assert.equal(acceptError, null);
 
-    const { data: ownershipAfterDrop } = await admin
+    const { data: ownershipAfterTrade } = await admin
       .from("league_player_ownership")
-      .select("player_id")
+      .select("fantasy_team_id")
       .eq("league_id", league.leagueId)
       .eq("player_id", playerId)
-      .maybeSingle();
-    assert.equal(ownershipAfterDrop, null, "sanity check: the player must genuinely be unowned now");
+      .single();
+    assert.equal(ownershipAfterTrade!.fantasy_team_id, league.teamIds[1], "sanity check: the player must genuinely belong to the OTHER team now");
 
     const squads = await queryMatchupSquads(admin, matchup);
     const team0Squad = matchup.homeFantasyTeamId === league.teamIds[0] ? squads.home : squads.away;
@@ -104,7 +128,7 @@ test("a historical round's matchup lineup reflects that round's real lineup_slot
     const starterSlot = team0Squad.starters.find((s) => s.player.id === playerId);
     assert.ok(
       starterSlot,
-      "the dropped player must still appear as a starter in this HISTORICAL round's matchup, even though they are no longer owned by anyone"
+      "the traded-away player must still appear as a starter in this HISTORICAL round's matchup, even though they are now owned by the other team"
     );
     assert.equal(starterSlot!.locked, true, "their locked slot must still read as locked");
   } finally {

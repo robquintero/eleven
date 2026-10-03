@@ -347,7 +347,7 @@ test("concurrency: double-clicking DROP on the same player -- the second call fa
 // CURRENT-ROUND LOCK INTEGRITY
 // ===========================================================================
 
-test("lock integrity: dropping a LOCKED starter leaves their locked slot completely untouched -- a replacement signed afterward starts on the bench in a brand-new slot, never inheriting the locked points", { skip }, async () => {
+test("Pass 14.6: dropping a LOCKED starter is now rejected outright (PLAYER_LOCKED) -- ownership and the locked slot are both left completely untouched", { skip }, async () => {
   const admin = createAdminClient();
   const league = await createTestLeague(admin, 2, 16);
   try {
@@ -373,7 +373,15 @@ test("lock integrity: dropping a LOCKED starter leaves their locked slot complet
       p_league_id: league.leagueId,
       p_player_id: playerA,
     });
-    assert.equal(dropError, null, "the drop itself is always allowed, even for a locked starter");
+    assert.equal(dropError?.message, "PLAYER_LOCKED", "a locked starter can no longer be dropped at all -- see 20261006000000_drop_lock_enforcement.sql");
+
+    const { data: ownershipAfter } = await admin
+      .from("league_player_ownership")
+      .select("fantasy_team_id")
+      .eq("league_id", league.leagueId)
+      .eq("player_id", playerA)
+      .single();
+    assert.equal(ownershipAfter!.fantasy_team_id, league.teamIds[0], "ownership must be completely unchanged by the rejected drop");
 
     const { data: slotA } = await admin
       .from("lineup_slots")
@@ -381,35 +389,8 @@ test("lock integrity: dropping a LOCKED starter leaves their locked slot complet
       .eq("roster_entry_id", rosterEntryA)
       .eq("fantasy_round_id", opened.roundId)
       .single();
-    assert.equal(
-      slotA!.starter,
-      true,
-      "a LOCKED starter's slot must be left completely untouched by a drop -- it is the authoritative historical scoring record"
-    );
+    assert.equal(slotA!.starter, true, "the locked slot must be left completely untouched by the rejected drop");
     assert.equal(new Date(slotA!.locked_at!).toISOString(), pastLock);
-
-    const [playerB] = await findFreeAgents(admin, league.leagueId, "GK", 1, new Set([playerA]));
-    const [rosterEntryB] = await signPlayers(league.clients[0], league.leagueId, [playerB]);
-
-    const { data: slotB } = await admin
-      .from("lineup_slots")
-      .select("starter")
-      .eq("roster_entry_id", rosterEntryB)
-      .eq("fantasy_round_id", opened.roundId)
-      .maybeSingle();
-    assert.ok(slotB, "a newly-signed player must get their own current-round lineup_slots row");
-    assert.equal(
-      slotB!.starter,
-      false,
-      "the replacement must start on the BENCH -- never inheriting the dropped player's starter status or points"
-    );
-
-    const { count } = await admin
-      .from("lineup_slots")
-      .select("*", { count: "exact", head: true })
-      .eq("fantasy_round_id", opened.roundId)
-      .in("roster_entry_id", [rosterEntryA, rosterEntryB]);
-    assert.equal(count, 2, "the locked slot and the replacement's new slot must be two distinct, independent rows");
   } finally {
     await cleanupTestLeague(admin, league);
   }
@@ -444,6 +425,27 @@ test("lock integrity: dropping an UNLOCKED starter demotes their current-round s
       .single();
     assert.equal(slotC!.starter, false, "an UNLOCKED departing starter must be demoted to the bench as part of the same atomic drop");
     assert.equal(slotC!.slot, "BENCH");
+
+    // A replacement signed afterward must never inherit/reuse the
+    // departed player's slot or points -- their own fresh bench row.
+    const [playerReplacement] = await findFreeAgents(admin, league.leagueId, "MID", 1, new Set([playerC]));
+    const [rosterEntryReplacement] = await signPlayers(league.clients[0], league.leagueId, [playerReplacement]);
+
+    const { data: slotReplacement } = await admin
+      .from("lineup_slots")
+      .select("starter")
+      .eq("roster_entry_id", rosterEntryReplacement)
+      .eq("fantasy_round_id", opened.roundId)
+      .maybeSingle();
+    assert.ok(slotReplacement, "a newly-signed player must get their own current-round lineup_slots row");
+    assert.equal(slotReplacement!.starter, false, "the replacement must start on the BENCH -- never inheriting the dropped player's starter status or points");
+
+    const { count } = await admin
+      .from("lineup_slots")
+      .select("*", { count: "exact", head: true })
+      .eq("fantasy_round_id", opened.roundId)
+      .in("roster_entry_id", [rosterEntryC, rosterEntryReplacement]);
+    assert.equal(count, 2, "the (now-bench) original slot and the replacement's new slot must be two distinct, independent rows");
   } finally {
     await cleanupTestLeague(admin, league);
   }

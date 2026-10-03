@@ -66,7 +66,7 @@ export function MatchupCompactRow({ player, onSelect }: { player: Player; onSele
             <span className="relative inline-flex size-1 rounded-full bg-live" />
           </span>
         )}
-        {isLocked && !isLive && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
+        {isLocked && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
         {compactPoints}
       </span>
     </button>
