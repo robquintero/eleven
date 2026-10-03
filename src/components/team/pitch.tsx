@@ -131,6 +131,7 @@ export function Pitch({
                 selected={selectedSlotId === item.id}
                 swapTarget={editing && swapTargetPosition === item.position && selectedSlotId !== item.id}
                 substituting={substitutingSlotId === item.id}
+                locked={item.locked ?? false}
                 onSelect={() => onSelectSlot(item)}
               />
             )}

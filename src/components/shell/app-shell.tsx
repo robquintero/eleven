@@ -7,12 +7,44 @@ import { MobileNav } from "@/components/shell/mobile-nav";
 import { NavigationTransitionProvider } from "@/components/shell/navigation-transition";
 import { LeagueSwitcher } from "@/components/shell/league-switcher";
 import { ProfileControl } from "@/components/shell/profile-control";
-import { StatusBar } from "@/components/shell/status-bar";
+import { StatusBar, type StatusBarData } from "@/components/shell/status-bar";
 import { Wordmark } from "@/components/shell/wordmark";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getUserLeagues } from "@/data-access/leagues";
+import { getCurrentMatchup, getMatchupSquads } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
+import { getUserTeamInLeague } from "@/data-access/teams";
+import { nextLock, starterBuckets } from "@/lib/team-fixture";
 import { ATTRIBUTION_LINE, PRODUCT_STATUS, SITE_NAME } from "@/lib/site-config";
+
+/**
+ * Pass 14.5: the real round-state summary behind the global `StatusBar` --
+ * same authoritative sources the Home dashboard uses (`getCurrentMatchup`,
+ * `getMatchupSquads`, `starterBuckets`, `nextLock`), never a second,
+ * divergent derivation. `null` whenever the active league genuinely has no
+ * team/round yet.
+ */
+async function loadStatusBarData(activeLeagueId: string | null): Promise<StatusBarData | null> {
+  if (!activeLeagueId) return null;
+  const team = await getUserTeamInLeague(activeLeagueId);
+  if (!team) return null;
+  const matchup = await getCurrentMatchup(activeLeagueId, team.id);
+  if (!matchup) return null;
+
+  const squads = await getMatchupSquads(matchup);
+  const mySquad = matchup.isUserHome ? squads.home : squads.away;
+  const buckets = starterBuckets(mySquad.starters);
+  const next = nextLock(mySquad.starters);
+
+  return {
+    roundNumber: matchup.roundNumber,
+    roundStatus: matchup.roundStatus,
+    liveCount: buckets.live,
+    lockedCount: buckets.locked + buckets.final,
+    remainingCount: buckets.upcoming,
+    nextLockKickoff: next?.player.fixture?.kickoff ?? null,
+  };
+}
 
 /**
  * The authenticated workstation chrome. Every value here is real: the
@@ -25,6 +57,7 @@ import { ATTRIBUTION_LINE, PRODUCT_STATUS, SITE_NAME } from "@/lib/site-config";
 export async function AppShell({ children }: { children: ReactNode }) {
   const [profile, leagues] = await Promise.all([getCurrentProfile(), getUserLeagues()]);
   const activeLeagueId = await getActiveLeagueId(leagues);
+  const statusBarData = await loadStatusBarData(activeLeagueId);
 
   return (
     <NavigationTransitionProvider>
@@ -68,7 +101,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
                 <ProfileControl profile={profile} />
               </div>
             </div>
-            <StatusBar />
+            <StatusBar data={statusBarData} />
           </header>
 
           <main id="main-content" className="flex-1 px-4 pt-6 pb-28 sm:px-6 lg:px-8 lg:pb-12">

@@ -4,6 +4,7 @@ import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { MatchupCommand } from "@/components/dashboard/matchup-command";
 import { MatchupLineups } from "@/components/matchup/matchup-lineups";
 import { MatchupPlayerCounts } from "@/components/matchup/matchup-player-counts";
+import { RoundWindow } from "@/components/football/round-window";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
@@ -59,6 +60,12 @@ export default async function MatchupPage() {
         </h1>
         <p className="mt-1.5 text-sm text-foreground-secondary">{league.name}</p>
       </div>
+
+      {matchup && (
+        <RoundWindow
+          round={{ number: matchup.roundNumber, startsAt: matchup.roundStartsAt, endsAt: matchup.roundEndsAt, status: matchup.roundStatus }}
+        />
+      )}
 
       {/* Pass 13 (§5): tighter rhythm (gap-3, not the page's own gap-6)
           between the score module and the XI below it -- proximity is the

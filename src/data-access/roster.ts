@@ -9,7 +9,9 @@ import { isSupabaseConfigured } from "../lib/supabase/config.ts";
 import { bigFiveLeagueFromCompetitionCode } from "../lib/leagues.ts";
 import { deriveFormationLabel } from "../domain/fantasy/constants.ts";
 import { isLocked } from "../domain/fantasy/lineup-lock.ts";
+import { getRoundPlayerState } from "./matchups.ts";
 import { layoutStartingXi } from "../lib/selectors/pitch-layout.ts";
+import type { RoundWindow } from "../domain/fantasy/round-calendar.ts";
 import type { Database } from "../lib/supabase/database.types.ts";
 import type { Player, PlayerPosition, Squad } from "../lib/types/fantasy.ts";
 
@@ -41,7 +43,11 @@ interface RosterRow {
   } | null;
 }
 
-function toPlayer(row: RosterRow): Player | null {
+function toPlayer(
+  row: RosterRow,
+  pointsByPlayerId: Map<string, number>,
+  fixtureByPlayerId: Map<string, Player["fixture"]>
+): Player | null {
   if (!row.players) return null;
   const player = row.players;
   const club = player.clubs;
@@ -61,8 +67,14 @@ function toPlayer(row: RosterRow): Player | null {
     position: player.position as PlayerPosition,
     number: player.shirt_number ?? undefined,
     nationality: player.nationality,
-    fantasyPoints: 0,
+    // Pass 14.5: real, round-scoped points (same aggregation
+    // `queryMatchupSquads` uses for the Matchup page) -- `0` is a real,
+    // known zero (no round yet, or the round hasn't started) whenever no
+    // round-player-state lookup ran, never a placeholder masquerading as
+    // "no data."
+    fantasyPoints: Math.round((pointsByPlayerId.get(player.id) ?? 0) * 100) / 100,
     availability: (player.availability_status as Player["availability"]) ?? "available",
+    fixture: fixtureByPlayerId.get(player.id),
     // Every player this function returns is, by construction, on the
     // CALLER's own roster in this league -- "mine", never "owned" (which
     // means someone else's) or undefined (Pass 10.5B fix: undefined here
@@ -114,19 +126,35 @@ export async function querySquad(
   if (error) console.error(`getUserSquad: roster_entries fetch failed for team ${fantasyTeamId}:`, error);
   if (error || !entries || entries.length === 0) return empty;
 
-  const playerByRosterEntryId = new Map<string, Player>();
-  for (const entry of entries as RosterRow[]) {
-    const player = toPlayer(entry);
-    if (player) playerByRosterEntryId.set(entry.id, player);
-  }
+  const rosterRows = entries as RosterRow[];
 
   const { data: currentRound } = await supabase
     .from("fantasy_rounds")
-    .select("id")
+    .select("id, starts_at, ends_at")
     .eq("league_id", leagueId)
     .order("number", { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // Pass 14.5: real, round-scoped points + fixture/lock display state --
+  // the SAME derivation `queryMatchupSquads` uses for the Matchup page
+  // (`getRoundPlayerState`), so Home's Starting XI and the Team page never
+  // show a second, divergent ("always 0 points, no lock indicator")
+  // truth. Empty maps (honest zero/no-fixture) whenever no round has
+  // opened for this league yet.
+  const playerIds = rosterRows.map((r) => r.player_id);
+  const { pointsByPlayerId, fixtureByPlayerId } = currentRound
+    ? await getRoundPlayerState(supabase, playerIds, {
+        startsAt: new Date(currentRound.starts_at),
+        endsAt: new Date(currentRound.ends_at),
+      } satisfies RoundWindow)
+    : { pointsByPlayerId: new Map<string, number>(), fixtureByPlayerId: new Map<string, Player["fixture"]>() };
+
+  const playerByRosterEntryId = new Map<string, Player>();
+  for (const entry of rosterRows) {
+    const player = toPlayer(entry, pointsByPlayerId, fixtureByPlayerId);
+    if (player) playerByRosterEntryId.set(entry.id, player);
+  }
 
   if (!currentRound) {
     return { formation: "—", starters: [], bench: Array.from(playerByRosterEntryId.values()) };
@@ -144,14 +172,22 @@ export async function querySquad(
   const starterEntries: Array<{ rosterEntryId: string; player: Player; locked: boolean }> = [];
   const bench: Player[] = [];
 
-  for (const [rosterEntryId, player] of playerByRosterEntryId) {
+  for (const [rosterEntryId, rawPlayer] of playerByRosterEntryId) {
     const slot = slotByRosterEntryId.get(rosterEntryId);
+    const locked = isLocked(slot?.locked_at ? new Date(slot.locked_at) : null, now);
+    // Same state-rewrite `buildMatchupTeamSquad` (data-access/matchups.ts)
+    // applies: a lock is a LINEUP concept, not a real-world match state,
+    // so it only overrides a still-"upcoming" raw fixture state -- once
+    // the real fixture is already "live"/"final" that's strictly more
+    // informative and is never suppressed. Applies to BENCH players too
+    // (brief §Phase 1: "locked bench players must visibly show that they
+    // cannot be moved") -- `lineup_slots` rows exist for bench entries as
+    // well, each with their own real `locked_at`.
+    const shouldShowLocked = locked && rawPlayer.fixture?.state === "upcoming";
+    const player = shouldShowLocked ? { ...rawPlayer, fixture: { ...rawPlayer.fixture!, state: "locked" as const } } : rawPlayer;
+
     if (slot?.starter) {
-      starterEntries.push({
-        rosterEntryId,
-        player,
-        locked: isLocked(slot.locked_at ? new Date(slot.locked_at) : null, now),
-      });
+      starterEntries.push({ rosterEntryId, player, locked });
     } else {
       bench.push(player);
     }

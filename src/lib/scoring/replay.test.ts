@@ -75,7 +75,7 @@ test("scenario: a stat correction (the provider removes a previously-reported as
   const after = calculateFantasyScore(afterCorrection);
 
   assert.ok(after.total < before.total, "removing a credited assist must lower the recomputed score");
-  assert.equal(before.total - after.total, 4, "the drop equals exactly one assist's point value (4, ELEVEN_STANDARD_V2) — nothing else changed, and going from 1 assist to 0 never crosses the 2+ milestone threshold either way");
+  assert.equal(before.total - after.total, 5, "the drop equals exactly one assist's point value (5, ELEVEN_STANDARD_V3) — nothing else changed, and going from 1 assist to 0 never crosses the 2+ milestone threshold either way");
 });
 
 test("scenario: a stat correction that ADDS a previously-missed card recomputes DOWN by the discipline penalty", () => {

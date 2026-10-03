@@ -1,6 +1,6 @@
 import { Lock } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
-import { playerStatusLabel } from "@/lib/team-fixture";
+import { formatRoundPoints, isPlayerLocked, playerStatusLabel } from "@/lib/team-fixture";
 import type { Player, PlayerPosition } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
@@ -32,19 +32,23 @@ export function MatchupCompactRow({ player, onSelect }: { player: Player; onSele
   const isLive = status.tone === "live";
   const isFlagged = player.availability === "injured" || player.availability === "suspended";
   const isDoubtful = player.availability === "doubtful";
-
-  // The full status string ("LIVE 12.5", "FT · 12.5") is too wide for a
-  // ~140px column — shown in full via the accessible label, but visually
-  // only the number (or a compact fallback) renders in the row itself.
-  const isLocked = status.tone === "neutral" && status.text === "LOCKED";
-  const compactStatus = isLive || status.text.startsWith("FT") ? (player.fantasyPoints ?? 0).toFixed(1) : isLocked ? null : "–";
+  // Pass 14.5: the points number is ALWAYS shown (never a "–" placeholder
+  // that reads as missing data) -- a locked-but-not-yet-kicked-off player
+  // truthfully has 0.0 so far, exactly like a "ready" one; the Lock icon
+  // is what distinguishes "can't be moved" from "hasn't started," not the
+  // absence of a number.
+  const isLocked = isPlayerLocked(player);
+  const compactPoints = formatRoundPoints(player.fantasyPoints ?? 0);
 
   return (
     <button
       type="button"
       onClick={onSelect}
-      aria-label={`${player.name}, ${player.position}, ${status.text}`}
-      className="flex w-full items-center gap-1 rounded-md px-1 py-1.5 text-left transition-colors active:bg-muted/60"
+      aria-label={`${player.name}, ${player.position}, ${status.text}, ${compactPoints} points`}
+      className={cn(
+        "flex w-full items-center gap-1 rounded-md px-1 py-1.5 text-left transition-colors active:bg-muted/60",
+        isLocked && "bg-foreground/2"
+      )}
     >
       <span className="label-system w-2.5 shrink-0 text-center text-[8px] font-semibold text-foreground-tertiary">
         {POSITION_LETTER[player.position]}
@@ -62,7 +66,8 @@ export function MatchupCompactRow({ player, onSelect }: { player: Player; onSele
             <span className="relative inline-flex size-1 rounded-full bg-live" />
           </span>
         )}
-        {isLocked ? <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" /> : compactStatus}
+        {isLocked && !isLive && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
+        {compactPoints}
       </span>
     </button>
   );

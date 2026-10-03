@@ -1,8 +1,10 @@
 import { TransitionLink } from "@/components/shell/transition-link";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
+import { RoundWindow } from "@/components/football/round-window";
 import { TeamWorkspace } from "@/components/team/team-workspace";
 import { ensureFirstRoundOpenedAction } from "@/app/(app)/team/actions";
 import { getActiveLeagueId } from "@/data-access/active-league";
+import { getCurrentMatchup } from "@/data-access/matchups";
 import { getUserLeagues } from "@/data-access/leagues";
 import { getUserSquad } from "@/data-access/roster";
 import { getUserTeamInLeague } from "@/data-access/teams";
@@ -26,9 +28,9 @@ export default async function TeamPage() {
   // cheap no-op once a round already exists, which is true almost always.
   if (team) await ensureFirstRoundOpenedAction(league.id);
 
-  const squad: Squad = team
-    ? await getUserSquad(league.id, team.id)
-    : { formation: "—", starters: [], bench: [] };
+  const [squad, matchup]: [Squad, Awaited<ReturnType<typeof getCurrentMatchup>>] = team
+    ? await Promise.all([getUserSquad(league.id, team.id), getCurrentMatchup(league.id, team.id)])
+    : [{ formation: "—", starters: [], bench: [] }, null];
 
   const squadSize = squad.starters.length + squad.bench.length;
 
@@ -66,6 +68,13 @@ export default async function TeamPage() {
         <StripCell label="BENCH" value={pad2(squad.bench.length)} />
       </div>
 
+      {matchup && (
+        <RoundWindow
+          className="mt-3"
+          round={{ number: matchup.roundNumber, startsAt: matchup.roundStartsAt, endsAt: matchup.roundEndsAt, status: matchup.roundStatus }}
+        />
+      )}
+
       {!team && (
         <p className="mt-2 text-xs text-foreground-tertiary">
           You don&apos;t have a fantasy team in this league yet.
@@ -93,7 +102,8 @@ export default async function TeamPage() {
 
       <TeamWorkspace
         squad={squad}
-        matchdayNumber={null}
+        matchdayNumber={matchup?.roundNumber ?? null}
+        hasActiveRound={matchup !== null && matchup.roundStatus !== "completed"}
         leagueId={league.id}
         fantasyTeamId={team?.id ?? null}
       />

@@ -51,7 +51,15 @@ export function MatchupCommand({
   }
 
   const isLive = matchup.status === "live";
-  const isScheduled = matchup.status === "scheduled";
+  // Pass 14.5: whether the ROUND has started, not whether a fixture is
+  // CURRENTLY live right now -- `matchup.status` reverts to "scheduled"
+  // the instant nothing is live (see data-access/matchups.ts's
+  // `roundStatus` doc comment), which previously showed the pre-kickoff
+  // "VS" anticipation layout even after real, already-locked/already-
+  // scored performances existed (e.g. The Room's Round 1, where several
+  // starters had already played while nothing happened to be live at
+  // read time).
+  const isScheduled = matchup.roundStatus === "upcoming";
   const homeScore = matchup.homeFinalPoints ?? matchup.homeLivePoints;
   const awayScore = matchup.awayFinalPoints ?? matchup.awayLivePoints;
   const total = homeScore + awayScore || 1;
@@ -88,8 +96,12 @@ export function MatchupCommand({
               </span>
               <span className="font-semibold text-live">LIVE</span>
             </>
+          ) : matchup.roundStatus === "completed" ? (
+            "FINAL"
+          ) : matchup.roundStatus === "in_progress" ? (
+            "IN PROGRESS"
           ) : (
-            matchup.status.toUpperCase()
+            "SCHEDULED"
           )}
           · MATCHDAY {pad2(matchup.roundNumber)}
         </span>

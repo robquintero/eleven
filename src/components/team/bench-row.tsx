@@ -1,6 +1,12 @@
-import { Ban } from "lucide-react";
+import { Ban, Lock } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
-import { playerFixtureCode, playerFixtureParticipantLabel, playerStatusLabel } from "@/lib/team-fixture";
+import {
+  formatRoundPoints,
+  isPlayerLocked,
+  playerFixtureCode,
+  playerFixtureParticipantLabel,
+  playerStateWord,
+} from "@/lib/team-fixture";
 import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
@@ -32,28 +38,51 @@ export function BenchRow({
   const isFlagged =
     player.availability === "injured" || player.availability === "suspended";
   const isDoubtful = player.availability === "doubtful";
-  const status = playerStatusLabel(player);
-  const isLive = status.tone === "live";
+  const state = playerStateWord(player);
+  const isLive = state.tone === "live";
+  // Pass 14.5: a locked bench player can't be swapped IN while editing --
+  // same "immovable" fact as a locked starter, rendered the same way
+  // (restrained row tint + Lock icon) but never treated as "disabled" the
+  // way a wrong-position bench player is (that's a Ban-icon, opacity-40
+  // state about this slot specifically, unrelated to this player's own
+  // lock).
+  const locked = isPlayerLocked(player);
+  const lockedForEditing = editing && locked;
+  const effectivelyDisabled = disabled || lockedForEditing;
 
   return (
     <button
       type="button"
       onClick={onSelect}
-      disabled={disabled}
-      aria-label={disabled ? `${player.name} (wrong position for the selected slot)` : undefined}
+      disabled={effectivelyDisabled}
+      aria-label={
+        disabled
+          ? `${player.name} (wrong position for the selected slot)`
+          : lockedForEditing
+            ? `${player.name} (locked -- their match has already started)`
+            : undefined
+      }
       className={cn(
         "grid w-full grid-cols-[1.25rem_1.5rem_2.25rem_1fr_auto] items-center gap-2 border-l-2 border-l-transparent py-2 pr-2 pl-1 text-left transition-colors sm:grid-cols-[1.25rem_1.5rem_2rem_1fr_2.25rem_4.25rem]",
-        editing && !disabled && "cursor-pointer",
+        editing && !effectivelyDisabled && "cursor-pointer",
         // Pass 13 (DESIGN.md §20): selection is a left-edge indicator, the
         // same pattern player-table.tsx/standings-table.tsx use -- never a
         // rounded ring highlight.
         selected && "border-l-accent bg-accent/10",
-        swapTarget && !selected && !disabled && "border-l-accent/30 bg-accent/5",
-        disabled && "cursor-not-allowed opacity-40"
+        swapTarget && !selected && !effectivelyDisabled && "border-l-accent/30 bg-accent/5",
+        disabled && "cursor-not-allowed opacity-40",
+        !disabled && locked && "bg-foreground/2",
+        !disabled && lockedForEditing && "cursor-not-allowed"
       )}
     >
       <span className="label-system text-[11px] text-foreground-tertiary">
-        {disabled ? <Ban className="size-3" strokeWidth={2} aria-hidden="true" /> : String(index + 1).padStart(2, "0")}
+        {disabled ? (
+          <Ban className="size-3" strokeWidth={2} aria-hidden="true" />
+        ) : locked ? (
+          <Lock className="size-3" strokeWidth={2} aria-hidden="true" />
+        ) : (
+          String(index + 1).padStart(2, "0")
+        )}
       </span>
 
       <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
@@ -81,20 +110,24 @@ export function BenchRow({
         {player.club.shortName}
       </span>
 
-      <span
-        className={cn(
-          "label-system flex items-center justify-end gap-1.5 text-xs font-semibold",
-          toneClass[status.tone]
-        )}
-      >
-        {isLive && (
-          <span className="relative flex size-1.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-live opacity-75" />
-            <span className="relative inline-flex size-1.5 rounded-full bg-live" />
-          </span>
-        )}
-        <span className="tabular-nums">{status.text}</span>
-      </span>
+      {/* Pass 14.5: round points are the most prominent value; the
+          READY/LOCKED/LIVE/FT word is a smaller secondary line, never
+          merged into one ambiguous string. */}
+      <div className="flex flex-col items-end gap-0.5">
+        <span className="label-system tabular-nums text-xs font-semibold text-foreground">
+          {formatRoundPoints(player.fantasyPoints)}
+        </span>
+        <span className={cn("label-system flex items-center gap-1 text-[10px]", toneClass[state.tone])}>
+          {isLive && (
+            <span className="relative flex size-1.5">
+              <span className="absolute inline-flex size-full animate-ping rounded-full bg-live opacity-75" />
+              <span className="relative inline-flex size-1.5 rounded-full bg-live" />
+            </span>
+          )}
+          {locked && !isLive && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
+          {state.text}
+        </span>
+      </div>
     </button>
   );
 }

@@ -33,6 +33,19 @@ export interface CurrentMatchup {
   /** The fantasy round's own Tue→Mon window (docs/game-rules.md "Fantasy round boundary") — what "round-aware" fixture lookups (Pass 10.5B) must stay inside, never crossing into a future round just to find something to show. */
   roundStartsAt: string;
   roundEndsAt: string;
+  /**
+   * Pass 14.5: the round's own authoritative lifecycle state
+   * (`fantasy_rounds.status`) — distinct from `status` below
+   * (`matchups.status`), which only reflects whether a fixture is
+   * CURRENTLY live right now and reverts to "scheduled" the instant
+   * nothing is (see rounds.ts `refreshMatchupScores`'s own comment). A
+   * round whose fixtures have already locked/finished for the day but
+   * aren't live AT THIS SECOND is still correctly "in_progress" here —
+   * this is what Phase 2's round-window/intelligence surfaces must read,
+   * never `status`, to avoid the "NO ACTIVE ROUND while players are
+   * visibly locked" contradiction.
+   */
+  roundStatus: "upcoming" | "in_progress" | "completed";
   status: "scheduled" | "live" | "final";
   homeFantasyTeamId: string;
   awayFantasyTeamId: string;
@@ -136,6 +149,7 @@ export async function getCurrentMatchup(
     roundNumber: round.number,
     roundStartsAt: round.starts_at,
     roundEndsAt: round.ends_at,
+    roundStatus: round.status as CurrentMatchup["roundStatus"],
     status: matchup.status as CurrentMatchup["status"],
     homeFantasyTeamId: matchup.home_fantasy_team_id,
     awayFantasyTeamId: matchup.away_fantasy_team_id,
@@ -439,26 +453,35 @@ export async function getMatchupSquads(matchup: CurrentMatchup): Promise<Matchup
  * `matchups.integration.test.ts` prove the historical-lineup-correctness
  * invariant against the real database.
  */
-export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: CurrentMatchup): Promise<MatchupSquads> {
-  const teamIds = [matchup.homeFantasyTeamId, matchup.awayFantasyTeamId];
+export interface RoundPlayerState {
+  pointsByPlayerId: Map<string, number>;
+  fixtureByPlayerId: Map<string, { opponent: string; isHome: boolean; kickoff: string; state: PlayerMatchState; homeLabel: string; awayLabel: string }>;
+}
 
-  const { data: entries } = await supabase
-    .from("roster_entries")
-    .select("player_id")
-    .in("fantasy_team_id", teamIds)
-    .eq("status", "active");
-
-  const playerIds = Array.from(new Set((entries ?? []).map((e) => e.player_id)));
-
-  const window: RoundWindow = { startsAt: new Date(matchup.roundStartsAt), endsAt: new Date(matchup.roundEndsAt) };
+/**
+ * Pass 14.5: the shared "real per-round points + real fixture/lock
+ * display state for these players, scoped to this round's window" lookup
+ * — extracted out of `queryMatchupSquads` (unchanged behavior) so
+ * `querySquad` (roster.ts, Home's Starting XI and the Team page) can reuse
+ * the EXACT same derivation instead of a second, divergent one. This is
+ * what fixes "locked players show 0 points / no lock indicator" outside
+ * the Matchup page — those surfaces were never calling this at all.
+ */
+export async function getRoundPlayerState(
+  supabase: SupabaseClientType,
+  playerIds: string[],
+  window: RoundWindow
+): Promise<RoundPlayerState> {
+  const pointsByPlayerId = new Map<string, number>();
+  const fixtureByPlayerId: RoundPlayerState["fixtureByPlayerId"] = new Map();
+  if (playerIds.length === 0) return { pointsByPlayerId, fixtureByPlayerId };
 
   // Real per-round points -- the exact same fixture-window + scoring-rule
-  // scoping refreshMatchupScores uses for matchup_scores.live_points,
-  // reused here (not re-derived) so a player's displayed round score can
-  // never disagree with the team total it rolls up into.
+  // scoping refreshMatchupScores uses for matchup_scores.live_points, so a
+  // player's displayed round score can never disagree with the team total
+  // it rolls up into.
   const fixtureIds = await getEligibleFixtureIds(supabase, window);
-  const pointsByPlayerId = new Map<string, number>();
-  if (playerIds.length > 0 && fixtureIds.length > 0) {
+  if (fixtureIds.length > 0) {
     const { data: scores } = await supabase
       .from("fantasy_player_scores")
       .select("player_id, points")
@@ -483,39 +506,53 @@ export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: 
   // POINTS value above already sums every fixture in the window
   // regardless of which one is displayed, so this choice is purely
   // presentational.
-  const fixtureByPlayerId = new Map<string, { opponent: string; isHome: boolean; kickoff: string; state: PlayerMatchState; homeLabel: string; awayLabel: string }>();
-  if (playerIds.length > 0) {
-    const teamIdsByPlayer = await getTeamIdsByPlayer(supabase, playerIds);
-    const allTeamIds = Array.from(new Set(Array.from(teamIdsByPlayer.values()).flat()));
-    const fixtures = await getFixturesForTeamIds(supabase, allTeamIds, { window });
+  const teamIdsByPlayer = await getTeamIdsByPlayer(supabase, playerIds);
+  const allTeamIds = Array.from(new Set(Array.from(teamIdsByPlayer.values()).flat()));
+  const fixtures = await getFixturesForTeamIds(supabase, allTeamIds, { window });
 
-    const involvedClubIds = Array.from(new Set(fixtures.flatMap((f) => [f.homeClubId, f.awayClubId])));
-    const { data: clubs } = involvedClubIds.length
-      ? await supabase.from("clubs").select("id, short_name").in("id", involvedClubIds)
-      : { data: [] as { id: string; short_name: string }[] };
-    const shortNameById = new Map((clubs ?? []).map((c) => [c.id, c.short_name]));
+  const involvedClubIds = Array.from(new Set(fixtures.flatMap((f) => [f.homeClubId, f.awayClubId])));
+  const { data: clubs } = involvedClubIds.length
+    ? await supabase.from("clubs").select("id, short_name").in("id", involvedClubIds)
+    : { data: [] as { id: string; short_name: string }[] };
+  const shortNameById = new Map((clubs ?? []).map((c) => [c.id, c.short_name]));
 
-    for (const playerId of playerIds) {
-      const teamIds = new Set(teamIdsByPlayer.get(playerId) ?? []);
-      const playerFixtures = fixtures.filter((f) => teamIds.has(f.homeClubId) || teamIds.has(f.awayClubId));
-      if (playerFixtures.length === 0) continue;
+  for (const playerId of playerIds) {
+    const teamIds = new Set(teamIdsByPlayer.get(playerId) ?? []);
+    const playerFixtures = fixtures.filter((f) => teamIds.has(f.homeClubId) || teamIds.has(f.awayClubId));
+    if (playerFixtures.length === 0) continue;
 
-      const live = playerFixtures.find((f) => f.status === "live" || f.status === "ht");
-      const upcoming = playerFixtures.find((f) => f.status === "scheduled" || f.status === "postponed");
-      const chosen = live ?? upcoming ?? playerFixtures[playerFixtures.length - 1];
-      const isHome = teamIds.has(chosen.homeClubId);
-      const homeLabel = shortNameById.get(chosen.homeClubId) ?? "—";
-      const awayLabel = shortNameById.get(chosen.awayClubId) ?? "—";
-      fixtureByPlayerId.set(playerId, {
-        opponent: isHome ? awayLabel : homeLabel,
-        isHome,
-        kickoff: chosen.kickoffAt.toISOString(),
-        state: FIXTURE_STATUS_TO_MATCH_STATE[chosen.status] ?? "upcoming",
-        homeLabel,
-        awayLabel,
-      });
-    }
+    const live = playerFixtures.find((f) => f.status === "live" || f.status === "ht");
+    const upcoming = playerFixtures.find((f) => f.status === "scheduled" || f.status === "postponed");
+    const chosen = live ?? upcoming ?? playerFixtures[playerFixtures.length - 1];
+    const isHome = teamIds.has(chosen.homeClubId);
+    const homeLabel = shortNameById.get(chosen.homeClubId) ?? "—";
+    const awayLabel = shortNameById.get(chosen.awayClubId) ?? "—";
+    fixtureByPlayerId.set(playerId, {
+      opponent: isHome ? awayLabel : homeLabel,
+      isHome,
+      kickoff: chosen.kickoffAt.toISOString(),
+      state: FIXTURE_STATUS_TO_MATCH_STATE[chosen.status] ?? "upcoming",
+      homeLabel,
+      awayLabel,
+    });
   }
+
+  return { pointsByPlayerId, fixtureByPlayerId };
+}
+
+export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: CurrentMatchup): Promise<MatchupSquads> {
+  const teamIds = [matchup.homeFantasyTeamId, matchup.awayFantasyTeamId];
+
+  const { data: entries } = await supabase
+    .from("roster_entries")
+    .select("player_id")
+    .in("fantasy_team_id", teamIds)
+    .eq("status", "active");
+
+  const playerIds = Array.from(new Set((entries ?? []).map((e) => e.player_id)));
+
+  const window: RoundWindow = { startsAt: new Date(matchup.roundStartsAt), endsAt: new Date(matchup.roundEndsAt) };
+  const { pointsByPlayerId, fixtureByPlayerId } = await getRoundPlayerState(supabase, playerIds, window);
 
   const [home, away] = await Promise.all([
     buildMatchupTeamSquad(supabase, matchup.homeFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByPlayerId),

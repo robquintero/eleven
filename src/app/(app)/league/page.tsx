@@ -3,6 +3,7 @@ import { TransitionLink } from "@/components/shell/transition-link";
 import { Trophy } from "lucide-react";
 import { setActiveLeagueAction } from "@/app/(app)/actions";
 import { LeagueMatchups } from "@/components/league/league-matchups";
+import { RoundWindow } from "@/components/football/round-window";
 import { CreateLeagueForm, JoinLeagueForm } from "@/components/league/league-forms";
 import { LeagueRecordsList } from "@/components/league/league-records";
 import { SeasonPanel } from "@/components/league/season-panel";
@@ -186,6 +187,18 @@ export default async function LeaguePage() {
             </div>
             <span className="label-system text-[11px] text-accent">{LEAGUE_LIFECYCLE_LABEL[lifecycle]}</span>
           </div>
+
+          {season?.currentRoundNumber !== null && season?.currentRoundNumber !== undefined && season.currentRoundStartsAt && season.currentRoundEndsAt && season.currentRoundStatus && (
+            <RoundWindow
+              className="mt-2"
+              round={{
+                number: season.currentRoundNumber,
+                startsAt: season.currentRoundStartsAt,
+                endsAt: season.currentRoundEndsAt,
+                status: season.currentRoundStatus,
+              }}
+            />
+          )}
 
           <SeasonPanel season={season} leagueId={activeLeagueId!} isCommissioner={activeDetail.role === "commissioner"} />
 

@@ -24,7 +24,7 @@ import { swapLineupAction, fillEmptySlotsAction } from "@/app/(app)/team/actions
 import { dropPlayerAction } from "@/app/(app)/players/actions";
 import { FORMATION_RULES } from "@/domain/fantasy/constants";
 import { assignToSlots, formationSlots, type FormationSlot } from "@/lib/selectors/pitch-layout";
-import { pad2 } from "@/lib/team-fixture";
+import { nextLock, pad2 } from "@/lib/team-fixture";
 import type { LineupSlot, Player, PlayerAvailability, PlayerPosition, Squad } from "@/lib/types/fantasy";
 
 const availabilityOrder: PlayerAvailability[] = ["available", "doubtful", "injured", "suspended"];
@@ -106,11 +106,14 @@ type Selection =
 export function TeamWorkspace({
   squad,
   matchdayNumber,
+  hasActiveRound = false,
   leagueId,
   fantasyTeamId,
 }: {
   squad: Squad;
   matchdayNumber: number | null;
+  /** Pass 14.5: the round's own authoritative lifecycle state (`fantasy_rounds.status !== "completed"`), never inferred from `squad.formation` (a roster-composition fact, not a round-lifecycle one). */
+  hasActiveRound?: boolean;
   leagueId: string;
   fantasyTeamId: string | null;
 }) {
@@ -474,11 +477,11 @@ export function TeamWorkspace({
           </RailModule>
 
           <RailModule header="ROUND_INTELLIGENCE" className="lg:py-2.5">
-            <RoundIntelligence starters={squad.starters} hasActiveRound={squad.formation !== "—"} />
+            <RoundIntelligence starters={squad.starters} hasActiveRound={hasActiveRound} />
           </RailModule>
 
           <RailModule header="NEXT_LOCK" className="lg:py-2.5">
-            <NextLock slot={null} hasStarters={squad.starters.length > 0} />
+            <NextLock slot={nextLock(squad.starters)} hasStarters={squad.starters.length > 0} />
           </RailModule>
 
           <RailModule

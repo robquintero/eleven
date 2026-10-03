@@ -27,6 +27,63 @@ export function formatKickoffTime(iso: string) {
   return kickoffTimeFormatter.format(new Date(iso));
 }
 
+const roundWindowFormatter = new Intl.DateTimeFormat("en-US", {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: true,
+  timeZone: "UTC",
+});
+
+/**
+ * Pass 14.5: one canonical rendering of a fantasy round's real, stored
+ * Tue→Mon window — "SEP 29, 12:00 AM UTC → OCT 6, 12:00 AM UTC" — always
+ * from `fantasy_rounds.starts_at`/`ends_at`, never inferred from today's
+ * date (brief §Phase 3: "do not infer the fantasy week from today's date
+ * if an authoritative fantasy_round exists").
+ */
+export function formatRoundWindow(startsAt: string, endsAt: string): string {
+  return `${roundWindowFormatter.format(new Date(startsAt)).toUpperCase()} UTC → ${roundWindowFormatter.format(new Date(endsAt)).toUpperCase()} UTC`;
+}
+
+/**
+ * Round points, always rendered with one decimal place — "0" must read as
+ * a real, known zero ("0.0"), never as missing data (brief §Phase 1).
+ */
+export function formatRoundPoints(points: number): string {
+  return points.toFixed(1);
+}
+
+/**
+ * Pass 14.5: whether a player's OWN lineup slot has already locked for
+ * this round — derivable purely from `fixture.state` once it's been
+ * correctly populated (a raw "upcoming" state is the only one that means
+ * "not locked yet"; "locked"/"live"/"final" all mean the lock instant has
+ * already passed, see `buildMatchupTeamSquad`'s/`queryMatchupSquads`'s own
+ * state-rewrite comment). A player with no fixture data for this round at
+ * all is never treated as locked — the safe default is "editable."
+ */
+export function isPlayerLocked(player: { fixture?: { state: PlayerMatchState } }): boolean {
+  return player.fixture !== undefined && player.fixture.state !== "upcoming";
+}
+
+/** Status word alone (no points embedded) — READY / LOCKED / LIVE / FT — for rows that render round points as their own separate, prominent element (brief §Phase 1: points and status must be visually distinct, not one merged string). Availability (injured/doubtful/suspended) still takes priority, matching `playerStatusLabel`. */
+export function playerStateWord(player: Player): PlayerStatusLabel {
+  if (player.availability === "injured" || player.availability === "suspended") {
+    return { text: availabilityLabel[player.availability], tone: "destructive" };
+  }
+  if (player.availability === "doubtful") {
+    return { text: availabilityLabel.doubtful, tone: "warning" };
+  }
+  const fixture = player.fixture;
+  if (!fixture) return { text: availabilityLabel.available, tone: "neutral" };
+  if (fixture.state === "live") return { text: "LIVE", tone: "live" };
+  if (fixture.state === "locked") return { text: "LOCKED", tone: "neutral" };
+  if (fixture.state === "final") return { text: "FT", tone: "neutral" };
+  return { text: availabilityLabel.available, tone: "neutral" };
+}
+
 export function fixtureOpponentLabel(player: Player) {
   if (!player.fixture) return null;
   const { opponent, isHome } = player.fixture;

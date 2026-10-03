@@ -20,6 +20,10 @@ export interface SeasonSummary {
   totalRounds: number | null;
   /** The highest-numbered fantasy round opened so far this season, or `null` if none has opened yet. */
   currentRoundNumber: number | null;
+  /** Pass 14.5: that same round's real stored window + lifecycle status (`fantasy_rounds.starts_at`/`ends_at`/`status`) -- `null` only alongside `currentRoundNumber === null`. Powers the League page's `RoundWindow` readout (brief §Phase 3). */
+  currentRoundStartsAt: string | null;
+  currentRoundEndsAt: string | null;
+  currentRoundStatus: "upcoming" | "in_progress" | "completed" | null;
   championFantasyTeamId: string | null;
   championTeamName: string | null;
 }
@@ -47,7 +51,7 @@ export async function getSeasonSummary(leagueId: string): Promise<SeasonSummary 
 
   const { data: latestRound } = await supabase
     .from("fantasy_rounds")
-    .select("number")
+    .select("number, starts_at, ends_at, status")
     .eq("season_id", season.id)
     .order("number", { ascending: false })
     .limit(1)
@@ -71,6 +75,9 @@ export async function getSeasonSummary(leagueId: string): Promise<SeasonSummary 
     rosterMode: season.roster_mode as RosterMode | null,
     totalRounds: season.total_rounds,
     currentRoundNumber: latestRound?.number ?? null,
+    currentRoundStartsAt: latestRound?.starts_at ?? null,
+    currentRoundEndsAt: latestRound?.ends_at ?? null,
+    currentRoundStatus: (latestRound?.status as SeasonSummary["currentRoundStatus"]) ?? null,
     championFantasyTeamId: season.champion_fantasy_team_id,
     championTeamName,
   };

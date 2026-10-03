@@ -371,7 +371,7 @@ test("end-to-end: a real roster entry's lineup_slots.locked_at reflects an inter
   }
 });
 
-test("scoring: a clean sheet earned in an international fixture is credited, exactly like a club clean sheet -- V2 constants unchanged", { skip }, async () => {
+test("scoring: a clean sheet earned in an international fixture is credited, exactly like a club clean sheet", { skip }, async () => {
   const admin = createAdminClient();
   const ctx = await setUpNationalTeams(admin);
   try {
@@ -413,8 +413,8 @@ test("scoring: a clean sheet earned in an international fixture is credited, exa
     const breakdown = scoreRow!.breakdown as Record<string, number>;
     assert.equal(
       breakdown.cleanSheet,
-      5,
-      "a GK's international clean sheet must score exactly like a club one (CLEAN_SHEET_BY_POSITION.GK = 5, unchanged) -- the pre-Pass-14 bug would have left this null/0 since the GK's permanent club never equals either side of this fixture"
+      6,
+      "a GK's international clean sheet must score exactly like a club one (CLEAN_SHEET_BY_POSITION.GK = 6 under the current ELEVEN_STANDARD_V3) -- the pre-Pass-14 bug would have left this null/0 since the GK's permanent club never equals either side of this fixture"
     );
 
     await admin.from("player_match_stats").delete().eq("player_id", gkId).eq("fixture_id", fixtureId);
@@ -545,6 +545,7 @@ test("GATE 6: a club performance and an international performance in the same ro
       roundNumber: 1,
       roundStartsAt: window.startsAt.toISOString(),
       roundEndsAt: window.endsAt.toISOString(),
+      roundStatus: "in_progress",
       status: "live",
       homeFantasyTeamId: league.teamIds[0],
       awayFantasyTeamId: league.teamIds[1],

@@ -1,8 +1,17 @@
+import { Lock } from "lucide-react";
 import { leagueLabels } from "@/lib/leagues";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { Button } from "@/components/ui/button";
+import { formatRoundPoints, isPlayerLocked, playerStateWord } from "@/lib/team-fixture";
 import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
+
+const toneClass = {
+  destructive: "text-destructive",
+  warning: "text-warning",
+  live: "text-live",
+  neutral: "text-foreground-tertiary",
+};
 
 /**
  * Pass 11: the Players page is the free-agent market — `onAdd`/`onDrop`
@@ -32,12 +41,18 @@ export function PlayerRow({
 }) {
   const showAdd = player.ownership === "free" && onAdd;
   const showDrop = player.ownership === "mine" && onDrop;
+  // Pass 14.5: restrained lock state -- only meaningful where `fixture` is
+  // populated (a real current-round starter, e.g. Home's Starting XI);
+  // the Players market has no round/fixture context, so `locked` is
+  // always false there and this row renders exactly as before.
+  const locked = isPlayerLocked(player);
+  const state = playerStateWord(player);
 
   return (
     <div
       className={cn(
         "flex w-full items-center gap-3 border-l-2 border-l-transparent py-3 pr-1 pl-2 transition-colors",
-        selected ? "border-l-accent bg-accent/10" : "hover:bg-surface"
+        selected ? "border-l-accent bg-accent/10" : locked ? "bg-foreground/2" : "hover:bg-surface"
       )}
     >
       <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-3 text-left">
@@ -56,9 +71,29 @@ export function PlayerRow({
           </p>
         </div>
 
-        <span className="label-system shrink-0 text-sm font-semibold text-foreground">
-          {player.fantasyPoints}
-        </span>
+        {/* Pass 14.5: round points are the most prominent value on the
+            row -- a known "0.0" (not a blank/missing-looking dash) when
+            the player's fixture hasn't produced anything yet, with the
+            READY/LOCKED/LIVE/FT status as a smaller, secondary line
+            underneath so the two concepts never collapse into one
+            ambiguous string. */}
+        <div className="flex shrink-0 flex-col items-end gap-0.5">
+          <span className="label-system tabular-nums text-sm font-semibold text-foreground">
+            {formatRoundPoints(player.fantasyPoints)}
+          </span>
+          {player.fixture && (
+            <span className={cn("label-system flex items-center gap-1 text-[10px]", toneClass[state.tone])}>
+              {state.tone === "live" && (
+                <span className="relative flex size-1.5">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-live opacity-75" />
+                  <span className="relative inline-flex size-1.5 rounded-full bg-live" />
+                </span>
+              )}
+              {locked && state.tone !== "live" && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
+              {state.text}
+            </span>
+          )}
+        </div>
       </button>
 
       {showAdd && (

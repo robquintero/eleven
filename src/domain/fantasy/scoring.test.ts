@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { calculateFantasyScore, SCORING_RULE_VERSION } from "./scoring.ts";
+// Pass 14.5: pinned explicitly to V2 -- `calculateFantasyScore`/
+// `SCORING_RULE_VERSION` now resolve to V3 (see scoring-v3.test.ts for its
+// own dedicated regression suite). This file preserves V2's exact,
+// byte-identical regression coverage.
+import { calculateFantasyScoreV2 as calculateFantasyScore, SCORING_RULE_VERSION_V2 as SCORING_RULE_VERSION } from "./scoring.ts";
 import type { ScoringInput } from "./scoring.ts";
 
 function baseInput(overrides: Partial<ScoringInput> = {}): ScoringInput {

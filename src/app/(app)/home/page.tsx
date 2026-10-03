@@ -7,6 +7,7 @@ import { OperationsRail } from "@/components/dashboard/operations-rail";
 import { StartingXI } from "@/components/dashboard/starting-xi";
 import { TradeDesk } from "@/components/dashboard/trade-desk";
 import { MatchupPlayerCounts } from "@/components/matchup/matchup-player-counts";
+import { RoundWindow } from "@/components/football/round-window";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { getActiveLeagueId } from "@/data-access/active-league";
@@ -52,8 +53,6 @@ export default async function HomePage() {
     getRecentActivity(league.id),
     team ? getLeagueTeams(league.id) : Promise.resolve<Team[]>([]),
   ]);
-
-  const startingXI = squad.starters.map((slot) => slot.player);
 
   // Pass 11.5: roster-vacancy readout -- same shared `rosterVacancies`
   // definition the Team page uses, never a second copy of "what counts
@@ -103,16 +102,24 @@ export default async function HomePage() {
   // this is non-null.
   const now = new Date();
   const fixtureIntel = matchup ? await getMatchupFixtureIntelligence(matchup, now) : null;
+
+  // Pass 14.5: fetched whenever a matchup exists, never gated on
+  // `matchup.status !== "scheduled"` -- `matchups.status` only reflects
+  // whether a fixture is CURRENTLY live right now and reverts to
+  // "scheduled" the instant nothing is (see data-access/matchups.ts's own
+  // `roundStatus` doc comment), so that gate was hiding real, already-
+  // locked/already-final starter data exactly in the case most worth
+  // showing (e.g. The Room's Round 1, where several starters' fixtures
+  // have already kicked off or finished while no fixture happens to be
+  // live AT THIS SECOND). Pure stored-data reads, no provider cost either way.
+  const matchupSquads = matchup ? await getMatchupSquads(matchup) : null;
+  const mySquad = matchup && matchupSquads ? (matchup.isUserHome ? matchupSquads.home : matchupSquads.away) : squad;
+
   // Pass 14: each starter's full team-id set (club + any national teams)
   // so "N OF YOUR XI INVOLVED" correctly counts a starter whose next
   // fixture is international, not just a club match.
-  const teamIdsByPlayerId = await getTeamIdsByPlayerIds(squad.starters.map((slot) => slot.player.id));
+  const teamIdsByPlayerId = await getTeamIdsByPlayerIds(mySquad.starters.map((slot) => slot.player.id));
 
-  // Pass 12D: Club Briefing's LIVE/FINAL states need the actual per-round
-  // squads (live/done/remaining counts, top performance) -- never
-  // fetched for a merely "scheduled" matchup, since there is nothing
-  // truthful to show yet (no fixtures have kicked off).
-  const matchupSquads = matchup && matchup.status !== "scheduled" ? await getMatchupSquads(matchup) : null;
   const topPerformer = matchupSquads
     ? [...matchupSquads.home.starters, ...matchupSquads.away.starters]
         .map((s) => s.player)
@@ -123,12 +130,16 @@ export default async function HomePage() {
           return best;
         }, null)
     : null;
+  // Pass 14.5: reads the round's own authoritative `roundStatus`
+  // (fantasy_rounds.status), never the transient `matchup.status` --
+  // see data-access/matchups.ts's `CurrentMatchup.roundStatus` comment.
   const round: FantasyRound | null = matchup
     ? {
         number: matchup.roundNumber,
         label: `Matchday ${matchup.roundNumber}`,
         deadline: fixtureIntel?.nextFixture?.kickoffAt ?? null,
-        status: matchup.status === "final" ? "completed" : matchup.status === "live" ? "in-progress" : "upcoming",
+        status:
+          matchup.roundStatus === "completed" ? "completed" : matchup.roundStatus === "in_progress" ? "in-progress" : "upcoming",
       }
     : null;
 
@@ -140,6 +151,12 @@ export default async function HomePage() {
         leagueName={league.name}
         round={round}
       />
+
+      {matchup && (
+        <RoundWindow
+          round={{ number: matchup.roundNumber, startsAt: matchup.roundStartsAt, endsAt: matchup.roundEndsAt, status: matchup.roundStatus }}
+        />
+      )}
 
       {lifecycle !== "ACTIVE" && lifecycle !== "COMPLETED" && (
         <LeagueStatusPanel
@@ -154,9 +171,9 @@ export default async function HomePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
         <div className="flex flex-col gap-6">
-          <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={squad.starters} teamIdsByPlayerId={teamIdsByPlayerId} />
+          <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={mySquad.starters} teamIdsByPlayerId={teamIdsByPlayerId} />
 
-          {matchup && matchupSquads && (matchup.status === "live" || matchup.status === "final") && (
+          {matchup && matchupSquads && matchup.roundStatus !== "upcoming" && (
             <MatchupPlayerCounts
               myTeamName={matchup.isUserHome ? matchup.homeTeamName : matchup.awayTeamName}
               opponentTeamName={matchup.isUserHome ? matchup.awayTeamName : matchup.homeTeamName}
@@ -185,14 +202,14 @@ export default async function HomePage() {
             </div>
           )}
 
-          <StartingXI players={startingXI} />
+          <StartingXI players={mySquad.starters.map((slot) => slot.player)} />
         </div>
 
         <div className="flex flex-col gap-6">
           <OperationsRail
-            starters={squad.starters}
+            starters={mySquad.starters}
             standings={standings}
-            hasActiveRound={matchup !== null && matchup.status !== "final"}
+            hasActiveRound={matchup !== null && matchup.roundStatus !== "completed"}
             fixtureIntel={fixtureIntel}
             myTeamId={team?.id ?? null}
           />
