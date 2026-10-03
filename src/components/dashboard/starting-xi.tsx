@@ -5,9 +5,12 @@ import { PlayerInspector } from "@/components/players/player-inspector";
 import { PlayerRow } from "@/components/players/player-row";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { ModuleHeader } from "@/components/ui/module-header";
+import { sortByStartingPositionOrder } from "@/lib/team-fixture";
 import type { Player } from "@/lib/types/fantasy";
 
-export function StartingXI({ players }: { players: Player[] }) {
+/** Pass 14.6.3: same FWD -> MID -> DEF -> GK display order as /matchup (via the one shared `sortByStartingPositionOrder` helper), not whatever order the squad query happened to return. */
+export function StartingXI({ players: unorderedPlayers }: { players: Player[] }) {
+  const players = sortByStartingPositionOrder(unorderedPlayers);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const selected = players.find((p) => p.id === selectedId) ?? null;

@@ -24,6 +24,7 @@ export function BenchRow({
   editing = false,
   selected = false,
   swapTarget = false,
+  compatibleLocked = false,
   disabled = false,
   onSelect,
 }: {
@@ -32,6 +33,8 @@ export function BenchRow({
   editing?: boolean;
   selected?: boolean;
   swapTarget?: boolean;
+  /** Pass 14.6.3: right position for the active selection, but THIS player's own lineup slot is already locked -- "correct position, but unavailable." Distinct from `swapTarget` (right position, swappable now), `disabled` (wrong position), and `selected`. Never clickable INTO a swap -- the click still fires (same as any other locked row) to surface the existing lock explanation, never silently does nothing. Caller computes exactly one of `swapTarget`/`compatibleLocked`/`disabled` true at a time for a given row. */
+  compatibleLocked?: boolean;
   /** Pass 10.5C.2: true when an empty slot of a DIFFERENT position is selected -- this player can't legally fill it. Genuinely non-interactive (native `disabled`), not just dimmed, and never relies on color alone: a Ban icon + reduced opacity + `cursor-not-allowed` all carry the same meaning independently. */
   disabled?: boolean;
   onSelect: () => void;
@@ -77,8 +80,13 @@ export function BenchRow({
         // rounded ring highlight.
         selected && "border-l-accent bg-accent/10",
         swapTarget && !selected && !disabled && !lockedForEditing && "border-l-accent/30 bg-accent/5",
+        // Pass 14.6.3: restrained amber -- "correct position, but locked" --
+        // deliberately distinct from the accent-blue valid-target tint
+        // above, the grey/opacity-40 `disabled` treatment below, and the
+        // plain neutral `locked` tint a non-swap-relevant locked row gets.
+        compatibleLocked && !selected && "border-l-warning/50 bg-warning/5",
         disabled && "cursor-not-allowed opacity-40",
-        !disabled && locked && "bg-foreground/2",
+        !disabled && locked && !compatibleLocked && "bg-foreground/2",
         !disabled && lockedForEditing && "cursor-not-allowed"
       )}
     >

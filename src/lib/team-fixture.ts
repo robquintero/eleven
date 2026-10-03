@@ -230,30 +230,60 @@ export const POSITION_BADGE_CLASS: Record<PlayerPosition, string> = {
 };
 
 /**
- * Pass 14.6.2: the Matchup page's starting-XI display order (attack-first,
+ * Pass 14.6.2/14.6.3: the canonical starting-XI display order (attack-first,
  * matching what a manager scans first) -- presentation only, never the
  * source of truth for formation/slot/roster rules, which don't have or
- * need a position ordering at all.
+ * need a position ordering at all. Shared by Matchup and Home so there is
+ * exactly one canonical implementation, never two display orders that can
+ * quietly drift apart.
  */
-const MATCHUP_STARTER_POSITION_ORDER: PlayerPosition[] = ["FWD", "MID", "DEF", "GK"];
+const STARTING_XI_POSITION_ORDER: PlayerPosition[] = ["FWD", "MID", "DEF", "GK"];
 
 /**
- * Sorts a starting XI for Matchup display into FWD -> MID -> DEF -> GK,
- * preserving each position group's existing relative order (a stable sort
- * keyed only on position). Does not mutate `starters` or touch
- * `lineup_slots`/formation data -- this is a display-time re-ordering of
- * the same `LineupSlot[]` already fetched for the page.
+ * Sorts a starting XI into FWD -> MID -> DEF -> GK for display, preserving
+ * each position group's existing relative order (a stable sort keyed only
+ * on position). Generic over anything with a `position` field -- both
+ * `LineupSlot` (Matchup) and plain `Player` (Home's `StartingXI`) qualify
+ * structurally, so this is the one implementation both rely on. Does not
+ * mutate its input or touch `lineup_slots`/formation data -- this is a
+ * display-time re-ordering of data already fetched for the page.
  */
-export function sortStartersForMatchupDisplay(starters: LineupSlot[]): LineupSlot[] {
-  return starters
-    .map((slot, index) => ({ slot, index }))
+export function sortByStartingPositionOrder<T extends { position: PlayerPosition }>(items: T[]): T[] {
+  return items
+    .map((item, index) => ({ item, index }))
     .sort((a, b) => {
       const diff =
-        MATCHUP_STARTER_POSITION_ORDER.indexOf(a.slot.position) -
-        MATCHUP_STARTER_POSITION_ORDER.indexOf(b.slot.position);
+        STARTING_XI_POSITION_ORDER.indexOf(a.item.position) - STARTING_XI_POSITION_ORDER.indexOf(b.item.position);
       return diff !== 0 ? diff : a.index - b.index;
     })
-    .map(({ slot }) => slot);
+    .map(({ item }) => item);
+}
+
+export interface BenchSwapRowState {
+  /** Right position, unlocked -- the existing valid/active accent-highlighted swap target. */
+  swapTarget: boolean;
+  /** Pass 14.6.3: right position, but this player's OWN lineup slot is already locked -- "correct position, but unavailable." Never a valid swap target; the row stays clickable so the existing lock explanation can still fire, it just must never look identical to `swapTarget`, `disabled`, or a plain selected row. */
+  compatibleLocked: boolean;
+  /** Wrong position for the active selection -- the existing grey/Ban-icon treatment. */
+  disabled: boolean;
+}
+
+/**
+ * Classifies one bench player against whichever position is currently
+ * being sought for a swap (Pass 14.6.3) -- `targetPosition` is `null`
+ * when nothing is selected (every row is then neutral: all three false).
+ * Exactly one of the three fields is ever true otherwise. Pure/presentation
+ * only -- reads `player.position` and lock state exactly the way
+ * `team-workspace.tsx` already did inline; extracted here so the
+ * three-way classification has one tested implementation instead of being
+ * re-derived at each call site.
+ */
+export function benchSwapRowState(player: Player, targetPosition: PlayerPosition | null): BenchSwapRowState {
+  if (targetPosition === null) return { swapTarget: false, compatibleLocked: false, disabled: false };
+  if (player.position !== targetPosition) return { swapTarget: false, compatibleLocked: false, disabled: true };
+  return isPlayerLocked(player)
+    ? { swapTarget: false, compatibleLocked: true, disabled: false }
+    : { swapTarget: true, compatibleLocked: false, disabled: false };
 }
 
 /** Zero-pads a matchday/index number for operational labels, e.g. "MATCHDAY 05". */

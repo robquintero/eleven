@@ -1,6 +1,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countStartersInFixture, formatRoundPoints, formatRoundWindow, isPlayerLocked, playerStateWord, starterBuckets } from "./team-fixture.ts";
+import {
+  benchSwapRowState,
+  countStartersInFixture,
+  formatRoundPoints,
+  formatRoundWindow,
+  isPlayerLocked,
+  playerStateWord,
+  sortByStartingPositionOrder,
+  starterBuckets,
+} from "./team-fixture.ts";
 import type { Club, LineupSlot, Player, PlayerFixture } from "./types/fantasy.ts";
 
 function club(shortName: string): Club {
@@ -153,4 +162,70 @@ test("starterBuckets: correctly separates live/locked/upcoming/final counts from
   assert.equal(buckets.final, 1);
   // "locked" count for UI purposes is locked+final (both immovable, not currently live) -- see operations-rail.tsx/round-intelligence.tsx.
   assert.equal(buckets.locked + buckets.final, 2);
+});
+
+// ---------------------------------------------------------------------
+// Pass 14.6.2/14.6.3: the shared FWD -> MID -> DEF -> GK display order
+// (Matchup + Home), and the bench/starter swap-row three-way
+// classification (Team page substitution, Pass 14.6.3 Part C).
+// ---------------------------------------------------------------------
+
+function plainPlayer(id: string, position: Player["position"], fixtureState?: PlayerFixture["state"]): Player {
+  return {
+    id,
+    externalId: id,
+    name: id,
+    club: club("ARS"),
+    position,
+    fantasyPoints: 0,
+    fixture: fixtureState ? fixtureWithState(fixtureState) : undefined,
+  };
+}
+
+test("sortByStartingPositionOrder: reorders into FWD -> MID -> DEF -> GK regardless of input order", () => {
+  const items = [
+    plainPlayer("gk1", "GK"),
+    plainPlayer("def1", "DEF"),
+    plainPlayer("mid1", "MID"),
+    plainPlayer("fwd1", "FWD"),
+  ];
+  const sorted = sortByStartingPositionOrder(items);
+  assert.deepEqual(sorted.map((p) => p.position), ["FWD", "MID", "DEF", "GK"]);
+});
+
+test("sortByStartingPositionOrder: preserves existing relative order within the same position group (stable sort)", () => {
+  const items = [plainPlayer("mid-a", "MID"), plainPlayer("fwd-a", "FWD"), plainPlayer("mid-b", "MID"), plainPlayer("fwd-b", "FWD")];
+  const sorted = sortByStartingPositionOrder(items);
+  assert.deepEqual(sorted.map((p) => p.id), ["fwd-a", "fwd-b", "mid-a", "mid-b"]);
+});
+
+test("sortByStartingPositionOrder: works generically over LineupSlot too (Matchup's shape, not just Player)", () => {
+  const slots: LineupSlot[] = [starterAt("def-slot"), { ...starterAt("fwd-slot"), position: "FWD" }];
+  const sorted = sortByStartingPositionOrder(slots);
+  assert.deepEqual(sorted.map((s) => s.position), ["FWD", "MID"]);
+});
+
+test("benchSwapRowState: nothing selected (null target) -- every row is neutral", () => {
+  const state = benchSwapRowState(plainPlayer("p", "MID"), null);
+  assert.deepEqual(state, { swapTarget: false, compatibleLocked: false, disabled: false });
+});
+
+test("benchSwapRowState: wrong position for the active selection -- disabled, never a target", () => {
+  const state = benchSwapRowState(plainPlayer("p", "DEF"), "MID");
+  assert.deepEqual(state, { swapTarget: false, compatibleLocked: false, disabled: true });
+});
+
+test("benchSwapRowState: same position, unlocked -- a genuine valid/active swap target", () => {
+  const state = benchSwapRowState(plainPlayer("p", "MID", "upcoming"), "MID");
+  assert.deepEqual(state, { swapTarget: true, compatibleLocked: false, disabled: false });
+});
+
+test("benchSwapRowState: same position, but already locked -- compatible-but-unavailable, distinct from both a valid target and a disabled (wrong-position) row", () => {
+  const state = benchSwapRowState(plainPlayer("p", "MID", "locked"), "MID");
+  assert.deepEqual(state, { swapTarget: false, compatibleLocked: true, disabled: false });
+});
+
+test("benchSwapRowState: a player with no fixture at all is never locked, so same-position still reads as a valid target", () => {
+  const state = benchSwapRowState(plainPlayer("p", "FWD"), "FWD");
+  assert.deepEqual(state, { swapTarget: true, compatibleLocked: false, disabled: false });
 });

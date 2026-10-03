@@ -338,7 +338,18 @@ async function buildMatchupTeamSquad(
   roundId: string,
   pointsByPlayerId: Map<string, number>,
   fixtureByPlayerId: Map<string, { opponent: string; isHome: boolean; kickoff: string; state: PlayerMatchState; homeLabel: string; awayLabel: string }>,
-  preAcquisitionPointsByPlayerId: Map<string, number> = new Map()
+  preAcquisitionPointsByPlayerId: Map<string, number> = new Map(),
+  // Pass 14.6.3: this team's real ownership relationship to the VIEWING
+  // user -- "mine" for the caller's own side, "owned" (by `ownerTeamName`,
+  // this same team) for the opponent's. Every `Player` this builds now
+  // carries a truthful `ownership`, not the `undefined` this previously
+  // left on every matchup-sourced player -- see this file's own
+  // `buildMatchupTeamSquad` doc comment and `toPlayer`'s own note on why
+  // that mattered (the inspector's "Join a league" fallback used to fire
+  // even while the viewer plainly IS in this league, for any player
+  // opened from Home's Starting XI or the Matchup page itself).
+  ownershipForTeam: "mine" | "owned" = "owned",
+  ownerTeamNameForTeam?: string
 ): Promise<Squad> {
   const empty: Squad = { formation: "—", starters: [], bench: [] };
 
@@ -382,6 +393,8 @@ async function buildMatchupTeamSquad(
         : undefined,
       availability: (player.availability_status as Player["availability"]) ?? "available",
       fixture,
+      ownership: ownershipForTeam,
+      ownerTeamName: ownershipForTeam === "owned" ? ownerTeamNameForTeam : undefined,
     };
   }
 
@@ -620,8 +633,26 @@ export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: 
   );
 
   const [home, away] = await Promise.all([
-    buildMatchupTeamSquad(supabase, matchup.homeFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByPlayerId, preAcquisitionPointsByPlayerId),
-    buildMatchupTeamSquad(supabase, matchup.awayFantasyTeamId, matchup.roundId, pointsByPlayerId, fixtureByPlayerId, preAcquisitionPointsByPlayerId),
+    buildMatchupTeamSquad(
+      supabase,
+      matchup.homeFantasyTeamId,
+      matchup.roundId,
+      pointsByPlayerId,
+      fixtureByPlayerId,
+      preAcquisitionPointsByPlayerId,
+      matchup.isUserHome ? "mine" : "owned",
+      matchup.homeTeamName
+    ),
+    buildMatchupTeamSquad(
+      supabase,
+      matchup.awayFantasyTeamId,
+      matchup.roundId,
+      pointsByPlayerId,
+      fixtureByPlayerId,
+      preAcquisitionPointsByPlayerId,
+      matchup.isUserHome ? "owned" : "mine",
+      matchup.awayTeamName
+    ),
   ]);
 
   return { home, away };

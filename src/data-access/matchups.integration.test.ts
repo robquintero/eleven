@@ -240,6 +240,94 @@ test("a player dropped (unlocked) then re-signed by the SAME team within the sam
   }
 });
 
+/**
+ * Pass 14.6.3 Part D regression: before this fix, `buildMatchupTeamSquad`
+ * never set `Player.ownership` at all, so any player opened from a
+ * matchup-sourced squad (Home's Starting XI, or the Matchup page itself)
+ * fell through `PlayerInspectorContent`'s "no ownership known" branch and
+ * showed "Join a league to see roster actions" -- even while the viewer
+ * plainly IS in this league, looking at their own real matchup. This
+ * proves `queryMatchupSquads` now stamps a truthful "mine" on the
+ * viewer's own side and "owned" (with the real owning team's name) on the
+ * opponent's side, derived from `CurrentMatchup.isUserHome` -- never
+ * hardcoded, never left undefined just because the data came from the
+ * matchup path instead of `querySquad` (roster.ts, which already set
+ * "mine" correctly for the Team page).
+ */
+test("queryMatchupSquads stamps truthful ownership on every player -- 'mine' for the viewer's own side, 'owned' (with the real team name) for the opponent's", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const { data: candidates } = await admin.from("players").select("id").eq("active", true).limit(2);
+    const myPlayerId = candidates![0]!.id;
+    const opponentPlayerId = candidates![1]!.id;
+
+    const { error: signMineError } = await league.clients[0].rpc("sign_player", {
+      p_league_id: league.leagueId,
+      p_player_id: myPlayerId,
+    });
+    assert.equal(signMineError, null);
+    const { error: signTheirsError } = await league.clients[1].rpc("sign_player", {
+      p_league_id: league.leagueId,
+      p_player_id: opponentPlayerId,
+    });
+    assert.equal(signTheirsError, null);
+
+    const opened = await openNextRound(admin, league.leagueId, new Date());
+    assert.ok(opened.ok, `round must open: ${!opened.ok ? opened.error : ""}`);
+    if (!opened.ok) return;
+
+    const { data: matchupRow } = await admin
+      .from("matchups")
+      .select("home_fantasy_team_id, away_fantasy_team_id")
+      .eq("fantasy_round_id", opened.roundId)
+      .single();
+    const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at, number").eq("id", opened.roundId).single();
+    const { data: teams } = await admin.from("fantasy_teams").select("id, name").in("id", league.teamIds);
+    const teamNameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
+
+    const isUserHome = matchupRow!.home_fantasy_team_id === league.teamIds[0];
+    const matchup: CurrentMatchup = {
+      id: "test-matchup",
+      roundId: opened.roundId,
+      roundNumber: round!.number,
+      roundStartsAt: round!.starts_at,
+      roundEndsAt: round!.ends_at,
+      roundStatus: "in_progress",
+      status: "live",
+      homeFantasyTeamId: matchupRow!.home_fantasy_team_id,
+      awayFantasyTeamId: matchupRow!.away_fantasy_team_id,
+      homeTeamName: teamNameById.get(matchupRow!.home_fantasy_team_id) ?? "Home",
+      awayTeamName: teamNameById.get(matchupRow!.away_fantasy_team_id) ?? "Away",
+      homeLivePoints: 0,
+      awayLivePoints: 0,
+      homeFinalPoints: null,
+      awayFinalPoints: null,
+      isUserHome,
+      scoresUpdatedAt: null,
+    };
+
+    const squads = await queryMatchupSquads(admin, matchup);
+    const mySquad = isUserHome ? squads.home : squads.away;
+    const opponentSquad = isUserHome ? squads.away : squads.home;
+    const opponentTeamId = isUserHome ? matchup.awayFantasyTeamId : matchup.homeFantasyTeamId;
+
+    // A lone rostered player at an open position may land as a starter or
+    // on the bench depending on `openNextRound`'s own placement logic --
+    // irrelevant to this test, which only cares about `ownership`.
+    const myPlayer = [...mySquad.starters.map((s) => s.player), ...mySquad.bench].find((p) => p.id === myPlayerId);
+    assert.ok(myPlayer, "my own newly-signed player must appear on my side");
+    assert.equal(myPlayer!.ownership, "mine", "a player on the viewer's own side must never fall back to undefined ownership");
+
+    const opponentPlayer = [...opponentSquad.starters.map((s) => s.player), ...opponentSquad.bench].find((p) => p.id === opponentPlayerId);
+    assert.ok(opponentPlayer, "the opponent's newly-signed player must appear on their side");
+    assert.equal(opponentPlayer!.ownership, "owned");
+    assert.equal(opponentPlayer!.ownerTeamName, teamNameById.get(opponentTeamId));
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
 test("getMatchupSquads returns a complete 4-4-2-shaped squad for a fully-rostered team with real per-round points populated", { skip }, async () => {
   const admin = createAdminClient();
   const league = await createTestLeague(admin, 2, 16);
