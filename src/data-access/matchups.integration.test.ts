@@ -136,6 +136,110 @@ test("a historical round's matchup lineup reflects that round's real lineup_slot
   }
 });
 
+/**
+ * Pass 14.6.2 regression: dropping an UNLOCKED bench player and
+ * re-acquiring the SAME player onto the SAME team, within the same round,
+ * must not render them twice on the Matchup bench. `sign_player` always
+ * inserts a fresh `roster_entries` row (never reuses the dropped one), so
+ * the team ends up with two `roster_entries` rows for this player this
+ * round -- one 'dropped' (its unlocked `lineup_slots` row left in place by
+ * `_release_current_round_slot`'s soft-drop design), one 'active'. Unlike
+ * the trade-while-locked case above, the dropped row's slot was never
+ * locked, so there is no historical snapshot to preserve -- it must be
+ * excluded, leaving exactly one bench entry for the real player.
+ */
+test("a player dropped (unlocked) then re-signed by the SAME team within the same round appears exactly once on the Matchup bench", { skip }, async () => {
+  const admin = createAdminClient();
+  const league = await createTestLeague(admin, 2, 16);
+  try {
+    const { data: candidates } = await admin.from("players").select("id").eq("active", true).limit(1);
+    const playerId = candidates![0]!.id;
+
+    const { error: signError } = await league.clients[0].rpc("sign_player", {
+      p_league_id: league.leagueId,
+      p_player_id: playerId,
+    });
+    assert.equal(signError, null);
+
+    const opened = await openNextRound(admin, league.leagueId, new Date());
+    assert.ok(opened.ok, `round must open: ${!opened.ok ? opened.error : ""}`);
+    if (!opened.ok) return;
+
+    // Force unlocked regardless of this real player's actual real-world
+    // fixture timing -- this test only cares about the unlocked case
+    // (the locked case is already covered by the trade test above).
+    await admin
+      .from("lineup_slots")
+      .update({ locked_at: null })
+      .eq("fantasy_round_id", opened.roundId)
+      .in(
+        "roster_entry_id",
+        (await admin.from("roster_entries").select("id").eq("fantasy_team_id", league.teamIds[0]).eq("player_id", playerId)).data!.map(
+          (r) => r.id
+        )
+      );
+
+    const { error: dropError } = await league.clients[0].rpc("drop_player", {
+      p_league_id: league.leagueId,
+      p_player_id: playerId,
+    });
+    assert.equal(dropError, null, "an unlocked bench player must still be droppable");
+
+    const { error: reSignError } = await league.clients[0].rpc("sign_player", {
+      p_league_id: league.leagueId,
+      p_player_id: playerId,
+    });
+    assert.equal(reSignError, null, "the same team re-acquiring the same player must succeed");
+
+    const { data: entries } = await admin
+      .from("roster_entries")
+      .select("id, status")
+      .eq("fantasy_team_id", league.teamIds[0])
+      .eq("player_id", playerId);
+    assert.equal(entries?.length, 2, "sanity check: two distinct roster_entries rows must now exist for this player on this team");
+    assert.ok(entries!.some((e) => e.status === "active"));
+    assert.ok(entries!.some((e) => e.status !== "active"));
+
+    const { data: matchupRow } = await admin
+      .from("matchups")
+      .select("home_fantasy_team_id, away_fantasy_team_id")
+      .eq("fantasy_round_id", opened.roundId)
+      .single();
+    const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at, number").eq("id", opened.roundId).single();
+
+    const matchup: CurrentMatchup = {
+      id: "test-matchup",
+      roundId: opened.roundId,
+      roundNumber: round!.number,
+      roundStartsAt: round!.starts_at,
+      roundEndsAt: round!.ends_at,
+      roundStatus: "in_progress",
+      status: "live",
+      homeFantasyTeamId: matchupRow!.home_fantasy_team_id,
+      awayFantasyTeamId: matchupRow!.away_fantasy_team_id,
+      homeTeamName: "Home",
+      awayTeamName: "Away",
+      homeLivePoints: 0,
+      awayLivePoints: 0,
+      homeFinalPoints: null,
+      awayFinalPoints: null,
+      isUserHome: true,
+      scoresUpdatedAt: null,
+    };
+
+    const squads = await queryMatchupSquads(admin, matchup);
+    const team0Squad = matchup.homeFantasyTeamId === league.teamIds[0] ? squads.home : squads.away;
+
+    const benchMatches = team0Squad.bench.filter((p) => p.id === playerId);
+    assert.equal(benchMatches.length, 1, "the player must appear exactly once on the bench, not once per roster_entry");
+
+    const starterMatches = team0Squad.starters.filter((s) => s.player.id === playerId);
+    assert.equal(starterMatches.length, 0, "a freshly re-signed player is never a starter");
+  } finally {
+    await cleanupTestLeague(admin, league);
+  }
+});
+
 test("getMatchupSquads returns a complete 4-4-2-shaped squad for a fully-rostered team with real per-round points populated", { skip }, async () => {
   const admin = createAdminClient();
   const league = await createTestLeague(admin, 2, 16);

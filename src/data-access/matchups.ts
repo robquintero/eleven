@@ -277,6 +277,7 @@ interface MatchupSlotRow {
   roster_entries: {
     id: string;
     player_id: string;
+    status: string;
     players: {
       id: string;
       name: string;
@@ -316,6 +317,20 @@ type SupabaseClientType = Awaited<ReturnType<typeof createClient>>;
  * by current status would silently exclude them from their own historical
  * scoring lineup, which is exactly the bug this query shape avoids (see
  * matchups.integration.test.ts's dedicated regression test for this).
+ *
+ * Pass 14.6.2: that said, an UNLOCKED slot belonging to a non-'active'
+ * roster_entry carries no historical snapshot worth preserving — bench
+ * points never count, and `_release_current_round_slot` already demotes
+ * any unlocked slot to bench the moment its owner drops the player, so
+ * nothing about the round's real scoring depends on that row. Left
+ * un-filtered, it instead produces a visible duplicate: drop-then-reacquire
+ * the SAME player on the SAME team within one round creates a second
+ * `roster_entries` row (and its own fresh `lineup_slots` row) for the same
+ * real player, and both rows match `fantasy_team_id` equally. The fix is
+ * therefore scoped exactly to that case — skip a row only when it is BOTH
+ * unlocked AND its roster_entry is no longer 'active' — so every currently
+ * active row, and every locked historical row (regardless of status),
+ * still renders exactly as before.
  */
 async function buildMatchupTeamSquad(
   supabase: SupabaseClientType,
@@ -330,7 +345,7 @@ async function buildMatchupTeamSquad(
   const { data: slotRows, error } = await supabase
     .from("lineup_slots")
     .select(
-      "roster_entry_id, starter, locked_at, roster_entries!inner(id, player_id, fantasy_team_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))))"
+      "roster_entry_id, starter, locked_at, roster_entries!inner(id, player_id, status, fantasy_team_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))))"
     )
     .eq("fantasy_round_id", roundId)
     .eq("roster_entries.fantasy_team_id", fantasyTeamId);
@@ -375,8 +390,12 @@ async function buildMatchupTeamSquad(
   const bench: Player[] = [];
 
   for (const row of slotRows as MatchupSlotRow[]) {
-    const player = toPlayer(row);
     const locked = isLocked(row.locked_at ? new Date(row.locked_at) : null, now);
+    // Pass 14.6.2: stale, unlocked leftover from a since-superseded
+    // roster_entry (e.g. drop-then-reacquire within the same round) —
+    // see this function's doc comment. Locked rows are never skipped.
+    if (!locked && row.roster_entries.status !== "active") continue;
+    const player = toPlayer(row);
     // `BenchRow`/`starterBuckets` (src/lib/team-fixture.ts) read "locked"
     // directly off `player.fixture.state`, which the raw fixture-status
     // mapping above never produces on its own (a lock is a LINEUP

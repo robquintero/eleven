@@ -229,6 +229,33 @@ export const POSITION_BADGE_CLASS: Record<PlayerPosition, string> = {
   FWD: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
 };
 
+/**
+ * Pass 14.6.2: the Matchup page's starting-XI display order (attack-first,
+ * matching what a manager scans first) -- presentation only, never the
+ * source of truth for formation/slot/roster rules, which don't have or
+ * need a position ordering at all.
+ */
+const MATCHUP_STARTER_POSITION_ORDER: PlayerPosition[] = ["FWD", "MID", "DEF", "GK"];
+
+/**
+ * Sorts a starting XI for Matchup display into FWD -> MID -> DEF -> GK,
+ * preserving each position group's existing relative order (a stable sort
+ * keyed only on position). Does not mutate `starters` or touch
+ * `lineup_slots`/formation data -- this is a display-time re-ordering of
+ * the same `LineupSlot[]` already fetched for the page.
+ */
+export function sortStartersForMatchupDisplay(starters: LineupSlot[]): LineupSlot[] {
+  return starters
+    .map((slot, index) => ({ slot, index }))
+    .sort((a, b) => {
+      const diff =
+        MATCHUP_STARTER_POSITION_ORDER.indexOf(a.slot.position) -
+        MATCHUP_STARTER_POSITION_ORDER.indexOf(b.slot.position);
+      return diff !== 0 ? diff : a.index - b.index;
+    })
+    .map(({ slot }) => slot);
+}
+
 /** Zero-pads a matchday/index number for operational labels, e.g. "MATCHDAY 05". */
 export function pad2(n: number) {
   return String(n).padStart(2, "0");

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { BenchRow } from "@/components/team/bench-row";
 import { MatchupCompactRow } from "@/components/matchup/matchup-compact-row";
 import { PlayerInspector } from "@/components/players/player-inspector";
-import { pad2 } from "@/lib/team-fixture";
+import { pad2, sortStartersForMatchupDisplay } from "@/lib/team-fixture";
 import type { LineupSlot, Player, Squad } from "@/lib/types/fantasy";
 
 /**
@@ -45,7 +45,7 @@ function TeamLineupColumn({
         <p className="p-4 text-center text-sm text-foreground-tertiary">NO STARTING XI SET</p>
       ) : (
         <div className="divide-y divide-border">
-          {squad.starters.map((slot: LineupSlot, index) => (
+          {sortStartersForMatchupDisplay(squad.starters).map((slot: LineupSlot, index) => (
             <BenchRow key={slot.id} index={index} player={slot.player} onSelect={() => onSelect(slot.player)} />
           ))}
         </div>
@@ -105,7 +105,7 @@ function MatchupCompactColumn({
         <p className="p-3 text-center text-[11px] text-foreground-tertiary">NO STARTING XI SET</p>
       ) : (
         <div className="divide-y divide-border">
-          {squad.starters.map((slot: LineupSlot) => (
+          {sortStartersForMatchupDisplay(squad.starters).map((slot: LineupSlot) => (
             <MatchupCompactRow key={slot.id} player={slot.player} onSelect={() => onSelect(slot.player)} />
           ))}
         </div>
