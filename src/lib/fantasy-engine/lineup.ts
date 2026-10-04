@@ -112,9 +112,31 @@ export interface LineupChangeRequest {
   position?: PlayerPosition;
 }
 
-export type LineupUpdateResult =
-  | { ok: true }
-  | { ok: false; error: "ROUND_NOT_FOUND" | "SLOT_LOCKED" | "INVALID_FORMATION" | "ROSTER_ENTRY_NOT_ON_TEAM" | "WRITE_FAILED" };
+export type LineupUpdateErrorCode = "ROUND_NOT_FOUND" | "SLOT_LOCKED" | "INVALID_FORMATION" | "ROSTER_ENTRY_NOT_ON_TEAM" | "WRITE_FAILED";
+
+export type LineupUpdateResult = { ok: true } | { ok: false; error: LineupUpdateErrorCode };
+
+/**
+ * Pass 14.7 Phase 5: classifies each possible lineup-update failure as
+ * either an expected GAME-RULE outcome -- never red/error styling, the
+ * engine is working correctly -- or a genuine unexpected ERROR (a real
+ * infra/data-sync failure). `ROUND_NOT_FOUND` (no round open yet),
+ * `SLOT_LOCKED` (the brief's own named example), and `INVALID_FORMATION`
+ * (a roster/formation constraint) are all states a manager can genuinely
+ * reach through normal use. `ROSTER_ENTRY_NOT_ON_TEAM` (stale client state
+ * referencing a player no longer on this roster) and `WRITE_FAILED` (a
+ * real database write failure) are not game rules being enforced -- they
+ * mean something actually went wrong. The one stable source of truth for
+ * this classification -- callers (team/actions.ts) read it instead of
+ * re-deriving "is this message a rule or an error" from free text.
+ */
+export const LINEUP_ERROR_KIND: Record<LineupUpdateErrorCode, "rule" | "error"> = {
+  ROUND_NOT_FOUND: "rule",
+  SLOT_LOCKED: "rule",
+  INVALID_FORMATION: "rule",
+  ROSTER_ENTRY_NOT_ON_TEAM: "error",
+  WRITE_FAILED: "error",
+};
 
 /**
  * Applies a batch of starter/bench changes to one team's lineup for one

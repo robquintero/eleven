@@ -6,6 +6,7 @@ import { Ban } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { TransitionLink } from "@/components/shell/transition-link";
+import { ActionFeedback, type ActionFeedbackKind } from "@/components/ui/action-feedback";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { RailModule } from "@/components/ui/rail-module";
 import { submitDraftPickAction, resolveExpiredPickAction } from "@/app/(app)/draft/actions";
@@ -63,7 +64,7 @@ export function DraftWorkspace({
   const [selected, setSelected] = useState<Player | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [submittedPlayerId, setSubmittedPlayerId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const remainingMs = useCountdown(draft.status === "in_progress" ? draft.pickDeadline : null);
@@ -131,7 +132,7 @@ export function DraftWorkspace({
     const result = await submitDraftPickAction(draft.draftId, playerId);
     if (result?.error) {
       setSubmittedPlayerId(null);
-      setError(result.error);
+      setError({ message: result.error, kind: result.kind });
       return;
     }
     router.refresh();
@@ -308,7 +309,7 @@ export function DraftWorkspace({
                           setSelected(player);
                           setInspectorOpen(true);
                         }}
-                        className="min-w-0 flex-1 text-left"
+                        className="min-w-0 flex-1 cursor-pointer rounded-sm text-left outline-none hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
                       >
                         <p
                           className={`truncate text-sm font-medium text-foreground ${isDrafted ? "line-through decoration-2 decoration-foreground-tertiary" : ""}`}
@@ -349,7 +350,7 @@ export function DraftWorkspace({
                 })
               )}
             </div>
-            {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+            {error && <ActionFeedback kind={error.kind} message={error.message} />}
           </>
         )}
       </section>

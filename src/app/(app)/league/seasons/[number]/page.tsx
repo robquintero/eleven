@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Trophy } from "lucide-react";
 import { StandingsTable } from "@/components/league/standings-table";
@@ -18,6 +19,12 @@ import { SCHEDULE_CYCLES_LABEL } from "@/domain/fantasy/season";
  * uses, so a completed season's archive renders identically in spirit,
  * just over frozen historical data.
  */
+export async function generateMetadata({ params }: { params: Promise<{ number: string }> }): Promise<Metadata> {
+  const { number } = await params;
+  const seasonNumber = Number(number);
+  return { title: Number.isInteger(seasonNumber) && seasonNumber >= 1 ? `Season ${seasonNumber}` : "Season" };
+}
+
 export default async function SeasonArchiveDetailPage({ params }: { params: Promise<{ number: string }> }) {
   const { number } = await params;
   const seasonNumber = Number(number);

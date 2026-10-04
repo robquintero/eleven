@@ -1,9 +1,12 @@
+import type { Metadata } from "next";
 import { PlayersWorkspace } from "@/components/players/players-workspace";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getUserLeagues } from "@/data-access/leagues";
 import { getClubFilters, getCompetitionFilters, getPlayerDatabase } from "@/data-access/players";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { parseFiltersFromSearchParams } from "@/lib/players-filters";
+
+export const metadata: Metadata = { title: "Players" };
 
 export default async function PlayersPage({ searchParams }: PageProps<"/players">) {
   const sp = await searchParams;

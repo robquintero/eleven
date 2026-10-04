@@ -50,10 +50,22 @@ export function PlayerRow({
     <div
       className={cn(
         "flex w-full items-center gap-3 border-l-2 border-l-transparent py-3 pr-1 pl-2 transition-colors",
-        selected ? "border-l-accent bg-accent/10" : locked ? "bg-foreground/2" : "hover:bg-surface"
+        selected
+          ? "border-l-accent bg-accent/10"
+          : // Pass 14.7 Phase 1: "locked does not mean visually dead" -- a
+            // locked row keeps its own restrained tint AND still responds
+            // to hover/focus when it's genuinely clickable (opens the
+            // player record), just distinctly from the plain hover state.
+            locked
+            ? "bg-foreground/2 hover:bg-foreground/5"
+            : "hover:bg-surface"
       )}
     >
-      <button type="button" onClick={onSelect} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+      <button
+        type="button"
+        onClick={onSelect}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+      >
         <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
 
         <span

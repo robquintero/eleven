@@ -28,10 +28,15 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createAdminClient, isSupabaseAdminConfigured } from "../lib/supabase/admin.ts";
+import { assertMutationTestsAllowedAgainstThisProject } from "../lib/supabase/test-production-guard.ts";
 import { queryPlayerDatabase } from "./players.ts";
 import { SCORING_RULE_VERSION } from "../domain/fantasy/scoring.ts";
 
 const skip = !isSupabaseAdminConfigured();
+// Pass 14.7 Phase 8: this file inserts/deletes real rows directly without
+// going through createTestLeague (see that helper's own guard comment) --
+// fails closed here instead.
+assertMutationTestsAllowedAgainstThisProject();
 
 const CURRENT_SEASON = 2026;
 

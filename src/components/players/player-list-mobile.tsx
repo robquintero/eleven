@@ -43,8 +43,8 @@ export function PlayerListMobile({
               }
             }}
             className={cn(
-              "flex w-full cursor-pointer items-center gap-3 py-3 text-left transition-colors",
-              isSelected && "bg-accent/10"
+              "flex w-full cursor-pointer items-center gap-3 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
+              isSelected ? "bg-accent/10" : "hover:bg-surface"
             )}
           >
             <span className="label-system flex w-9 shrink-0 items-center justify-center rounded-md bg-muted py-1 text-[11px] font-semibold text-foreground-secondary">

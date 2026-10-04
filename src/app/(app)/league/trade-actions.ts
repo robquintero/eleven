@@ -3,9 +3,9 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { toTradeActionError } from "@/lib/errors/trade-action-error";
-import { TRADE_ACTION_ERROR_COPY } from "@/lib/errors/trade-action-error-copy";
+import { TRADE_ACTION_ERROR_COPY, TRADE_ACTION_ERROR_KIND } from "@/lib/errors/trade-action-error-copy";
 
-export type TradeActionState = { error?: string } | undefined;
+export type TradeActionState = { error: string; kind: "rule" | "error" } | undefined;
 
 /**
  * Pass 11: trade proposal/acceptance are ordinary authenticated manager
@@ -32,7 +32,7 @@ export async function proposeTradeAction(
   });
   if (error) {
     const code = toTradeActionError(error.message).code;
-    return { error: TRADE_ACTION_ERROR_COPY[code] };
+    return { error: TRADE_ACTION_ERROR_COPY[code], kind: TRADE_ACTION_ERROR_KIND[code] };
   }
   revalidatePath("/league");
   return undefined;
@@ -43,7 +43,7 @@ export async function acceptTradeAction(tradeId: string): Promise<TradeActionSta
   const { error } = await supabase.rpc("accept_trade", { p_trade_id: tradeId });
   if (error) {
     const code = toTradeActionError(error.message).code;
-    return { error: TRADE_ACTION_ERROR_COPY[code] };
+    return { error: TRADE_ACTION_ERROR_COPY[code], kind: TRADE_ACTION_ERROR_KIND[code] };
   }
   revalidatePath("/league");
   revalidatePath("/team");
@@ -56,7 +56,7 @@ export async function rejectTradeAction(tradeId: string): Promise<TradeActionSta
   const { error } = await supabase.rpc("reject_trade", { p_trade_id: tradeId });
   if (error) {
     const code = toTradeActionError(error.message).code;
-    return { error: TRADE_ACTION_ERROR_COPY[code] };
+    return { error: TRADE_ACTION_ERROR_COPY[code], kind: TRADE_ACTION_ERROR_KIND[code] };
   }
   revalidatePath("/league");
   return undefined;
@@ -67,7 +67,7 @@ export async function cancelTradeAction(tradeId: string): Promise<TradeActionSta
   const { error } = await supabase.rpc("cancel_trade", { p_trade_id: tradeId });
   if (error) {
     const code = toTradeActionError(error.message).code;
-    return { error: TRADE_ACTION_ERROR_COPY[code] };
+    return { error: TRADE_ACTION_ERROR_COPY[code], kind: TRADE_ACTION_ERROR_KIND[code] };
   }
   revalidatePath("/league");
   return undefined;

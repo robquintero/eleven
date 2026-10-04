@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Swords } from "lucide-react";
 import { ComingSoon } from "@/components/shell/coming-soon";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
@@ -10,6 +11,8 @@ import { getPlayerDatabase } from "@/data-access/players";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
 import { MIN_MANAGERS_TO_START_DRAFT } from "@/domain/fantasy/constants";
+
+export const metadata: Metadata = { title: "Draft" };
 
 export default async function DraftPage() {
   const leagues = await getUserLeagues();

@@ -30,9 +30,17 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createAdminClient, isSupabaseAdminConfigured } from "../supabase/admin.ts";
+import { assertMutationTestsAllowedAgainstThisProject } from "../supabase/test-production-guard.ts";
 import { runLiveSyncTick } from "./live-sync.ts";
 
 const skip = !isSupabaseAdminConfigured();
+// Pass 14.7 Phase 8: this file inserts real competitions/clubs/fixtures
+// directly without going through createTestLeague (see that helper's own
+// guard comment) -- fails closed here instead. Especially relevant here:
+// this file's own header comment documents the real incident where a
+// fixed historical `now` in an earlier version of this exact test
+// misclassified real production fixtures as due for sync.
+assertMutationTestsAllowedAgainstThisProject();
 
 async function setUpFakeCompetition(admin: ReturnType<typeof createAdminClient>, code: string) {
   const { data, error } = await admin

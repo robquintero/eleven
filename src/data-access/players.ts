@@ -399,7 +399,7 @@ export async function queryPlayerDatabase(
   return { players, total: count ?? players.length, page, pageSize };
 }
 
-type SupabaseClientType = Awaited<ReturnType<typeof createClient>>;
+export type SupabaseClientType = Awaited<ReturnType<typeof createClient>>;
 
 async function getUsageAggregates(
   supabase: SupabaseClientType,
@@ -462,7 +462,8 @@ async function getUsageAggregates(
  * `.in()`-filtered query, well under both the URL-length and row-count
  * concerns.
  */
-async function getFantasyScoreAggregates(
+/** Pass 14.7: exported for `src/data-access/intelligence.ts` (Home's Form/Market Intelligence module) -- the exact same real season-points aggregation, never a second, divergent computation of "total/average points this season." */
+export async function getFantasyScoreAggregates(
   supabase: SupabaseClientType,
   playerIds?: string[]
 ): Promise<Map<string, { totalPoints: number; averagePoints: number }>> {

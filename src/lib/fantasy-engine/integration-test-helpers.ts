@@ -10,6 +10,7 @@
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "../supabase/admin.ts";
+import { assertMutationTestsAllowedAgainstThisProject } from "../supabase/test-production-guard.ts";
 import { maybeOpenFirstRound } from "./draft-completion.ts";
 import type { Database } from "../supabase/database.types.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
@@ -44,6 +45,13 @@ export async function createTestLeague(
   managers: number,
   squadSize = 16
 ): Promise<TestLeague> {
+  // Pass 14.7 Phase 8: fail-closed production guard -- see
+  // test-production-guard.ts's own doc comment. Every real mutation this
+  // helper (and everything built on top of it) performs starts here, so
+  // this is the one place that needs to check, not each of the 11
+  // integration-test files that call it.
+  assertMutationTestsAllowedAgainstThisProject();
+
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!;
   const password = "Pass10-Integration-Test!" + Math.random().toString(36).slice(2);

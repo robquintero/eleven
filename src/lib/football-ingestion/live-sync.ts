@@ -154,6 +154,21 @@ export async function runLiveSyncTick(
   // Marked ONLY after this competition's own syncFixtures call actually
   // succeeds, so a failed/quota-stopped competition correctly stays due
   // on the very next tick rather than silently going quiet for 30 minutes.
+  //
+  // Pass 14.7 Phase 9: "actually succeeds" means `result.counts.failed ===
+  // 0`, never just "didn't throw" -- `syncFixtures` deliberately swallows
+  // its own provider-call failure internally (its own try/catch around
+  // `getFixtures`, see sync-fixtures.ts) and returns a normal SyncResult
+  // with `counts.failed` incremented rather than throwing, specifically so
+  // one bad competition doesn't abort the whole tick's loop. The missing
+  // `API_FOOTBALL_KEY` production incident exploited exactly this: the
+  // `catch` block below never ran (nothing threw), so every approaching-
+  // kickoff fixture in that competition was marked as freshly synced even
+  // though the real provider call never happened, silently delaying the
+  // next real attempt by a full throttle interval. `counts.failed` is
+  // reliable here (unlike `errors`, which also carries benign skip
+  // messages for things like UEFA qualifying-round fixtures on an
+  // otherwise fully successful sync).
   const approachingFixtureIdsToMark: string[] = [];
 
   for (const code of competitionCodes) {
@@ -164,9 +179,11 @@ export async function runLiveSyncTick(
       errors.push(...result.errors);
       lastQuota = result.quota;
       if (shouldStopForQuota(result.quota)) stoppedForQuota = true;
-      for (const f of needingSync) {
-        if ((f.competitions as { code: string } | null)?.code !== code) continue;
-        if (decisionByFixtureId.get(f.id)?.reason === "approaching-kickoff") approachingFixtureIdsToMark.push(f.id);
+      if (result.counts.failed === 0) {
+        for (const f of needingSync) {
+          if ((f.competitions as { code: string } | null)?.code !== code) continue;
+          if (decisionByFixtureId.get(f.id)?.reason === "approaching-kickoff") approachingFixtureIdsToMark.push(f.id);
+        }
       }
     } catch (err) {
       errors.push(`syncFixtures failed for ${code}: ${err instanceof Error ? err.message : String(err)}`);

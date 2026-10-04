@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { RoundWindow } from "@/components/football/round-window";
@@ -12,6 +13,8 @@ import { ROSTER_RULES } from "@/domain/fantasy/constants";
 import { rosterVacancies, type RosterCounts } from "@/domain/fantasy/roster-rules";
 import { pad2 } from "@/lib/team-fixture";
 import type { Squad } from "@/lib/types/fantasy";
+
+export const metadata: Metadata = { title: "Team" };
 
 export default async function TeamPage() {
   const leagues = await getUserLeagues();

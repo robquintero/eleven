@@ -8,6 +8,7 @@ import { PlayerDatabaseToolbar } from "@/components/players/player-database-tool
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { PlayerListMobile } from "@/components/players/player-list-mobile";
 import { PlayerTable } from "@/components/players/player-table";
+import { ActionFeedback, type ActionFeedbackKind } from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -65,7 +66,7 @@ export function PlayersWorkspace({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [queryDraft, setQueryDraft] = useState(filters.query);
   const [pendingPlayerId, setPendingPlayerId] = useState<string | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
   const [dropTarget, setDropTarget] = useState<Player | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -79,7 +80,7 @@ export function PlayersWorkspace({
     const result = await signPlayerAction(leagueId, player.id);
     setPendingPlayerId(null);
     if (result?.error) {
-      setActionError(result.error);
+      setActionError({ message: result.error, kind: result.kind });
       return;
     }
     router.refresh();
@@ -99,7 +100,7 @@ export function PlayersWorkspace({
     setPendingPlayerId(null);
     setDropTarget(null);
     if (result?.error) {
-      setActionError(result.error);
+      setActionError({ message: result.error, kind: result.kind });
       return;
     }
     router.refresh();
@@ -234,11 +235,7 @@ export function PlayersWorkspace({
         />
       </div>
 
-      {actionError && (
-        <p className="label-system mt-3 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
-          {actionError}
-        </p>
-      )}
+      {actionError && <ActionFeedback kind={actionError.kind} message={actionError.message} />}
 
       <div
         className={

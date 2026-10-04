@@ -46,7 +46,7 @@ export function MatchupCompactRow({ player, onSelect }: { player: Player; onSele
       onClick={onSelect}
       aria-label={`${player.name}, ${player.position}, ${status.text}, ${compactPoints} points`}
       className={cn(
-        "flex w-full items-center gap-1 rounded-md px-1 py-1.5 text-left transition-colors active:bg-muted/60",
+        "flex w-full cursor-pointer items-center gap-1 rounded-md px-1 py-1.5 text-left outline-none transition-colors hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset active:bg-muted/60",
         isLocked && "bg-foreground/2"
       )}
     >

@@ -7,6 +7,7 @@ import { BenchRow, EmptySlotRow } from "@/components/team/bench-row";
 import { NextLock } from "@/components/team/next-lock";
 import { RoundIntelligence } from "@/components/team/round-intelligence";
 import { SquadAvailability } from "@/components/team/squad-availability";
+import { ActionFeedback, type ActionFeedbackKind } from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { RailModule } from "@/components/ui/rail-module";
@@ -116,7 +117,15 @@ export function TeamWorkspace({
   const [selected, setSelected] = useState<Selection>(null);
   const [pendingAssignments, setPendingAssignments] = useState<Map<string, Player>>(new Map());
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
+  // Pass 14.7 Phase 5: every CLIENT-side validation message below (wrong
+  // position, locked explanation) is an expected game-rule outcome by
+  // construction -- it's never anything else, so this is always "rule",
+  // never re-derived from the message text. Server-returned messages use
+  // their own action's `kind` instead (see trySwap/handleSaveFills).
+  function setRuleError(message: string) {
+    setError({ message, kind: "rule" });
+  }
   // `isRefreshing` tracks the router.refresh() that follows a successful
   // write via useTransition. `substitutionBusy` stays true across BOTH the
   // action call (`pending`) and that follow-up refresh, so the processing
@@ -175,7 +184,7 @@ export function TeamWorkspace({
     const result = await swapLineupAction(leagueId, fantasyTeamId, starterOut, benchIn);
     setPending(false);
     if (result?.error) {
-      setError(result.error);
+      setError({ message: result.error, kind: result.kind });
       return;
     }
     startRefreshTransition(() => {
@@ -209,12 +218,12 @@ export function TeamWorkspace({
       return;
     }
     if (row.locked) {
-      setError("That player's match has already started — their lineup slot is locked.");
+      setRuleError("That player's match has already started — their lineup slot is locked.");
       return;
     }
     if (selected?.kind === "bench") {
       if (selected.player.position !== row.position) {
-        setError(`${selected.player.name} is a ${selected.player.position} and can't fill a ${row.position} slot.`);
+        setRuleError(`${selected.player.name} is a ${selected.player.position} and can't fill a ${row.position} slot.`);
         return;
       }
       trySwap(row.player.id, selected.player.id);
@@ -227,7 +236,7 @@ export function TeamWorkspace({
     if (!canEdit || substitutionBusy) return;
     if (selected?.kind === "bench") {
       if (selected.player.position !== emptySlot.position) {
-        setError(`That slot needs a ${emptySlot.position}.`);
+        setRuleError(`That slot needs a ${emptySlot.position}.`);
         return;
       }
       queueFill(emptySlot.slotId, selected.player);
@@ -250,7 +259,7 @@ export function TeamWorkspace({
     // show -- including for the new `compatibleLocked` (right position,
     // but locked) visual state, Pass 14.6.3.
     if (isPlayerLocked(player)) {
-      setError("That player's match has already started — they can't enter your lineup until the round ends.");
+      setRuleError("That player's match has already started — they can't enter your lineup until the round ends.");
       return;
     }
     if (selected?.kind === "starter") {
@@ -259,7 +268,7 @@ export function TeamWorkspace({
     }
     if (selected?.kind === "emptySlot") {
       if (player.position !== selected.position) {
-        setError(`That slot needs a ${selected.position}.`);
+        setRuleError(`That slot needs a ${selected.position}.`);
         return;
       }
       queueFill(selected.slotId, player);
@@ -295,7 +304,7 @@ export function TeamWorkspace({
     const result = await fillEmptySlotsAction(leagueId, fantasyTeamId, fills);
     setPending(false);
     if (result?.error) {
-      setError(result.error);
+      setError({ message: result.error, kind: result.kind });
       return;
     }
     setPendingAssignments(new Map());
@@ -324,7 +333,7 @@ export function TeamWorkspace({
           )}
         </div>
       )}
-      {error && <p className="mt-2 text-xs text-destructive">{error}</p>}
+      {error && <ActionFeedback kind={error.kind} message={error.message} />}
 
       <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_0.5fr] lg:items-start">
         <section>

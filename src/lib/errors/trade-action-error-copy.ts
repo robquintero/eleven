@@ -17,3 +17,34 @@ export const TRADE_ACTION_ERROR_COPY: Record<TradeActionErrorCode, string> = {
   ROSTER_LIMIT_EXCEEDED: "This trade would exceed a position limit for one of the rosters.",
   UNKNOWN: "Something went wrong. Try again.",
 };
+
+/**
+ * Pass 14.7 Phase 5: classifies each trade-action failure as an expected
+ * GAME-RULE outcome (never red/error styling) or a genuine unexpected
+ * ERROR. `TRADE_ASSET_NO_LONGER_OWNED` is the brief's own named example
+ * ("trade/drop restriction") -- a real race where ownership changed after
+ * the trade was proposed, already proven as an expected, truthful outcome
+ * (see market-trades.integration.test.ts's own dedicated test).
+ * `ROSTER_FULL`/`ROSTER_LIMIT_EXCEEDED`/`UNEVEN_TRADE`/`EMPTY_TRADE`/
+ * `CANNOT_TRADE_WITH_SELF`/`TRADE_NOT_PENDING` are all constraints a
+ * manager can genuinely reach through normal use. Everything else signals
+ * something actually went wrong (auth/membership boundaries, or a
+ * reference to a team/trade/asset that doesn't exist the way the client
+ * thought).
+ */
+export const TRADE_ACTION_ERROR_KIND: Record<TradeActionErrorCode, "rule" | "error"> = {
+  NOT_AUTHENTICATED: "error",
+  NOT_LEAGUE_MEMBER: "error",
+  RECEIVING_TEAM_NOT_FOUND: "error",
+  CANNOT_TRADE_WITH_SELF: "rule",
+  EMPTY_TRADE: "rule",
+  UNEVEN_TRADE: "rule",
+  INVALID_TRADE_ASSET: "error",
+  TRADE_NOT_FOUND: "error",
+  NOT_AUTHORIZED: "error",
+  TRADE_NOT_PENDING: "rule",
+  TRADE_ASSET_NO_LONGER_OWNED: "rule",
+  ROSTER_FULL: "rule",
+  ROSTER_LIMIT_EXCEEDED: "rule",
+  UNKNOWN: "error",
+};

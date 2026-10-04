@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Swords } from "lucide-react";
 import { ComingSoon } from "@/components/shell/coming-soon";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
@@ -11,6 +12,8 @@ import { getUserLeagues } from "@/data-access/leagues";
 import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads, getTeamIdsByPlayerIds } from "@/data-access/matchups";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
+
+export const metadata: Metadata = { title: "Matchup" };
 
 export default async function MatchupPage() {
   const leagues = await getUserLeagues();

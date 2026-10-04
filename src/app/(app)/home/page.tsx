@@ -1,5 +1,7 @@
+import type { Metadata } from "next";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
+import { FormIntelligence } from "@/components/dashboard/form-intelligence";
 import { Greeting } from "@/components/dashboard/greeting";
 import { LeagueStatusPanel } from "@/components/dashboard/league-status-panel";
 import { MatchupCommand } from "@/components/dashboard/matchup-command";
@@ -12,6 +14,7 @@ import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { ModuleHeader } from "@/components/ui/module-header";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
+import { getHotFreeAgents } from "@/data-access/intelligence";
 import { getUserLeagues } from "@/data-access/leagues";
 import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads, getStandings, getTeamIdsByPlayerIds } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
@@ -23,6 +26,8 @@ import { getTeamTrades, type TradeView } from "@/data-access/trades";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
 import { rosterVacancies, type RosterCounts } from "@/domain/fantasy/roster-rules";
 import type { FantasyRound } from "@/lib/types/fantasy";
+
+export const metadata: Metadata = { title: "Home" };
 
 export default async function HomePage() {
   const [profile, leagues] = await Promise.all([getCurrentProfile(), getUserLeagues()]);
@@ -46,12 +51,13 @@ export default async function HomePage() {
     draftStatus,
   });
 
-  const [squad, matchup, standings, activity, allTeams] = await Promise.all([
+  const [squad, matchup, standings, activity, allTeams, hotFreeAgents] = await Promise.all([
     team ? getUserSquad(league.id, team.id) : Promise.resolve({ formation: "—" as const, starters: [], bench: [] }),
     team ? getCurrentMatchup(league.id, team.id) : Promise.resolve(null),
     getStandings(league.id),
     getRecentActivity(league.id),
     team ? getLeagueTeams(league.id) : Promise.resolve<Team[]>([]),
+    getHotFreeAgents(league.id),
   ]);
 
   // Pass 11.5: roster-vacancy readout -- same shared `rosterVacancies`
@@ -230,6 +236,8 @@ export default async function HomePage() {
               </div>
             </div>
           )}
+
+          <FormIntelligence agents={hotFreeAgents} leagueId={league.id} canTransact={Boolean(team)} />
         </div>
       </div>
 

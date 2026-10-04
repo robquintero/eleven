@@ -9,6 +9,7 @@ import {
   proposeTradeAction,
   rejectTradeAction,
 } from "@/app/(app)/league/trade-actions";
+import { ActionFeedback, type ActionFeedbackKind } from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -22,7 +23,7 @@ import type { RosterPlayerOption } from "@/data-access/roster";
 import type { Team } from "@/data-access/teams";
 import type { TradeView } from "@/data-access/trades";
 
-type TradeResponder = (id: string) => Promise<{ error?: string } | undefined>;
+type TradeResponder = (id: string) => Promise<{ error: string; kind: ActionFeedbackKind } | undefined>;
 
 /**
  * Pass 11 manager-to-manager trades. No commissioner veto/voting, no
@@ -52,7 +53,7 @@ export function TradeCenter({
 }) {
   const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
   const [proposeOpen, setProposeOpen] = useState(false);
 
   async function respond(action: TradeResponder, tradeId: string) {
@@ -61,7 +62,7 @@ export function TradeCenter({
     const result = await action(tradeId);
     setPendingId(null);
     if (result?.error) {
-      setError(result.error);
+      setError({ message: result.error, kind: result.kind });
       return;
     }
     router.refresh();
@@ -81,11 +82,7 @@ export function TradeCenter({
         </Button>
       </div>
 
-      {error && (
-        <p className="label-system mt-2 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
-          {error}
-        </p>
-      )}
+      {error && <ActionFeedback kind={error.kind} message={error.message} />}
 
       <div className="mt-3 flex flex-col gap-4">
         <TradeList
@@ -240,7 +237,7 @@ export function ProposeTradeDialog({
   const [offeredIds, setOfferedIds] = useState<string[]>([]);
   const [requestedIds, setRequestedIds] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
 
   const targetTeam = otherTeams.find((t) => t.id === targetTeamId) ?? null;
   const targetRoster = targetTeamId ? (rostersByTeamId[targetTeamId] ?? []) : [];
@@ -264,7 +261,7 @@ export function ProposeTradeDialog({
     const result = await proposeTradeAction(leagueId, targetTeamId, offeredIds, requestedIds);
     setSubmitting(false);
     if (result?.error) {
-      setError(result.error);
+      setError({ message: result.error, kind: result.kind });
       return;
     }
     reset();
@@ -289,7 +286,7 @@ export function ProposeTradeDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {error && <p className="text-xs text-destructive">{error}</p>}
+        {error && <ActionFeedback kind={error.kind} message={error.message} />}
 
         {step === "manager" && (
           <div className="flex max-h-72 flex-col gap-1.5 overflow-y-auto">
@@ -422,7 +419,7 @@ function TradePlayerRow({
       role="checkbox"
       aria-checked={selected}
       onClick={onToggle}
-      className={`flex w-full items-center gap-2 rounded-control border px-2 py-1.5 text-left transition-colors ${
+      className={`flex w-full cursor-pointer items-center gap-2 rounded-control border px-2 py-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 ${
         selected ? "border-accent bg-accent/10" : "border-border hover:bg-muted"
       }`}
     >

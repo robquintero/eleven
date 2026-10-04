@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LogOut, UserRound } from "lucide-react";
 import { ChangePasswordForm } from "@/components/account/change-password-form";
@@ -14,6 +15,8 @@ import { getUserLeagues } from "@/data-access/leagues";
  * product status line. Deliberately not a preferences system: no
  * notifications, no theming, no broader settings than this.
  */
+export const metadata: Metadata = { title: "Account" };
+
 export default async function AccountPage() {
   const identity = await getAccountIdentity();
 

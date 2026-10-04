@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { Trophy } from "lucide-react";
@@ -27,6 +28,8 @@ import {
   LEAGUE_LIFECYCLE_LABEL,
 } from "@/domain/fantasy/league-lifecycle";
 import { leagueSeasonIdentityLabel, standingsEmptyContext } from "@/domain/fantasy/season";
+
+export const metadata: Metadata = { title: "League" };
 
 export default async function LeaguePage() {
   const profile = await getCurrentProfile();

@@ -126,7 +126,7 @@ export function PlayerTable({
               }}
               className={cn(
                 rowGrid,
-                "w-full cursor-pointer border-l-2 border-l-transparent py-2 pr-2 pl-3 text-left transition-colors",
+                "w-full cursor-pointer border-l-2 border-l-transparent py-2 pr-2 pl-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
                 isSelected && "border-l-accent bg-accent/10",
                 isHighlighted && "ring-1 ring-inset ring-accent/50",
                 !isSelected && !isHighlighted && "hover:bg-surface"

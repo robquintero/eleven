@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getPlayerDatabase, getPlayerRecentMatches, getPlayerLatestScoreBreakdown, type RecentMatchRow, type PlayerScoreBreakdown } from "@/data-access/players";
 import { toMarketActionError } from "@/lib/errors/market-action-error";
-import { MARKET_ACTION_ERROR_COPY } from "@/lib/errors/market-action-error-copy";
+import { MARKET_ACTION_ERROR_COPY, MARKET_ACTION_ERROR_KIND } from "@/lib/errors/market-action-error-copy";
 import { shouldSearchPlayers } from "@/lib/search/player-search";
 
-export type MarketActionState = { error?: string } | undefined;
+export type MarketActionState = { error: string; kind: "rule" | "error" } | undefined;
 
 export interface PlayerSearchResult {
   id: string;
@@ -56,7 +56,7 @@ export async function dropPlayerAction(leagueId: string, playerId: string): Prom
   const { error } = await supabase.rpc("drop_player", { p_league_id: leagueId, p_player_id: playerId });
   if (error) {
     const code = toMarketActionError(error.message).code;
-    return { error: MARKET_ACTION_ERROR_COPY[code] };
+    return { error: MARKET_ACTION_ERROR_COPY[code], kind: MARKET_ACTION_ERROR_KIND[code] };
   }
   revalidatePath("/players");
   revalidatePath("/team");
@@ -69,7 +69,7 @@ export async function signPlayerAction(leagueId: string, playerId: string): Prom
   const { error } = await supabase.rpc("sign_player", { p_league_id: leagueId, p_player_id: playerId });
   if (error) {
     const code = toMarketActionError(error.message).code;
-    return { error: MARKET_ACTION_ERROR_COPY[code] };
+    return { error: MARKET_ACTION_ERROR_COPY[code], kind: MARKET_ACTION_ERROR_KIND[code] };
   }
   revalidatePath("/players");
   revalidatePath("/team");

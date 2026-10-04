@@ -1,21 +1,45 @@
-/** Compact bar visualization of recent fantasy scores — the one sparkline pattern in the app. */
-export function FormSparkline({ values }: { values: number[] }) {
+import { cn } from "@/lib/utils";
+
+/**
+ * Compact bar visualization of recent fantasy scores — the one sparkline
+ * pattern in the app. Pass 14.7: size is now configurable (defaults
+ * unchanged from the original hardcoded values, so the existing
+ * player-inspector-content.tsx caller is pixel-identical) so the SAME
+ * component can also render small enough for a dense rail module (Home's
+ * Form/Market Intelligence) instead of a second, parallel sparkline
+ * implementation.
+ */
+export function FormSparkline({
+  values,
+  barHeightClass = "h-12",
+  barWidthClass = "w-4",
+  gapClass = "gap-3",
+  showLabels = true,
+}: {
+  values: number[];
+  barHeightClass?: string;
+  barWidthClass?: string;
+  gapClass?: string;
+  showLabels?: boolean;
+}) {
   if (values.length === 0) return null;
   const max = Math.max(...values, 1);
 
   return (
-    <div className="flex items-end gap-3">
+    <div className={cn("flex items-end", gapClass)}>
       {values.map((points, index) => (
         <div key={index} className="flex flex-col items-center gap-1.5">
-          <div className="flex h-12 w-4 items-end bg-muted">
+          <div className={cn("flex items-end bg-muted", barHeightClass, barWidthClass)}>
             <div
               className="w-full bg-foreground/50"
               style={{ height: `${Math.max((points / max) * 100, 8)}%` }}
             />
           </div>
-          <span className="font-mono text-[11px] tabular-nums text-foreground-tertiary">
-            {points}
-          </span>
+          {showLabels && (
+            <span className="font-mono text-[11px] tabular-nums text-foreground-tertiary">
+              {points}
+            </span>
+          )}
         </div>
       ))}
     </div>

@@ -20,11 +20,21 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
-import { updateLineup } from "@/lib/fantasy-engine/lineup";
+import { LINEUP_ERROR_KIND, updateLineup } from "@/lib/fantasy-engine/lineup";
 import { ensureFirstRoundOpened } from "@/lib/fantasy-engine/rounds";
 import type { PlayerPosition } from "@/lib/types/fantasy";
 
-export type LineupActionState = { error?: string } | undefined;
+/**
+ * Pass 14.7 Phase 5: `kind` is set from `LINEUP_ERROR_KIND` (a stable code
+ * classification, never inferred from the message text) wherever the
+ * failure traces back to a real `LineupUpdateErrorCode` — the few
+ * earlier-stage checks below that short-circuit before even calling
+ * `updateLineup` (auth/ownership/stale-roster-reference) are classified
+ * the same way those same codes would be (`ROUND_NOT_FOUND`/
+ * `ROSTER_ENTRY_NOT_ON_TEAM`-equivalent), kept inline since they're not
+ * routed through `updateLineup` itself.
+ */
+export type LineupActionState = { error: string; kind: "rule" | "error" } | undefined;
 
 /**
  * Self-healing safety net (Pass 10.5C), called from the Team page's own
@@ -70,7 +80,7 @@ export async function swapLineupAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Sign in to do that." };
+  if (!user) return { error: "Sign in to do that.", kind: "error" };
 
   const { data: team } = await supabase
     .from("fantasy_teams")
@@ -79,7 +89,7 @@ export async function swapLineupAction(
     .eq("league_id", leagueId)
     .eq("owner_user_id", user.id)
     .maybeSingle();
-  if (!team) return { error: "You don't own this team." };
+  if (!team) return { error: "You don't own this team.", kind: "error" };
 
   const { data: round } = await supabase
     .from("fantasy_rounds")
@@ -88,7 +98,7 @@ export async function swapLineupAction(
     .order("number", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!round) return { error: "No fantasy round is open yet." };
+  if (!round) return { error: "No fantasy round is open yet.", kind: LINEUP_ERROR_KIND.ROUND_NOT_FOUND };
 
   const { data: rosterEntries } = await supabase
     .from("roster_entries")
@@ -99,10 +109,10 @@ export async function swapLineupAction(
 
   const outEntry = rosterEntries?.find((r) => r.player_id === starterPlayerIdOut);
   const inEntry = rosterEntries?.find((r) => r.player_id === benchPlayerIdIn);
-  if (!outEntry || !inEntry) return { error: "Player not found on this roster." };
+  if (!outEntry || !inEntry) return { error: "Player not found on this roster.", kind: LINEUP_ERROR_KIND.ROSTER_ENTRY_NOT_ON_TEAM };
 
   const inPosition = (inEntry.players as { position: string } | null)?.position;
-  if (!inPosition) return { error: "Player not found on this roster." };
+  if (!inPosition) return { error: "Player not found on this roster.", kind: LINEUP_ERROR_KIND.ROSTER_ENTRY_NOT_ON_TEAM };
 
   const result = await updateLineup(
     supabase,
@@ -123,7 +133,7 @@ export async function swapLineupAction(
       ROSTER_ENTRY_NOT_ON_TEAM: "Player not found on this roster.",
       WRITE_FAILED: "Couldn't save your lineup — please try again.",
     };
-    return { error: copy[result.error] ?? "Couldn't update your lineup." };
+    return { error: copy[result.error] ?? "Couldn't update your lineup.", kind: LINEUP_ERROR_KIND[result.error] ?? "error" };
   }
 
   revalidatePath("/team");
@@ -159,7 +169,7 @@ export async function fillEmptySlotsAction(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Sign in to do that." };
+  if (!user) return { error: "Sign in to do that.", kind: "error" };
 
   const { data: team } = await supabase
     .from("fantasy_teams")
@@ -168,7 +178,7 @@ export async function fillEmptySlotsAction(
     .eq("league_id", leagueId)
     .eq("owner_user_id", user.id)
     .maybeSingle();
-  if (!team) return { error: "You don't own this team." };
+  if (!team) return { error: "You don't own this team.", kind: "error" };
 
   const { data: round } = await supabase
     .from("fantasy_rounds")
@@ -177,7 +187,7 @@ export async function fillEmptySlotsAction(
     .order("number", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (!round) return { error: "No fantasy round is open yet." };
+  if (!round) return { error: "No fantasy round is open yet.", kind: LINEUP_ERROR_KIND.ROUND_NOT_FOUND };
 
   const { data: rosterEntries } = await supabase
     .from("roster_entries")
@@ -193,9 +203,9 @@ export async function fillEmptySlotsAction(
   const changes = [];
   for (const fill of fills) {
     const entry = entryByPlayerId.get(fill.playerId);
-    if (!entry) return { error: "Player not found on this roster." };
+    if (!entry) return { error: "Player not found on this roster.", kind: LINEUP_ERROR_KIND.ROSTER_ENTRY_NOT_ON_TEAM };
     const actualPosition = (entry.players as { position: string } | null)?.position;
-    if (actualPosition !== fill.position) return { error: "That player doesn't play that position." };
+    if (actualPosition !== fill.position) return { error: "That player doesn't play that position.", kind: LINEUP_ERROR_KIND.INVALID_FORMATION };
     changes.push({ rosterEntryId: entry.id, starter: true, position: fill.position });
   }
 
@@ -208,7 +218,7 @@ export async function fillEmptySlotsAction(
       ROSTER_ENTRY_NOT_ON_TEAM: "Player not found on this roster.",
       WRITE_FAILED: "Couldn't save your lineup — please try again.",
     };
-    return { error: copy[result.error] ?? "Couldn't update your lineup." };
+    return { error: copy[result.error] ?? "Couldn't update your lineup.", kind: LINEUP_ERROR_KIND[result.error] ?? "error" };
   }
 
   revalidatePath("/team");

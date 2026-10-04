@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { FORMATION_RULES } from "@/domain/fantasy/constants";
+import { FORMATION_RULES, ROSTER_RULES } from "@/domain/fantasy/constants";
 import { SCORING_RULE_VERSION_V3, SCORING_V3_WEIGHTS } from "@/domain/fantasy/scoring";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -107,6 +107,15 @@ export function GameRulesDialog() {
               {FORMATION_RULES.positionRange.DEF.max} DEF / {FORMATION_RULES.positionRange.MID.max} MID /{" "}
               {FORMATION_RULES.positionRange.FWD.max} FWD — {FORMATION_RULES.startersTotal} starters, no formation
               selection.
+            </Section>
+
+            <Section title="ROSTER">
+              Every roster carries exactly {ROSTER_RULES.squadSize} players: {ROSTER_RULES.positionRange.GK.min} GK,{" "}
+              {ROSTER_RULES.positionRange.DEF.min}–{ROSTER_RULES.positionRange.DEF.max} DEF,{" "}
+              {ROSTER_RULES.positionRange.MID.min}–{ROSTER_RULES.positionRange.MID.max} MID, and{" "}
+              {ROSTER_RULES.positionRange.FWD.min}–{ROSTER_RULES.positionRange.FWD.max} FWD. This squad rule is
+              deeper than the {FORMATION_RULES.startersTotal}-player starting XI above on purpose — it guarantees a
+              real backup at every position, not just enough bodies to fill one matchday.
             </Section>
 
             <Section title="PLAYER LOCKS">

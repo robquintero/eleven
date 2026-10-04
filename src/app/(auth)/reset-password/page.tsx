@@ -6,7 +6,7 @@ import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-pa
 import { isSupabaseConfigured } from "@/lib/supabase/config";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Set new password — Eleven" };
+export const metadata: Metadata = { title: "Set new password" };
 
 /**
  * Reached only after `/auth/callback` exchanges a real recovery-link code
