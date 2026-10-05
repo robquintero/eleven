@@ -7,9 +7,8 @@ import {
   cancelTradeAction,
   rejectTradeAction,
 } from "@/app/(app)/league/trade-actions";
-import { ProposeTradeDialog, TradeList } from "@/components/league/trade-center";
+import { LazyProposeTradeDialog, TradeList } from "@/components/league/trade-center";
 import { Button } from "@/components/ui/button";
-import type { RosterPlayerOption } from "@/data-access/roster";
 import type { Team } from "@/data-access/teams";
 import type { TradeView } from "@/data-access/trades";
 
@@ -28,17 +27,13 @@ type TradeResponder = (id: string) => Promise<{ error?: string } | undefined>;
 export function TradeDesk({
   leagueId,
   myTeamId,
-  myRoster,
   otherTeams,
-  rostersByTeamId,
   incoming,
   outgoing,
 }: {
   leagueId: string;
   myTeamId: string;
-  myRoster: RosterPlayerOption[];
   otherTeams: Team[];
-  rostersByTeamId: Record<string, RosterPlayerOption[]>;
   incoming: TradeView[];
   outgoing: TradeView[];
 }) {
@@ -120,13 +115,12 @@ export function TradeDesk({
         </div>
       )}
 
-      <ProposeTradeDialog
+      <LazyProposeTradeDialog
         open={proposeOpen}
         onOpenChange={setProposeOpen}
         leagueId={leagueId}
-        myRoster={myRoster}
+        myTeamId={myTeamId}
         otherTeams={otherTeams}
-        rostersByTeamId={rostersByTeamId}
         onProposed={() => {
           setProposeOpen(false);
           router.refresh();

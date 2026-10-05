@@ -699,17 +699,9 @@ test("updateLineup: an incomplete fill (fewer than 11) is rejected -- an in-prog
 });
 
 // ---------------------------------------------------------------------
-// Pass 10.5C.2A: ordinary lineup writes (swap/fill/formation-change) move
-// off the service-role admin client onto the authenticated request-scoped
-// client (`team/actions.ts`), under a new ownership-scoped RLS UPDATE
-// policy (supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql).
-// These two tests exercise the REAL authenticated client
-// (`league.clients[i]`, a real signed-in Supabase Auth session — not
-// admin) to prove: (1) a manager's own write actually persists through
-// this policy, not just "doesn't error", and (2) the database itself
-// blocks a write to another manager's team, independent of and in
-// addition to the application-level ownership check every Server Action
-// already performs.
+// Performance 1: a real authenticated session saves through the validated
+// RPC. Direct table DML is forbidden even on the manager's own slots.
+// The RPC separately enforces team ownership, beyond the Server Action.
 // ---------------------------------------------------------------------
 
 test("a genuine starter<->bench substitution persists through the authenticated client -- Pass 10.5C.5's actual regression (the prior 'false positive' version of this test asserted only 'still 11 starters', which stayed true even while the write silently failed with permission denied)", { skip }, async () => {
@@ -743,6 +735,16 @@ test("a genuine starter<->bench substitution persists through the authenticated 
       (s) => !s.starter && (roster!.find((r) => r.id === s.roster_entry_id)!.players as { position: string }).position === "DEF"
     )!;
     assert.ok(defOut && defIn, "test setup: needs one DEF starter and one DEF bench player to swap");
+
+    // Managers use the actual DB clock, not updateLineup's simulated date.
+    // Move only this isolated test's two locks into the real future so
+    // the valid-swap regression doesn't depend on when this suite is run.
+    await admin.from("lineup_slots").update({ locked_at: new Date(Date.now() + 3_600_000).toISOString() })
+      .eq("fantasy_round_id", openResult.roundId).in("roster_entry_id", [defOut.roster_entry_id, defIn.roster_entry_id]);
+
+    const bypass = await league.clients[0].from("lineup_slots")
+      .update({ starter: false, locked_at: null }).eq("roster_entry_id", defOut.roster_entry_id);
+    assert.equal(bypass.error?.code, "42501", "even the owner cannot PATCH starter/locked_at");
 
     // league.clients[0] is a real, signed-in session for team 0's own
     // owner -- the SAME kind of client swapLineupAction uses, deliberately
@@ -780,11 +782,12 @@ test("a genuine starter<->bench substitution persists through the authenticated 
     assert.deepEqual(counts, { GK: 1, DEF: 4, MID: 4, FWD: 2 }, "still exactly the fixed 4-4-2 shape after the substitution");
 
     // Another manager (team 1's own authenticated session) must not be
-    // able to mutate team 0's lineup_slots at all -- the base GRANT this
-    // pass added makes the table writable by `authenticated` generally,
-    // so this proves the RLS POLICY (not just the GRANT) is still the
-    // thing doing the actual per-row enforcement.
-    await league.clients[1].from("lineup_slots").update({ starter: true }).eq("roster_entry_id", defOut.roster_entry_id);
+    // able to mutate team 0 through either direct DML or the RPC.
+    const direct = await league.clients[1].from("lineup_slots").update({ starter: true }).eq("roster_entry_id", defOut.roster_entry_id);
+    assert.equal(direct.error?.code, "42501");
+    const foreignRpc = await updateLineup(league.clients[1], teamId, openResult.roundId,
+      [{ rosterEntryId: defOut.roster_entry_id, starter: true, position: "DEF" }], new Date());
+    assert.deepEqual(foreignRpc, { ok: false, error: "ROSTER_ENTRY_NOT_ON_TEAM" });
     const { data: stillAfterCrossAttempt } = await admin.from("lineup_slots").select("starter").eq("roster_entry_id", defOut.roster_entry_id).single();
     assert.equal(stillAfterCrossAttempt!.starter, false, "another manager's write attempt must not change team 0's lineup_slots row");
   } finally {
@@ -820,10 +823,9 @@ test("the database itself rejects a manager writing another team's lineup_slots,
 
     // Team 1's own authenticated session attempts to flip a row it does
     // NOT own, bypassing updateLineup()/the Server Action's ownership
-    // check entirely -- this is exactly what the RLS policy alone must
-    // stop, as the last line of defense (docs/game-rules.md-style
-    // "manager must only ever modify their own fantasy team's lineup").
-    await league.clients[1].from("lineup_slots").update({ starter: !before }).eq("id", victimSlot.id);
+    // check entirely -- direct DML is now denied at the privilege boundary.
+    const direct = await league.clients[1].from("lineup_slots").update({ starter: !before }).eq("id", victimSlot.id);
+    assert.equal(direct.error?.code, "42501");
 
     const { data: after } = await admin.from("lineup_slots").select("starter").eq("id", victimSlot.id).single();
     assert.equal(after!.starter, before, "team 1 must not be able to change team 0's lineup_slots row at all");

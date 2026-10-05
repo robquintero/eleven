@@ -345,7 +345,9 @@ async function ensureRoundOneOpenedForSeason(
   leagueId: string,
   seasonId: string | null
 ): Promise<void> {
-  let query = admin.from("fantasy_rounds").select("id, number").order("number", { ascending: true }).limit(1);
+  // Progression beyond round one already establishes initialization. Do
+  // not keep scanning historical round one on every Team visit.
+  let query = admin.from("fantasy_rounds").select("id, number, starts_at, ends_at").order("number", { ascending: false }).limit(1);
   query = seasonId ? query.eq("season_id", seasonId) : query.eq("league_id", leagueId);
   const { data: existingRound } = await query.maybeSingle();
 
@@ -364,7 +366,10 @@ async function ensureRoundOneOpenedForSeason(
   if (existingRound.number !== 1) return;
 
   try {
-    await repairIncompleteRoundOne(admin, leagueId, existingRound.id);
+    await repairIncompleteRoundOne(admin, leagueId, existingRound.id, {
+      startsAt: new Date(existingRound.starts_at),
+      endsAt: new Date(existingRound.ends_at),
+    });
   } catch (err) {
     console.error(`ensureFirstRoundOpened: repairIncompleteRoundOne threw for league ${leagueId}`, err);
   }
@@ -388,33 +393,29 @@ async function ensureRoundOneOpenedForSeason(
  * requires the previous round to already be `completed` before a new one
  * can open at all.
  */
-async function repairIncompleteRoundOne(admin: SupabaseClient<Database>, leagueId: string, roundId: string): Promise<void> {
-  const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at").eq("id", roundId).single();
-  if (!round) return;
-  const window: RoundWindow = { startsAt: new Date(round.starts_at), endsAt: new Date(round.ends_at) };
-
-  const { data: teams } = await admin.from("fantasy_teams").select("id").eq("league_id", leagueId);
-  if (!teams) return;
-
-  for (const team of teams) {
-    const { data: rosterEntries } = await admin
+async function repairIncompleteRoundOne(admin: SupabaseClient<Database>, leagueId: string, roundId: string, window: RoundWindow): Promise<void> {
+  // A left embed keeps roster entries with NO slots. As before, even one
+  // existing slot protects the team's manager-edited lineup from repair.
+  // Page the batched read so PostgREST's row cap cannot hide a team.
+  const initializedByTeam = new Map<string, boolean>();
+  for (let from = 0; ; from += 1000) {
+    const { data: entries, error } = await admin
       .from("roster_entries")
-      .select("id")
-      .eq("fantasy_team_id", team.id)
-      .eq("status", "active");
-    if (!rosterEntries || rosterEntries.length === 0) continue;
-
-    const { count } = await admin
-      .from("lineup_slots")
-      .select("*", { count: "exact", head: true })
-      .eq("fantasy_round_id", roundId)
-      .in(
-        "roster_entry_id",
-        rosterEntries.map((r) => r.id)
-      );
-    if (count && count > 0) continue;
-
-    await createRoundLineupSlots(admin, team.id, roundId, window, null);
+      .select("fantasy_team_id, lineup_slots!left(id)")
+      .eq("league_id", leagueId)
+      .eq("status", "active")
+      .eq("lineup_slots.fantasy_round_id", roundId)
+      .order("id", { ascending: true })
+      .range(from, from + 999);
+    if (error) throw new Error(`Failed to check round-one initialization: ${error.message}`);
+    for (const entry of entries ?? []) {
+      initializedByTeam.set(entry.fantasy_team_id,
+        (initializedByTeam.get(entry.fantasy_team_id) ?? false) || entry.lineup_slots.length > 0);
+    }
+    if (!entries || entries.length < 1000) break;
+  }
+  for (const [teamId, initialized] of initializedByTeam) {
+    if (!initialized) await createRoundLineupSlots(admin, teamId, roundId, window, null);
   }
 }
 

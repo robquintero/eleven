@@ -16,13 +16,13 @@ import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getHotFreeAgents } from "@/data-access/intelligence";
 import { getUserLeagues } from "@/data-access/leagues";
-import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads, getStandings, getTeamIdsByPlayerIds } from "@/data-access/matchups";
+import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads, getStandings } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
-import { getTeamRosterPlayers, type RosterPlayerOption } from "@/data-access/roster";
+import { getTeamRosterPlayers } from "@/data-access/roster";
 import { getUserSquad } from "@/data-access/roster";
 import { getLeagueTeams, getUserTeamInLeague, type Team } from "@/data-access/teams";
 import { getRecentActivity } from "@/data-access/transactions";
-import { getTeamTrades, type TradeView } from "@/data-access/trades";
+import { getTeamTrades } from "@/data-access/trades";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
 import { rosterVacancies, type RosterCounts } from "@/domain/fantasy/roster-rules";
 import type { FantasyRound } from "@/lib/types/fantasy";
@@ -51,80 +51,41 @@ export default async function HomePage() {
     draftStatus,
   });
 
-  const [squad, matchup, standings, activity, allTeams, hotFreeAgents] = await Promise.all([
-    team ? getUserSquad(league.id, team.id) : Promise.resolve({ formation: "—" as const, starters: [], bench: [] }),
-    team ? getCurrentMatchup(league.id, team.id) : Promise.resolve(null),
+  const now = new Date();
+  // Matchup-dependent reads start as soon as the matchup arrives, without
+  // waiting for standings, activity or market intelligence.
+  const matchupPromise = (async () => {
+    const matchup = team ? await getCurrentMatchup(league.id, team.id) : null;
+    const [matchupSquads, fixtureIntel, fallbackSquad] = await Promise.all([
+      matchup ? getMatchupSquads(matchup) : Promise.resolve(null),
+      matchup ? getMatchupFixtureIntelligence(matchup, now) : Promise.resolve(null),
+      !matchup && team ? getUserSquad(league.id, team.id) : Promise.resolve(null),
+    ]);
+    return { matchup, matchupSquads, fixtureIntel, fallbackSquad };
+  })();
+  const [{ matchup, matchupSquads, fixtureIntel, fallbackSquad }, standings, activity, allTeams, hotFreeAgents, activeRoster, trades] = await Promise.all([
+    matchupPromise,
     getStandings(league.id),
     getRecentActivity(league.id),
     team ? getLeagueTeams(league.id) : Promise.resolve<Team[]>([]),
     getHotFreeAgents(league.id),
+    team ? getTeamRosterPlayers(league.id, team.id) : Promise.resolve([]),
+    team ? getTeamTrades(league.id, team.id) : Promise.resolve({ incoming: [], outgoing: [] }),
   ]);
-
-  // Pass 11.5: roster-vacancy readout -- same shared `rosterVacancies`
-  // definition the Team page uses, never a second copy of "what counts
-  // as short."
+  // Vacancy counts describe CURRENT ownership; matchup lineups can retain
+  // locked historical players after a trade. Do not count those as roster.
   const positionCounts: RosterCounts = {};
-  for (const slot of squad.starters) positionCounts[slot.player.position] = (positionCounts[slot.player.position] ?? 0) + 1;
-  for (const player of squad.bench) positionCounts[player.position] = (positionCounts[player.position] ?? 0) + 1;
+  for (const player of activeRoster) positionCounts[player.position] = (positionCounts[player.position] ?? 0) + 1;
   const vacancies = rosterVacancies(positionCounts);
-
-  // Trade entry point -- same composition pattern /league already uses
-  // (getLeagueTeams -> per-team rosters -> getTeamTrades), reused as-is
-  // so Home's TradeDesk needs no new trade data-access of its own.
-  let tradeDeskProps: {
-    myTeamId: string;
-    myRoster: RosterPlayerOption[];
-    otherTeams: Team[];
-    rostersByTeamId: Record<string, RosterPlayerOption[]>;
-    incoming: TradeView[];
-    outgoing: TradeView[];
-  } | null = null;
-
-  if (team) {
-    const otherTeams = allTeams.filter((t) => t.id !== team.id);
-    const [myRoster, otherRosters, trades] = await Promise.all([
-      getTeamRosterPlayers(league.id, team.id),
-      Promise.all(otherTeams.map((t) => getTeamRosterPlayers(league.id, t.id))),
-      getTeamTrades(league.id, team.id),
-    ]);
-    const rostersByTeamId = Object.fromEntries(otherTeams.map((t, i) => [t.id, otherRosters[i]]));
-    tradeDeskProps = {
-      myTeamId: team.id,
-      myRoster,
-      otherTeams,
-      rostersByTeamId,
-      incoming: trades.incoming,
-      outgoing: trades.outgoing,
-    };
-  }
-
-  // Pass 10.5B: Home must not contradict what Pass 10.5A already proved
-  // live (round 1 opens automatically on draft completion, a real H2H
-  // matchup exists, both XIs exist) — `round` here reflects the SAME real
-  // matchup, not a hardcoded "no round" state. `deadline` is the next
-  // applicable lock instant (see getMatchupFixtureIntelligence), never a
-  // single global deadline Eleven's real per-player-lock model doesn't
-  // have — `Greeting` itself only renders the "LOCKS ..." segment when
-  // this is non-null.
-  const now = new Date();
-  const fixtureIntel = matchup ? await getMatchupFixtureIntelligence(matchup, now) : null;
-
-  // Pass 14.5: fetched whenever a matchup exists, never gated on
-  // `matchup.status !== "scheduled"` -- `matchups.status` only reflects
-  // whether a fixture is CURRENTLY live right now and reverts to
-  // "scheduled" the instant nothing is (see data-access/matchups.ts's own
-  // `roundStatus` doc comment), so that gate was hiding real, already-
-  // locked/already-final starter data exactly in the case most worth
-  // showing (e.g. The Room's Round 1, where several starters' fixtures
-  // have already kicked off or finished while no fixture happens to be
-  // live AT THIS SECOND). Pure stored-data reads, no provider cost either way.
-  const matchupSquads = matchup ? await getMatchupSquads(matchup) : null;
-  const mySquad = matchup && matchupSquads ? (matchup.isUserHome ? matchupSquads.home : matchupSquads.away) : squad;
-
-  // Pass 14: each starter's full team-id set (club + any national teams)
-  // so "N OF YOUR XI INVOLVED" correctly counts a starter whose next
-  // fixture is international, not just a club match.
-  const teamIdsByPlayerId = await getTeamIdsByPlayerIds(mySquad.starters.map((slot) => slot.player.id));
+  const mySquad = matchup && matchupSquads
+    ? (matchup.isUserHome ? matchupSquads.home : matchupSquads.away)
+    : fallbackSquad ?? { formation: "—", starters: [], bench: [] };
+  const teamIdsByPlayerId = matchupSquads?.teamIdsByPlayerId;
+  const tradeDeskProps = team ? {
+    myTeamId: team.id,
+    otherTeams: allTeams.filter((t) => t.id !== team.id),
+    ...trades,
+  } : null;
 
   const topPerformer = matchupSquads
     ? [...matchupSquads.home.starters, ...matchupSquads.away.starters]
@@ -227,9 +188,7 @@ export default async function HomePage() {
                 <TradeDesk
                   leagueId={league.id}
                   myTeamId={tradeDeskProps.myTeamId}
-                  myRoster={tradeDeskProps.myRoster}
                   otherTeams={tradeDeskProps.otherTeams}
-                  rostersByTeamId={tradeDeskProps.rostersByTeamId}
                   incoming={tradeDeskProps.incoming}
                   outgoing={tradeDeskProps.outgoing}
                 />

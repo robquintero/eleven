@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { X } from "lucide-react";
 import { BenchRow, EmptySlotRow } from "@/components/team/bench-row";
 import { NextLock } from "@/components/team/next-lock";
@@ -113,10 +112,8 @@ export function TeamWorkspace({
   leagueId: string;
   fantasyTeamId: string | null;
 }) {
-  const router = useRouter();
   const [selected, setSelected] = useState<Selection>(null);
   const [pendingAssignments, setPendingAssignments] = useState<Map<string, Player>>(new Map());
-  const [pending, setPending] = useState(false);
   const [error, setError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
   // Pass 14.7 Phase 5: every CLIENT-side validation message below (wrong
   // position, locked explanation) is an expected game-rule outcome by
@@ -126,16 +123,10 @@ export function TeamWorkspace({
   function setRuleError(message: string) {
     setError({ message, kind: "rule" });
   }
-  // `isRefreshing` tracks the router.refresh() that follows a successful
-  // write via useTransition. `substitutionBusy` stays true across BOTH the
-  // action call (`pending`) and that follow-up refresh, so the processing
-  // state -- and the guard against a second, conflicting lineup mutation --
-  // lasts until the NEW server-confirmed squad has actually landed, never
-  // just the instant the action call itself returns. Every row's handler
-  // early-returns on `substitutionBusy`, and the Done button itself shows
-  // "Saving…" for the duration.
-  const [isRefreshing, startRefreshTransition] = useTransition();
-  const substitutionBusy = pending || isRefreshing;
+  // Guard conflicting edits until the action and its fresh server-rendered
+  // payload commit. Next supplies that payload after revalidatePath.
+  const [isSaving, startSaveTransition] = useTransition();
+  const substitutionBusy = isSaving;
 
   const canEdit = Boolean(fantasyTeamId);
 
@@ -171,8 +162,7 @@ export function TeamWorkspace({
    * write's real (roughly 1-2s) latency, without ever showing the
    * replacement before the server confirms it -- the picker (`selected`)
    * closes immediately, before the request even starts. `substitutionBusy`
-   * (`pending || isRefreshing`) stays true until the POST-success
-   * `router.refresh()` transition itself settles, so every row's handler
+   * stays true until the action's server-confirmed payload commits, so every row's handler
    * stays guarded against a second, conflicting lineup mutation through
    * the full round-trip, not just the action call.
    */
@@ -180,15 +170,17 @@ export function TeamWorkspace({
     if (!fantasyTeamId || substitutionBusy) return;
     setSelected(null);
     setError(null);
-    setPending(true);
-    const result = await swapLineupAction(leagueId, fantasyTeamId, starterOut, benchIn);
-    setPending(false);
-    if (result?.error) {
-      setError({ message: result.error, kind: result.kind });
-      return;
-    }
-    startRefreshTransition(() => {
-      router.refresh();
+    // The installed Next action handler renders a fresh Flight payload
+    // when revalidatePath marks this page. A second router.refresh would
+    // repeat the same Team read graph. Keep the transition pending until
+    // the action's confirmed payload commits; this is not optimistic UI.
+    startSaveTransition(async () => {
+      try {
+        const result = await swapLineupAction(leagueId, fantasyTeamId, starterOut, benchIn);
+        if (result?.error) setError({ message: result.error, kind: result.kind });
+      } catch {
+        setError({ message: "Couldn't save your lineup — please try again.", kind: "error" });
+      }
     });
   }
 
@@ -296,20 +288,23 @@ export function TeamWorkspace({
    */
   async function handleSaveFills() {
     if (!fantasyTeamId || substitutionBusy || pendingAssignments.size === 0) return;
-    setPending(true);
     setError(null);
     const fills = slots
       .filter((slot) => pendingAssignments.has(slot.id))
       .map((slot) => ({ playerId: pendingAssignments.get(slot.id)!.id, position: slot.position }));
-    const result = await fillEmptySlotsAction(leagueId, fantasyTeamId, fills);
-    setPending(false);
-    if (result?.error) {
-      setError({ message: result.error, kind: result.kind });
-      return;
-    }
-    setPendingAssignments(new Map());
-    setSelected(null);
-    router.refresh();
+    startSaveTransition(async () => {
+      try {
+        const result = await fillEmptySlotsAction(leagueId, fantasyTeamId, fills);
+        if (result?.error) {
+          setError({ message: result.error, kind: result.kind });
+          return;
+        }
+        setPendingAssignments(new Map());
+        setSelected(null);
+      } catch {
+        setError({ message: "Couldn't save your lineup — please try again.", kind: "error" });
+      }
+    });
   }
 
   return (

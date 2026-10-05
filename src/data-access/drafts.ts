@@ -97,7 +97,37 @@ export interface DraftState {
 export async function getDraftState(leagueId: string): Promise<DraftState | null> {
   if (!isSupabaseConfigured()) return null;
   const supabase = await resolveClient();
-  return queryDraftState(supabase, leagueId);
+  const { getCurrentUser } = await import("../lib/supabase/server.ts");
+  const { getUserTeamInLeague } = await import("./teams.ts");
+  const [user, team] = await Promise.all([getCurrentUser(), getUserTeamInLeague(leagueId)]);
+  return queryDraftState(supabase, leagueId, user, team?.id ?? null);
+}
+
+export interface DraftUpdate {
+  draft: DraftState | null;
+  ownership: Record<string, string>;
+}
+
+/** The polling read graph deliberately excludes player catalog/ranking data. */
+export async function queryDraftUpdate(
+  supabase: Awaited<ReturnType<typeof createClient>>, leagueId: string, requestUser?: { id: string } | null
+): Promise<DraftUpdate> {
+  const [draft, ownership] = await Promise.all([
+    queryDraftState(supabase, leagueId, requestUser, undefined, true),
+    (async () => {
+      const result: Record<string, string> = {};
+      for (let from = 0; ; from += 1000) {
+        const { data, error } = await supabase.from("league_player_ownership")
+          .select("player_id, fantasy_team_id").eq("league_id", leagueId)
+          .order("player_id", { ascending: true }).range(from, from + 999);
+        if (error) throw new Error(`Failed to load draft ownership: ${error.message}`);
+        for (const row of data ?? []) result[row.player_id] = row.fantasy_team_id;
+        if (!data || data.length < 1000) break;
+      }
+      return result;
+    })(),
+  ]);
+  return { draft, ownership };
 }
 
 /**
@@ -110,26 +140,45 @@ export async function getDraftState(leagueId: string): Promise<DraftState | null
  * state this function already handles — `myFantasyTeamId`/`isMyTurn`
  * just come back `null`/`false`).
  */
-export async function queryDraftState(supabase: Awaited<ReturnType<typeof createClient>>, leagueId: string): Promise<DraftState | null> {
-  const { data: draftRow } = await supabase
+export async function queryDraftState(supabase: Awaited<ReturnType<typeof createClient>>, leagueId: string, requestUser?: { id: string } | null, requestTeamId?: string | null, requireComplete = false): Promise<DraftState | null> {
+  const { data: draftRow, error: draftError } = await supabase
     .from("drafts")
     .select("id, status, current_round, current_pick, current_pick_started_at")
     .eq("league_id", leagueId)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (requireComplete && draftError) throw new Error(`Failed to load draft: ${draftError.message}`);
   if (!draftRow) return null;
 
-  const { data: leagueRow } = await supabase.from("fantasy_leagues").select("settings").eq("id", leagueId).maybeSingle();
-  const settings = (leagueRow?.settings ?? {}) as { squadSize?: number; pickTimerSeconds?: number };
-  const totalRounds = settings.squadSize ?? 16;
-  const pickTimerSeconds = settings.pickTimerSeconds ?? 300;
-
-  const { data: orderRows } = await supabase
+  const [{ data: leagueRow, error: leagueError }, { data: orderRows, error: orderError }, { data: pickRows, error: pickRowsError }, myFantasyTeamId] = await Promise.all([
+    supabase.from("fantasy_leagues").select("settings").eq("id", leagueId).maybeSingle(),
+    supabase
     .from("draft_orders")
     .select("position, fantasy_teams(id, name, abbreviation)")
     .eq("draft_id", draftRow.id)
-    .order("position", { ascending: true });
+    .order("position", { ascending: true }),
+    supabase
+    .from("draft_picks")
+    .select("pick_number, round, fantasy_team_id, picked_at, fantasy_teams(name), players(id, name, position, clubs!players_club_id_fkey(short_name))")
+    .eq("draft_id", draftRow.id)
+    .order("pick_number", { ascending: true }),
+    (async () => {
+      if (requestTeamId !== undefined) return requestTeamId;
+      const user = requestUser === undefined ? (await supabase.auth.getUser()).data.user : requestUser;
+      if (!user) return null;
+      const { data: team, error } = await supabase.from("fantasy_teams").select("id")
+        .eq("league_id", leagueId).eq("owner_user_id", user.id).maybeSingle();
+      if (requireComplete && error) throw new Error(`Failed to load draft team: ${error.message}`);
+      return team?.id ?? null;
+    })(),
+  ]);
+  if (requireComplete && (leagueError || orderError || pickRowsError)) {
+    throw new Error(`Failed to load complete draft state: ${(leagueError || orderError || pickRowsError)!.message}`);
+  }
+  const settings = (leagueRow?.settings ?? {}) as { squadSize?: number; pickTimerSeconds?: number };
+  const totalRounds = settings.squadSize ?? 16;
+  const pickTimerSeconds = settings.pickTimerSeconds ?? 300;
 
   const order: DraftOrderEntry[] = (orderRows ?? []).map((row) => {
     const team = row.fantasy_teams as unknown as { id: string; name: string; abbreviation: string } | null;
@@ -141,11 +190,6 @@ export async function queryDraftState(supabase: Awaited<ReturnType<typeof create
     };
   });
 
-  const { data: pickRows, error: pickRowsError } = await supabase
-    .from("draft_picks")
-    .select("pick_number, round, fantasy_team_id, picked_at, fantasy_teams(name), players(id, name, position, clubs!players_club_id_fkey(short_name))")
-    .eq("draft_id", draftRow.id)
-    .order("pick_number", { ascending: true });
   if (pickRowsError) console.error(`getDraftState: draft_picks fetch failed for draft ${draftRow.id}:`, pickRowsError);
 
   const picks: DraftPickRecord[] = (pickRows ?? []).map((row) => {
@@ -175,20 +219,6 @@ export async function queryDraftState(supabase: Awaited<ReturnType<typeof create
     draftRow.current_pick_started_at && !isComplete
       ? new Date(new Date(draftRow.current_pick_started_at).getTime() + pickTimerSeconds * 1000).toISOString()
       : null;
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  let myFantasyTeamId: string | null = null;
-  if (user) {
-    const { data: myTeam } = await supabase
-      .from("fantasy_teams")
-      .select("id")
-      .eq("league_id", leagueId)
-      .eq("owner_user_id", user.id)
-      .maybeSingle();
-    myFantasyTeamId = myTeam?.id ?? null;
-  }
 
   return {
     draftId: draftRow.id,

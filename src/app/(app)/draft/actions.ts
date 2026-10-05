@@ -1,5 +1,6 @@
 "use server";
 
+import { queryDraftUpdate } from "@/data-access/drafts";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { maybeOpenFirstRound } from "@/lib/fantasy-engine/draft-completion";
@@ -97,4 +98,10 @@ export async function resolveExpiredPickAction(draftId: string): Promise<DraftAc
     revalidatePath("/team");
   }
   return undefined;
+}
+
+/** Poll only changing draft state and ownership, never the player ranking. */
+export async function getDraftUpdateAction(leagueId: string) {
+  const supabase = await createClient();
+  return queryDraftUpdate(supabase, leagueId);
 }

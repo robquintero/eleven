@@ -153,7 +153,9 @@ export async function queryHotFreeAgents(
       average,
     });
   }
-  recentCandidates.sort((a, b) => b.average - a.average);
+  // Equal signals have no product preference; immutable player identity
+  // gives a stable final tie-breaker without another catalog-wide read.
+  recentCandidates.sort((a, b) => b.average - a.average || a.playerId.localeCompare(b.playerId));
 
   const picked = recentCandidates.slice(0, limit);
   const pickedIds = new Set(picked.map((c) => c.playerId));
@@ -168,7 +170,7 @@ export async function queryHotFreeAgents(
     fallbackCandidates = Array.from(seasonAll.entries())
       .filter(([playerId]) => !ownedIds.has(playerId) && !pickedIds.has(playerId))
       .map(([playerId, agg]) => ({ playerId, totalPoints: agg.totalPoints }))
-      .sort((a, b) => b.totalPoints - a.totalPoints)
+      .sort((a, b) => b.totalPoints - a.totalPoints || a.playerId.localeCompare(b.playerId))
       .slice(0, limit - picked.length);
   }
 

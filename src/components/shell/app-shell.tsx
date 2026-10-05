@@ -12,7 +12,7 @@ import { StatusBar, type StatusBarData } from "@/components/shell/status-bar";
 import { Wordmark } from "@/components/shell/wordmark";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getUserLeagues } from "@/data-access/leagues";
-import { getCurrentMatchup, getMatchupSquads } from "@/data-access/matchups";
+import { getCurrentMatchup, getMatchupStatusStarters } from "@/data-access/matchups";
 import { getCurrentProfile } from "@/data-access/profiles";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { nextLock, starterBuckets } from "@/lib/team-fixture";
@@ -21,7 +21,7 @@ import { ATTRIBUTION_LINE, PRODUCT_STATUS, SITE_NAME } from "@/lib/site-config";
 /**
  * Pass 14.5: the real round-state summary behind the global `StatusBar` --
  * same authoritative sources the Home dashboard uses (`getCurrentMatchup`,
- * `getMatchupSquads`, `starterBuckets`, `nextLock`), never a second,
+ * shared matchup lineup/fixture derivation, `starterBuckets`, `nextLock`), never a second,
  * divergent derivation. `null` whenever the active league genuinely has no
  * team/round yet.
  */
@@ -32,10 +32,9 @@ async function loadStatusBarData(activeLeagueId: string | null): Promise<StatusB
   const matchup = await getCurrentMatchup(activeLeagueId, team.id);
   if (!matchup) return null;
 
-  const squads = await getMatchupSquads(matchup);
-  const mySquad = matchup.isUserHome ? squads.home : squads.away;
-  const buckets = starterBuckets(mySquad.starters);
-  const next = nextLock(mySquad.starters);
+  const starters = await getMatchupStatusStarters(matchup);
+  const buckets = starterBuckets(starters);
+  const next = nextLock(starters);
 
   return {
     roundNumber: matchup.roundNumber,

@@ -1,6 +1,7 @@
 import "server-only";
+import { cache } from "react";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 import { LeagueActionError, toLeagueActionError } from "@/lib/errors/league-action-error";
 import type { LeagueSettings } from "@/domain/fantasy/types";
 
@@ -31,17 +32,17 @@ function maxTeamsFromSettings(settings: unknown): number {
  * Switcher / league hub render an empty state ("no active leagues") for
  * that case rather than an error.
  */
-export async function getUserLeagues(): Promise<LeagueSummary[]> {
+export const getUserLeagues = cache(async function getUserLeagues(): Promise<LeagueSummary[]> {
   if (!isSupabaseConfigured()) return [];
 
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return [];
+  const user = await getCurrentUser();
+  if (!user) return [];
 
   const { data: memberships, error: membershipError } = await supabase
     .from("league_memberships")
     .select("league_id, role")
-    .eq("user_id", userData.user.id);
+    .eq("user_id", user.id);
 
   if (membershipError || !memberships || memberships.length === 0) return [];
 
@@ -82,7 +83,7 @@ export async function getUserLeagues(): Promise<LeagueSummary[]> {
     maxTeams: maxTeamsFromSettings(league.settings),
     role: (roleByLeagueId.get(league.id) ?? "manager") as LeagueSummary["role"],
   }));
-}
+});
 
 export interface LeagueMember {
   userId: string;
@@ -135,10 +136,8 @@ export async function getLeagueDetail(leagueId: string): Promise<LeagueDetail | 
   const displayNameByUserId = new Map((profiles ?? []).map((p) => [p.id, p.display_name]));
   const teamNameByUserId = new Map((teams ?? []).map((t) => [t.owner_user_id, t.name]));
 
-  const {
-    data: userData,
-  } = await supabase.auth.getUser();
-  const callerRole = memberships.find((m) => m.user_id === userData.user?.id)?.role ?? "manager";
+  const user = await getCurrentUser();
+  const callerRole = memberships.find((m) => m.user_id === user?.id)?.role ?? "manager";
 
   return {
     id: league.id,

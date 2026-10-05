@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 // Relative imports (not the usual `@/...` aliases) -- same reasoning as
 // src/data-access/players.ts's own import-block comment: keeps
@@ -99,11 +100,11 @@ function toPlayer(
  * scheduled yet), every roster player is bench-unassigned, which is the
  * correct, truthful state, not a bug to work around.
  */
-export async function getUserSquad(leagueId: string, fantasyTeamId: string): Promise<Squad> {
+export const getUserSquad = cache(async function getUserSquad(leagueId: string, fantasyTeamId: string): Promise<Squad> {
   if (!isSupabaseConfigured()) return { formation: "—", starters: [], bench: [] };
   const supabase = await resolveClient();
   return querySquad(supabase, leagueId, fantasyTeamId);
-}
+});
 
 /**
  * The actual query logic behind `getUserSquad`, parameterized by an
@@ -120,27 +121,26 @@ export async function querySquad(
 ): Promise<Squad> {
   const empty: Squad = { formation: "—", starters: [], bench: [] };
 
-  const { data: entries, error } = await supabase
+  const [{ data: entries, error }, { data: currentRound }] = await Promise.all([
+    supabase
     .from("roster_entries")
     .select(
       "id, player_id, acquired_at, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code)))"
     )
     .eq("league_id", leagueId)
     .eq("fantasy_team_id", fantasyTeamId)
-    .eq("status", "active");
-
-  if (error) console.error(`getUserSquad: roster_entries fetch failed for team ${fantasyTeamId}:`, error);
-  if (error || !entries || entries.length === 0) return empty;
-
-  const rosterRows = entries as RosterRow[];
-
-  const { data: currentRound } = await supabase
+    .eq("status", "active"),
+    supabase
     .from("fantasy_rounds")
     .select("id, starts_at, ends_at")
     .eq("league_id", leagueId)
     .order("number", { ascending: false })
     .limit(1)
-    .maybeSingle();
+    .maybeSingle(),
+  ]);
+  if (error) console.error(`getUserSquad: roster_entries fetch failed for team ${fantasyTeamId}:`, error);
+  if (error || !entries || entries.length === 0) return empty;
+  const rosterRows = entries as RosterRow[];
 
   // Pass 14.5: real, round-scoped points + fixture/lock display state --
   // the SAME derivation `queryMatchupSquads` uses for the Matchup page
@@ -150,8 +150,9 @@ export async function querySquad(
   // opened for this league yet.
   const playerIds = rosterRows.map((r) => r.player_id);
   const acquiredAtByPlayerId = new Map(rosterRows.map((r) => [r.player_id, r.acquired_at]));
-  const { pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId } = currentRound
-    ? await getRoundPlayerState(
+  const [{ pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId }, { data: slots }] = await Promise.all([
+    currentRound
+    ? getRoundPlayerState(
         supabase,
         playerIds,
         { startsAt: new Date(currentRound.starts_at), endsAt: new Date(currentRound.ends_at) } satisfies RoundWindow,
@@ -161,7 +162,13 @@ export async function querySquad(
         pointsByPlayerId: new Map<string, number>(),
         preAcquisitionPointsByPlayerId: new Map<string, number>(),
         fixtureByPlayerId: new Map<string, Player["fixture"]>(),
-      };
+      },
+    currentRound ? supabase
+    .from("lineup_slots")
+    .select("roster_entry_id, starter, locked_at")
+    .eq("fantasy_round_id", currentRound.id)
+    .in("roster_entry_id", rosterRows.filter((r) => r.players).map((r) => r.id)) : Promise.resolve({ data: [] }),
+  ]);
 
   const playerByRosterEntryId = new Map<string, Player>();
   for (const entry of rosterRows) {
@@ -173,11 +180,6 @@ export async function querySquad(
     return { formation: "—", starters: [], bench: Array.from(playerByRosterEntryId.values()) };
   }
 
-  const { data: slots } = await supabase
-    .from("lineup_slots")
-    .select("roster_entry_id, starter, locked_at")
-    .eq("fantasy_round_id", currentRound.id)
-    .in("roster_entry_id", Array.from(playerByRosterEntryId.keys()));
 
   const slotByRosterEntryId = new Map((slots ?? []).map((s) => [s.roster_entry_id, s]));
   const now = new Date();
@@ -278,4 +280,28 @@ export async function getTeamRosterPlayers(
     .map((row) => row.players)
     .filter((p): p is { id: string; name: string; position: string } => Boolean(p))
     .map((p) => ({ id: p.id, name: p.name, position: p.position as PlayerPosition }));
+}
+
+/** Batched, RLS-scoped composition choices, fetched only when a trade opens. */
+export async function getLeagueRosterPlayersByTeam(leagueId: string): Promise<Record<string, RosterPlayerOption[]>> {
+  if (!isSupabaseConfigured()) return {};
+  const supabase = await resolveClient();
+  return queryLeagueRosterPlayersByTeam(supabase, leagueId);
+}
+
+export async function queryLeagueRosterPlayersByTeam(supabase: SupabaseClient<Database>, leagueId: string): Promise<Record<string, RosterPlayerOption[]>> {
+  const result: Record<string, RosterPlayerOption[]> = {};
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase.from("roster_entries")
+      .select("fantasy_team_id, players(id, name, position)")
+      .eq("league_id", leagueId).eq("status", "active")
+      .order("id", { ascending: true }).range(from, from + 999);
+    if (error) throw new Error("Couldn't load trade rosters.");
+    for (const row of data ?? []) {
+      if (!row.players) continue;
+      (result[row.fantasy_team_id] ??= []).push({ ...row.players, position: row.players.position as PlayerPosition });
+    }
+    if (!data || data.length < 1000) break;
+  }
+  return result;
 }

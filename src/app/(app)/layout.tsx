@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/shell/app-shell";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/server";
 
 /**
  * Pass 10C: the whole authenticated application is noindex,nofollow, set
@@ -27,9 +27,8 @@ export const metadata: Metadata = {
  */
 export default async function AppGroupLayout({ children }: { children: ReactNode }) {
   if (isSupabaseConfigured()) {
-    const supabase = await createClient();
-    const { data } = await supabase.auth.getUser();
-    if (!data.user) redirect("/login");
+    const user = await getCurrentUser();
+    if (!user) redirect("/login");
   }
 
   return <AppShell>{children}</AppShell>;

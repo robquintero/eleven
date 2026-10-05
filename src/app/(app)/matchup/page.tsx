@@ -9,7 +9,7 @@ import { RoundWindow } from "@/components/football/round-window";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
-import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads, getTeamIdsByPlayerIds } from "@/data-access/matchups";
+import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads } from "@/data-access/matchups";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
 
@@ -46,14 +46,13 @@ export default async function MatchupPage() {
   }
 
   const matchup = team ? await getCurrentMatchup(league.id, team.id) : null;
-  const squads = matchup ? await getMatchupSquads(matchup) : null;
   const now = new Date();
-  const fixtureIntel = matchup ? await getMatchupFixtureIntelligence(matchup, now) : null;
+  const [squads, fixtureIntel] = await Promise.all([
+    matchup ? getMatchupSquads(matchup) : Promise.resolve(null),
+    matchup ? getMatchupFixtureIntelligence(matchup, now) : Promise.resolve(null),
+  ]);
   const myStarters = squads ? (matchup!.isUserHome ? squads.home.starters : squads.away.starters) : undefined;
-  // Pass 14: see the identical Home comment -- each starter's full
-  // team-id set so "N OF YOUR XI INVOLVED" correctly counts international
-  // fixture participation, not just club matches.
-  const teamIdsByPlayerId = await getTeamIdsByPlayerIds((myStarters ?? []).map((slot) => slot.player.id));
+  const teamIdsByPlayerId = squads?.teamIdsByPlayerId;
 
   return (
     <div className="flex flex-col gap-6">

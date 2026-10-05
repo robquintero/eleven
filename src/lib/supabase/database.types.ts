@@ -1399,6 +1399,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      update_team_lineup: {
+        Args: { p_fantasy_team_id: string; p_round_id: string; p_changes: Json; p_now?: string }
+        Returns: undefined
+      }
+      get_player_score_totals: {
+        Args: { p_season: number; p_version: string; p_player_ids?: string[] }
+        Returns: { player_id: string; total_points: number; appearances: number }[]
+      }
+
       _current_round_id: { Args: { p_league_id: string }; Returns: string }
       _init_current_round_slot: {
         Args: {

@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
 import type { Database } from "@/lib/supabase/database.types";
@@ -14,7 +15,9 @@ import type { Database } from "@/lib/supabase/database.types";
  * catch just no-ops the write when called from a context that can't
  * perform it, matching Supabase's documented Next.js App Router pattern.
  */
-export async function createClient() {
+// React cache is scoped to the current server render, never shared across
+// requests. Actions still construct their own client outside that dispatcher.
+export const createClient = cache(async function createClient() {
   const cookieStore = await cookies();
 
   return createServerClient<Database>(
@@ -38,4 +41,11 @@ export async function createClient() {
       },
     }
   );
-}
+});
+
+/** One verified Auth lookup per render, shared by context readers. */
+export const getCurrentUser = cache(async function getCurrentUser() {
+  const supabase = await createClient();
+  const { data } = await supabase.auth.getUser();
+  return data.user;
+});

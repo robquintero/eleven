@@ -19,7 +19,6 @@ import { getLeagueCompetitionSummary, getStandings } from "@/data-access/matchup
 import { getCurrentProfile } from "@/data-access/profiles";
 import { getSeasonSummary, listSeasons } from "@/data-access/seasons";
 import { SeasonArchiveList } from "@/components/league/season-archive-list";
-import { getTeamRosterPlayers, type RosterPlayerOption } from "@/data-access/roster";
 import { getLeagueTeams, getUserTeamInLeague } from "@/data-access/teams";
 import { getRecentActivity } from "@/data-access/transactions";
 import { getTeamTrades } from "@/data-access/trades";
@@ -81,27 +80,19 @@ export default async function LeaguePage() {
 
   let tradeCenterProps: {
     myTeamId: string;
-    myRoster: RosterPlayerOption[];
     otherTeams: Awaited<ReturnType<typeof getLeagueTeams>>;
-    rostersByTeamId: Record<string, RosterPlayerOption[]>;
     incoming: Awaited<ReturnType<typeof getTeamTrades>>["incoming"];
     outgoing: Awaited<ReturnType<typeof getTeamTrades>>["outgoing"];
   } | null = null;
 
   if (activeLeagueId && myTeam) {
-    const allTeams = await getLeagueTeams(activeLeagueId);
-    const otherTeams = allTeams.filter((t) => t.id !== myTeam.id);
-    const [myRoster, otherRosters, trades] = await Promise.all([
-      getTeamRosterPlayers(activeLeagueId, myTeam.id),
-      Promise.all(otherTeams.map((t) => getTeamRosterPlayers(activeLeagueId, t.id))),
-      getTeamTrades(activeLeagueId, myTeam.id),
+    const [allTeams, trades] = await Promise.all([
+      getLeagueTeams(activeLeagueId), getTeamTrades(activeLeagueId, myTeam.id),
     ]);
-    const rostersByTeamId = Object.fromEntries(otherTeams.map((t, i) => [t.id, otherRosters[i]]));
+    const otherTeams = allTeams.filter((t) => t.id !== myTeam.id);
     tradeCenterProps = {
       myTeamId: myTeam.id,
-      myRoster,
       otherTeams,
-      rostersByTeamId,
       incoming: trades.incoming,
       outgoing: trades.outgoing,
     };
@@ -361,9 +352,7 @@ export default async function LeaguePage() {
                 <TradeCenter
                   leagueId={activeLeagueId!}
                   myTeamId={tradeCenterProps.myTeamId}
-                  myRoster={tradeCenterProps.myRoster}
                   otherTeams={tradeCenterProps.otherTeams}
-                  rostersByTeamId={tradeCenterProps.rostersByTeamId}
                   incoming={tradeCenterProps.incoming}
                   outgoing={tradeCenterProps.outgoing}
                 />

@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import {
+  getTradeRostersAction,
   acceptTradeAction,
   cancelTradeAction,
   proposeTradeAction,
@@ -37,17 +38,13 @@ type TradeResponder = (id: string) => Promise<{ error: string; kind: ActionFeedb
 export function TradeCenter({
   leagueId,
   myTeamId,
-  myRoster,
   otherTeams,
-  rostersByTeamId,
   incoming,
   outgoing,
 }: {
   leagueId: string;
   myTeamId: string;
-  myRoster: RosterPlayerOption[];
   otherTeams: Team[];
-  rostersByTeamId: Record<string, RosterPlayerOption[]>;
   incoming: TradeView[];
   outgoing: TradeView[];
 }) {
@@ -128,13 +125,12 @@ export function TradeCenter({
         />
       </div>
 
-      <ProposeTradeDialog
+      <LazyProposeTradeDialog
         open={proposeOpen}
         onOpenChange={setProposeOpen}
         leagueId={leagueId}
-        myRoster={myRoster}
+        myTeamId={myTeamId}
         otherTeams={otherTeams}
-        rostersByTeamId={rostersByTeamId}
         onProposed={() => {
           setProposeOpen(false);
           router.refresh();
@@ -464,4 +460,41 @@ function TradeCountHint({ offeredCount, requestedCount }: { offeredCount: number
       )}
     </div>
   );
+}
+
+/** Trade composition has no data cost until the manager opens it. */
+export function LazyProposeTradeDialog(props: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  leagueId: string;
+  myTeamId: string;
+  otherTeams: Team[];
+  onProposed: () => void;
+}) {
+  const [loaded, setLoaded] = useState<{ leagueId: string; rosters: Record<string, RosterPlayerOption[]> } | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  useEffect(() => {
+    if (!props.open) return;
+    let cancelled = false;
+    getTradeRostersAction(props.leagueId).then((rosters) => {
+      if (!cancelled) setLoaded({ leagueId: props.leagueId, rosters });
+    }).catch(() => {
+      if (!cancelled) setLoadError("Couldn't load trade rosters. Close and try again.");
+    });
+    return () => { cancelled = true; };
+  }, [props.open, props.leagueId]);
+  function onOpenChange(open: boolean) {
+    if (!open) { setLoaded(null); setLoadError(null); }
+    props.onOpenChange(open);
+  }
+  if (!loaded || loaded.leagueId !== props.leagueId) {
+    return <Dialog open={props.open} onOpenChange={onOpenChange}>
+      <DialogContent><DialogHeader><DialogTitle>PROPOSE TRADE</DialogTitle>
+        <DialogDescription>{loadError ?? "Loading rosters…"}</DialogDescription>
+      </DialogHeader></DialogContent>
+    </Dialog>;
+  }
+  return <ProposeTradeDialog {...props} onOpenChange={onOpenChange}
+    onProposed={() => { setLoaded(null); setLoadError(null); props.onProposed(); }}
+    myRoster={loaded.rosters[props.myTeamId] ?? []} rostersByTeamId={loaded.rosters} />;
 }

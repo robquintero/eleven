@@ -13,9 +13,9 @@
  *
  * As of Pass 10.5C.2A, ordinary lineup editing (swap/fill) no longer
  * depends on this at all — those writes go
- * through the authenticated request-scoped client under a real,
- * ownership-scoped RLS policy (see
- * supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql).
+ * through the authenticated request-scoped client to update_team_lineup,
+ * which independently authorizes and validates the transaction. Direct
+ * manager lineup DML is revoked by the Performance 1 migration.
  * The one remaining consumer is the draft's round-1 auto-open self-heal
  * (`ensureFirstRoundOpenedAction`), a genuine multi-team lifecycle
  * operation that legitimately needs service-role. Without it, a

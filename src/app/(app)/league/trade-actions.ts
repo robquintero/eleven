@@ -1,5 +1,6 @@
 "use server";
 
+import { getLeagueRosterPlayersByTeam } from "@/data-access/roster";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { toTradeActionError } from "@/lib/errors/trade-action-error";
@@ -71,4 +72,8 @@ export async function cancelTradeAction(tradeId: string): Promise<TradeActionSta
   }
   revalidatePath("/league");
   return undefined;
+}
+
+export async function getTradeRostersAction(leagueId: string) {
+  return getLeagueRosterPlayersByTeam(leagueId);
 }

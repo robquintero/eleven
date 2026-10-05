@@ -1,16 +1,10 @@
 "use server";
 
-// Pass 10.5C.2A: swapLineupAction/fillEmptySlotsAction below write through
-// the request-scoped, RLS-respecting `createClient()` -- see each
-// function's own doc comment and
-// supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql
-// (and 20260930060000_grant_lineup_slots_update.sql's own comment on the
-// base GRANT that policy also needed). Only `ensureFirstRoundOpenedAction`
-// below still needs the privileged admin client: opening a round writes
-// EVERY team's `lineup_slots` in the league at once (see
-// `createRoundLineupSlots`), not just the caller's own team, so no single
-// manager's row-ownership -- and no per-row RLS update policy -- could
-// ever cover it.
+// Manager swaps/fills use createClient() and update_team_lineup, whose
+// SECURITY DEFINER boundary validates membership, current ownership,
+// latest round, locks and formation. Managers have no direct lineup DML.
+// ensureFirstRoundOpenedAction still uses the privileged admin client: opening a
+// round initializes EVERY team's slots, a trusted lifecycle operation.
 //
 // Pass 10.5C.5: Eleven V1 is 4-4-2 only -- `changeFormationAction` was
 // removed along with the rest of the formation-selection feature (see
@@ -61,14 +55,10 @@ export async function ensureFirstRoundOpenedAction(leagueId: string): Promise<vo
  * `swapPlayers` view-model semantics (src/lib/selectors/lineup.ts) but
  * actually persisted. This is an ordinary authenticated manager operation
  * on their OWN team, so it writes through the request-scoped,
- * RLS-respecting client throughout — no service-role client involved.
- * `lineup_slots` has a real ownership-scoped UPDATE policy for this (see
- * supabase/migrations/20260930050000_lineup_slots_owner_write_policy.sql,
- * mirroring `fantasy_teams`'s own "owners can update their own team"
- * policy), so the database itself enforces "a manager can only touch
- * their own team's lineup" as a second line of defense behind the
- * explicit ownership check below. `updateLineup()` itself re-validates
- * lock state and formation validity all-or-nothing.
+ * request client throughout — no service-role client involved. The
+ * atomic `update_team_lineup` RPC independently checks team ownership
+ * and league membership, then validates locks and formation against
+ * locked database state before writing the entire batch.
  */
 export async function swapLineupAction(
   leagueId: string,
@@ -91,21 +81,22 @@ export async function swapLineupAction(
     .maybeSingle();
   if (!team) return { error: "You don't own this team.", kind: "error" };
 
-  const { data: round } = await supabase
+  const [{ data: round }, { data: rosterEntries }] = await Promise.all([
+    supabase
     .from("fantasy_rounds")
     .select("id")
     .eq("league_id", leagueId)
     .order("number", { ascending: false })
     .limit(1)
-    .maybeSingle();
-  if (!round) return { error: "No fantasy round is open yet.", kind: LINEUP_ERROR_KIND.ROUND_NOT_FOUND };
-
-  const { data: rosterEntries } = await supabase
+    .maybeSingle(),
+    supabase
     .from("roster_entries")
     .select("id, player_id, players(position)")
     .eq("fantasy_team_id", fantasyTeamId)
     .eq("status", "active")
-    .in("player_id", [starterPlayerIdOut, benchPlayerIdIn]);
+    .in("player_id", [starterPlayerIdOut, benchPlayerIdIn]),
+  ]);
+  if (!round) return { error: "No fantasy round is open yet.", kind: LINEUP_ERROR_KIND.ROUND_NOT_FOUND };
 
   const outEntry = rosterEntries?.find((r) => r.player_id === starterPlayerIdOut);
   const inEntry = rosterEntries?.find((r) => r.player_id === benchPlayerIdIn);
@@ -155,7 +146,7 @@ export async function swapLineupAction(
  * fills locally and only call this once that's true (see
  * `team-workspace.tsx`) -- calling it earlier just returns
  * INVALID_FORMATION, never partially applies anything. Same authenticated,
- * RLS-respecting write path as `swapLineupAction` above (Pass 10.5C.2A) —
+ * independently authorized RPC path as `swapLineupAction` above —
  * no service-role client involved.
  */
 export async function fillEmptySlotsAction(

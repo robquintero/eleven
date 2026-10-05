@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 // Relative imports (not the usual `@/...` aliases) specifically so
 // `queryPlayerDatabase` below stays importable from a plain Node
 // integration test (players.integration.test.ts) the same way
@@ -130,7 +131,11 @@ export async function getPlayerDatabase(query: PlayerQuery = {}): Promise<Player
     return { players: [], total: 0, page, pageSize };
   }
   const supabase = await resolveClient();
-  return queryPlayerDatabase(supabase, query);
+  if (!query.activeLeagueId) return queryPlayerDatabase(supabase, query, null);
+  const { getCurrentUser } = await import("../lib/supabase/server.ts");
+  const { getUserTeamInLeague } = await import("./teams.ts");
+  const [user, team] = await Promise.all([getCurrentUser(), getUserTeamInLeague(query.activeLeagueId)]);
+  return queryPlayerDatabase(supabase, query, user, team?.id ?? null);
 }
 
 /**
@@ -144,7 +149,9 @@ export async function getPlayerDatabase(query: PlayerQuery = {}): Promise<Player
  */
 export async function queryPlayerDatabase(
   supabase: SupabaseClientType,
-  query: PlayerQuery = {}
+  query: PlayerQuery = {},
+  requestUser?: { id: string } | null,
+  requestTeamId?: string | null
 ): Promise<PlayerDatabasePage> {
   const page = query.page ?? 1;
   const pageSize = query.pageSize ?? DEFAULT_PAGE_SIZE;
@@ -168,10 +175,12 @@ export async function queryPlayerDatabase(
   if (query.activeLeagueId) {
     const [{ data: ownership }, { data: userData }] = await Promise.all([
       supabase.from("league_player_ownership").select("player_id, fantasy_team_id").eq("league_id", query.activeLeagueId),
-      supabase.auth.getUser(),
+      requestUser === undefined ? supabase.auth.getUser() : Promise.resolve({ data: { user: requestUser } }),
     ]);
     ownerTeamIdByPlayerId = new Map((ownership ?? []).map((o) => [o.player_id, o.fantasy_team_id]));
-    if (userData.user) {
+    if (requestTeamId !== undefined) {
+      myFantasyTeamId = requestTeamId;
+    } else if (userData.user) {
       const { data: myTeam } = await supabase
         .from("fantasy_teams")
         .select("id")
@@ -257,6 +266,7 @@ export async function queryPlayerDatabase(
   const from = (page - 1) * pageSize;
   let data: PlayerRow[];
   let count: number;
+  let rankingScores: Map<string, { totalPoints: number; averagePoints: number }> | undefined;
 
   if (query.sort === "points" || query.sort === "club") {
     // Neither points nor club name is orderable with a single `.order()`
@@ -273,18 +283,19 @@ export async function queryPlayerDatabase(
     // active players, the exact points-sort bug this comment replaces),
     // compute the real sort key in JS, sort+paginate, then fetch the full
     // rows for just that page's ids.
-    const idRows = await fetchAllRows<{ id: string; name: string; club_id: string }>((from, to) =>
+    const [idRows, globalScores] = await Promise.all([fetchAllRows<{ id: string; name: string; club_id: string }>((from, to) =>
       applyCommonFilters(supabase.from("players").select("id, name, club_id").eq("active", true))
         .order("id", { ascending: true })
         .range(from, to)
-    );
+    ), query.sort === "points" ? getFantasyScoreAggregates(supabase) : Promise.resolve(undefined)]);
 
     count = idRows.length;
     if (count === 0) return { players: [], total: 0, page, pageSize };
 
     let sortedIds: string[];
     if (query.sort === "points") {
-      const scoresByCandidateId = await getFantasyScoreAggregates(supabase);
+      const scoresByCandidateId = globalScores!;
+      rankingScores = scoresByCandidateId;
       sortedIds = [...idRows]
         .sort((a, b) => {
           const pointsA = scoresByCandidateId.get(a.id)?.totalPoints ?? 0;
@@ -346,7 +357,7 @@ export async function queryPlayerDatabase(
   const [usageByPlayerId, nextFixtureByPlayerId, scoresByPlayerId] = await Promise.all([
     getUsageAggregates(supabase, playerIds),
     getNextFixtureByPlayer(supabase, playerIds),
-    getFantasyScoreAggregates(supabase, playerIds),
+    rankingScores ? Promise.resolve(rankingScores) : getFantasyScoreAggregates(supabase, playerIds),
   ]);
 
   const players: Player[] = data.map((row) => {
@@ -450,64 +461,40 @@ async function getUsageAggregates(
  * `playerIds` omitted means "every scored player this season" -- used by
  * `getPlayerDatabase`'s points-sort path, which needs the complete
  * picture to sort correctly anyway (see that call site's own comment).
- * Deliberately NOT implemented as "pass all 2767 active player ids
- * through `.in()`": a filter list that long risks the request URL itself
- * exceeding normal proxy/server limits, on top of still needing
- * `fetchAllRows` pagination for the response. Fetching the whole
- * season's `fantasy_player_scores` table instead (paginated past the
- * project's max_rows cap, same as the id-candidate query above) avoids
- * both problems at once -- it's a bounded ~11.5k rows this season, not
- * proportional to the active-player count. Callers with a small, already-
- * known id list (the normal per-page enrichment path) keep the cheaper
- * `.in()`-filtered query, well under both the URL-length and row-count
- * concerns.
+ * Postgres sums canonical scores by season/version; only one row per
+ * player crosses the wire. Page those aggregates past PostgREST's cap.
+ * Small per-page callers can pass IDs; global ranking omits that filter.
  */
 /** Pass 14.7: exported for `src/data-access/intelligence.ts` (Home's Form/Market Intelligence module) -- the exact same real season-points aggregation, never a second, divergent computation of "total/average points this season." */
-export async function getFantasyScoreAggregates(
+// Memoized per server render by client and optional IDs. Season/version
+// are fixed constants; ownership is never part of this global data.
+export const getFantasyScoreAggregates = cache(async function getFantasyScoreAggregates(
   supabase: SupabaseClientType,
   playerIds?: string[]
 ): Promise<Map<string, { totalPoints: number; averagePoints: number }>> {
   const result = new Map<string, { totalPoints: number; averagePoints: number }>();
   if (playerIds && playerIds.length === 0) return result;
-
-  const data = playerIds
-    ? (
-        await supabase
-          .from("fantasy_player_scores")
-          .select("player_id, points, fixtures!inner(season)")
-          .eq("scoring_rule_version", SCORING_RULE_VERSION)
-          .eq("fixtures.season", CURRENT_SEASON)
-          .in("player_id", playerIds)
-      ).data
-    : await fetchAllRows<{ player_id: string; points: number }>((from, to) =>
-        supabase
-          .from("fantasy_player_scores")
-          .select("id, player_id, points, fixtures!inner(season)")
-          .eq("scoring_rule_version", SCORING_RULE_VERSION)
-          .eq("fixtures.season", CURRENT_SEASON)
-          .order("id", { ascending: true })
-          .range(from, to)
-      );
-
-  if (!data) return result;
-
-  const byPlayer = new Map<string, { total: number; count: number }>();
-  for (const row of data) {
-    const agg = byPlayer.get(row.player_id) ?? { total: 0, count: 0 };
-    agg.total += row.points;
-    agg.count += 1;
-    byPlayer.set(row.player_id, agg);
+  for (let from = 0; ; from += 1000) {
+    const { data: rows, error } = await supabase.rpc("get_player_score_totals", {
+      p_season: CURRENT_SEASON, p_version: SCORING_RULE_VERSION,
+      ...(playerIds ? { p_player_ids: playerIds } : {}),
+    }).range(from, from + 999);
+    // Never publish a partially read ranking as complete.
+    if (error) throw new Error(`Failed to load player score totals: ${error.message}`);
+    for (const row of rows ?? []) {
+      const total = Number(row.total_points);
+      const appearances = Number(row.appearances);
+      result.set(row.player_id, {
+        // Keep JavaScript rounding (including negative half cases) exactly
+        // as before; SQL returns the unrounded aggregate and count.
+        totalPoints: Math.round(total * 100) / 100,
+        averagePoints: Math.round((total / appearances) * 100) / 100,
+      });
+    }
+    if (!rows || rows.length < 1000) break;
   }
-
-  for (const [playerId, agg] of byPlayer) {
-    result.set(playerId, {
-      totalPoints: Math.round(agg.total * 100) / 100,
-      averagePoints: Math.round((agg.total / agg.count) * 100) / 100,
-    });
-  }
-
   return result;
-}
+});
 
 /** Every club's short name, id-keyed -- used by the club-sort path, which needs ALL of them (not just a page's worth) to compute a real sort key. A small table (~200 rows) but paginated via `fetchAllRows` anyway so this never silently breaks if it grows past max_rows. */
 async function getAllClubShortNames(supabase: SupabaseClientType): Promise<Map<string, string>> {
@@ -716,4 +703,22 @@ export async function getPlayerLatestScoreBreakdown(playerId: string): Promise<P
     total: latest.points,
     components: (latest.breakdown as Record<string, number> | null) ?? {},
   };
+}
+
+/** Compact identity search: no usage, fixtures, ranking or ownership reads. */
+export async function getPlayerIdentityMatches(query: string) {
+  if (!isSupabaseConfigured()) return [];
+  return queryPlayerIdentityMatches(await resolveClient(), query);
+}
+export async function queryPlayerIdentityMatches(supabase: SupabaseClientType, query: string) {
+  const term = normalizeForSearch(query.trim());
+  const { data: clubs } = await supabase.from("clubs").select("id")
+    .or(`name_unaccented.ilike.%${term}%,short_name_unaccented.ilike.%${term}%`);
+  const clubIds = (clubs ?? []).map((c) => c.id);
+  let builder = supabase.from("players").select("id, name, position, clubs!players_club_id_fkey(short_name)")
+    .eq("active", true);
+  builder = clubIds.length ? builder.or(`name_unaccented.ilike.%${term}%,club_id.in.(${clubIds.join(",")})`)
+    : builder.ilike("name_unaccented", `%${term}%`);
+  const { data } = await builder.order("name", { ascending: true }).order("id", { ascending: true }).limit(6);
+  return (data ?? []).map((p) => ({ id: p.id, name: p.name, position: p.position, clubShortName: p.clubs?.short_name ?? "—" }));
 }

@@ -1,7 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { computeLockInstant, isLocked } from "../../domain/fantasy/lineup-lock.ts";
-import { isStarterCompositionValid } from "../../domain/fantasy/constants.ts";
+import { computeLockInstant } from "../../domain/fantasy/lineup-lock.ts";
 import { chooseAutomaticStartingXi } from "../../domain/fantasy/auto-lineup.ts";
 import { getKickoffsByPlayer } from "./player-fixture-participation.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
@@ -142,8 +141,8 @@ export const LINEUP_ERROR_KIND: Record<LineupUpdateErrorCode, "rule" | "error"> 
  * Applies a batch of starter/bench changes to one team's lineup for one
  * round — all-or-nothing: if any changed slot is already locked, or the
  * resulting starter set wouldn't be a valid formation, NOTHING is
- * written (never a partially-applied lineup). `now` is always explicit
- * (docs/game-rules.md "Clock injection").
+ * written (never a partially-applied lineup). Trusted service-role
+ * simulations use explicit `now`; managers use the authoritative DB clock.
  */
 export async function updateLineup(
   admin: SupabaseClient<Database>,
@@ -152,61 +151,23 @@ export async function updateLineup(
   changes: LineupChangeRequest[],
   now: Date
 ): Promise<LineupUpdateResult> {
-  const { data: allSlots } = await admin
-    .from("lineup_slots")
-    .select("id, roster_entry_id, starter, slot, locked_at, roster_entries!inner(fantasy_team_id, player_id, players(position))")
-    .eq("fantasy_round_id", roundId)
-    .eq("roster_entries.fantasy_team_id", fantasyTeamId);
-
-  if (!allSlots || allSlots.length === 0) {
-    return { ok: false, error: "ROUND_NOT_FOUND" };
+  // One RPC = one database transaction. Validation and all writes execute
+  // against locked server state, including when called by a direct client.
+  try {
+    const { error } = await admin.rpc("update_team_lineup", {
+      p_fantasy_team_id: fantasyTeamId,
+      p_round_id: roundId,
+      p_changes: changes.map((change) => ({
+        roster_entry_id: change.rosterEntryId,
+        starter: change.starter,
+        position: change.position ?? null,
+      })),
+      p_now: now.toISOString(),
+    });
+    if (!error) return { ok: true };
+    const code = error.message as LineupUpdateErrorCode;
+    return { ok: false, error: Object.hasOwn(LINEUP_ERROR_KIND, code) ? code : "WRITE_FAILED" };
+  } catch {
+    return { ok: false, error: "WRITE_FAILED" };
   }
-
-  const slotByRosterEntryId = new Map(allSlots.map((s) => [s.roster_entry_id, s]));
-
-  for (const change of changes) {
-    const existing = slotByRosterEntryId.get(change.rosterEntryId);
-    if (!existing) {
-      return { ok: false, error: "ROSTER_ENTRY_NOT_ON_TEAM" };
-    }
-    if (isLocked(existing.locked_at ? new Date(existing.locked_at) : null, now)) {
-      return { ok: false, error: "SLOT_LOCKED" };
-    }
-  }
-
-  const changeByRosterEntryId = new Map(changes.map((c) => [c.rosterEntryId, c]));
-  const resultingCounts: Partial<Record<PlayerPosition, number>> = {};
-  for (const slot of allSlots) {
-    const change = changeByRosterEntryId.get(slot.roster_entry_id);
-    const starter = change ? change.starter : slot.starter;
-    if (!starter) continue;
-    const position = (change?.position ?? (slot.roster_entries as { players: { position: string } | null }).players?.position) as PlayerPosition | undefined;
-    if (!position) continue;
-    resultingCounts[position] = (resultingCounts[position] ?? 0) + 1;
-  }
-
-  if (!isStarterCompositionValid(resultingCounts)) {
-    return { ok: false, error: "INVALID_FORMATION" };
-  }
-
-  for (const change of changes) {
-    const existing = slotByRosterEntryId.get(change.rosterEntryId)!;
-    const player = (existing.roster_entries as { players: { position: string } | null }).players;
-    const slot = change.starter ? (change.position ?? player?.position ?? "BENCH") : "BENCH";
-    const { error } = await admin
-      .from("lineup_slots")
-      .update({ starter: change.starter, slot })
-      .eq("id", existing.id);
-    // Pass 10.5C.5: this used to be fire-and-forget. A missing base-table
-    // GRANT (not just the RLS policy -- Postgres requires both) made every
-    // authenticated-client write silently fail with "permission denied"
-    // while this function kept returning { ok: true } regardless, which is
-    // exactly how a starter/bench swap could appear to succeed in the UI
-    // (no error shown, loading state clears) while nothing was ever
-    // persisted. Surfacing the error here means that class of failure can
-    // never be silent again, whatever its cause.
-    if (error) return { ok: false, error: "WRITE_FAILED" };
-  }
-
-  return { ok: true };
 }

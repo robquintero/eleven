@@ -1,6 +1,7 @@
 import "server-only";
+import { cache } from "react";
 import { isSupabaseConfigured } from "@/lib/supabase/config";
-import { createClient } from "@/lib/supabase/server";
+import { createClient, getCurrentUser } from "@/lib/supabase/server";
 
 export interface Profile {
   id: string;
@@ -14,17 +15,17 @@ export interface Profile {
  * src/lib/supabase/config.ts. Callers must render a truthful
  * unavailable/signed-out state for `null`, never a fabricated identity.
  */
-export async function getCurrentProfile(): Promise<Profile | null> {
+export const getCurrentProfile = cache(async function getCurrentProfile(): Promise<Profile | null> {
   if (!isSupabaseConfigured()) return null;
 
   const supabase = await createClient();
-  const { data: userData } = await supabase.auth.getUser();
-  if (!userData.user) return null;
+  const user = await getCurrentUser();
+  if (!user) return null;
 
   const { data, error } = await supabase
     .from("profiles")
     .select("id, display_name, avatar_url")
-    .eq("id", userData.user.id)
+    .eq("id", user.id)
     .single();
 
   if (error || !data) return null;
@@ -34,4 +35,4 @@ export async function getCurrentProfile(): Promise<Profile | null> {
     displayName: data.display_name,
     avatarUrl: data.avatar_url,
   };
-}
+});

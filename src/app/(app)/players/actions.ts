@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { getPlayerDatabase, getPlayerRecentMatches, getPlayerLatestScoreBreakdown, type RecentMatchRow, type PlayerScoreBreakdown } from "@/data-access/players";
+import { getPlayerIdentityMatches, getPlayerRecentMatches, getPlayerLatestScoreBreakdown, type RecentMatchRow, type PlayerScoreBreakdown } from "@/data-access/players";
 import { toMarketActionError } from "@/lib/errors/market-action-error";
 import { MARKET_ACTION_ERROR_COPY, MARKET_ACTION_ERROR_KIND } from "@/lib/errors/market-action-error-copy";
 import { shouldSearchPlayers } from "@/lib/search/player-search";
@@ -27,8 +27,7 @@ export interface PlayerSearchResult {
 export async function searchPlayersAction(query: string): Promise<PlayerSearchResult[]> {
   if (!shouldSearchPlayers(query)) return [];
 
-  const { players } = await getPlayerDatabase({ query: query.trim(), sort: "points", pageSize: 6 });
-  return players.map((p) => ({ id: p.id, name: p.name, position: p.position, clubShortName: p.club.shortName }));
+  return getPlayerIdentityMatches(query);
 }
 
 /** Thin server-action wrapper so the client-side Player Inspector can fetch one player's real recent matches on demand, without ever calling Supabase directly. */

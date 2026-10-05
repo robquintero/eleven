@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DraftWorkspace } from "@/components/draft/draft-workspace";
-import { getAvailablePlayersAction } from "@/app/(app)/draft/actions";
+import { getAvailablePlayersAction, getDraftUpdateAction } from "@/app/(app)/draft/actions";
 import type { DraftState } from "@/data-access/drafts";
 import type { PlayerDatabasePage } from "@/data-access/players";
 import type { PlayerPosition } from "@/lib/types/fantasy";
+import { currentDraftUpdate } from "@/lib/draft-snapshot";
 
-/** Root client island for /draft — owns the debounced player search and periodically refreshes the server-rendered draft state so turn changes made by OTHER managers (or an auto-pick) show up without a manual reload. */
+/** Owns player search and polls changing draft/ownership state without reloading the catalog. */
 export function DraftPageClient({
   leagueId,
   draft,
@@ -21,23 +22,43 @@ export function DraftPageClient({
   initialPlayers: PlayerDatabasePage;
 }) {
   const router = useRouter();
+  const [update, setUpdate] = useState<Awaited<ReturnType<typeof getDraftUpdateAction>> | null>(null);
+  const acceptedUpdate = currentDraftUpdate(draft, update);
+  const currentDraft = acceptedUpdate?.draft ?? draft;
   // `null` means "no active search" -- render straight from the server's
-  // own fresh `initialPlayers` prop (which changes on every periodic
-  // router.refresh(), automatically staying current with no effect
-  // needed to resync it). A non-null value is this component's own
+  // own fresh `initialPlayers` prop. A non-null value is this component's own
   // client-fetched search result, which intentionally persists until the
   // user clears the box.
   const [searchResults, setSearchResults] = useState<PlayerDatabasePage | null>(null);
   const [query, setQuery] = useState("");
   const [positionFilter, setPositionFilter] = useState<PlayerPosition | null>(null);
-  const availablePlayers = searchResults ?? initialPlayers;
+  const basePlayers = searchResults ?? initialPlayers;
+  const availablePlayers = acceptedUpdate ? {
+    ...basePlayers,
+    players: basePlayers.players.map((player) => ({ ...player, ownership: acceptedUpdate.ownership[player.id]
+      ? acceptedUpdate.ownership[player.id] === currentDraft.myFantasyTeamId ? "mine" as const : "owned" as const
+      : "free" as const })),
+  } : basePlayers;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (draft.status !== "in_progress") return;
-    const interval = setInterval(() => router.refresh(), 5000);
-    return () => clearInterval(interval);
-  }, [draft.status, router]);
+    if (currentDraft.status !== "in_progress") return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const next = await getDraftUpdateAction(leagueId);
+        if (!cancelled) {
+          if (next.draft?.status === "completed") router.refresh();
+          else if (next.draft) setUpdate(next);
+        }
+      } finally {
+        if (!cancelled) timer = setTimeout(() => { void poll().catch(() => {}); }, 5000);
+      }
+    }
+    timer = setTimeout(() => { void poll().catch(() => {}); }, 5000);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [currentDraft.status, currentDraft.draftId, leagueId, router]);
 
   function runSearch(nextQuery: string, nextPosition: PlayerPosition | null) {
     if (!nextQuery && !nextPosition) {
@@ -71,7 +92,7 @@ export function DraftPageClient({
       </div>
       <div className="mt-4">
         <DraftWorkspace
-          draft={draft}
+          draft={currentDraft}
           availablePlayers={availablePlayers}
           onSearch={handleSearch}
           positionFilter={positionFilter}

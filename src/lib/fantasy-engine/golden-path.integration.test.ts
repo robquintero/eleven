@@ -185,7 +185,10 @@ test("golden path: draft -> XI/bench -> substitution (+ locked rejection) -> fre
     const secondPair = claimPair(new Set([starterToBench.id]));
     assert.ok(secondPair, "a second independent (starter, same-position bench) pair must exist");
     const { starter: lockedStarter, benchMatch: lockedBenchCandidate } = secondPair!;
-    await admin.from("lineup_slots").update({ locked_at: new Date(syntheticNow.getTime() - 3_600_000).toISOString() }).eq("id", lockedStarter.id);
+    // Manager RPCs validate against the database clock, never a caller's
+    // synthetic p_now. Put this isolated slot in the real past; trusted
+    // service-role simulation still supports clock injection.
+    await admin.from("lineup_slots").update({ locked_at: new Date(Date.now() - 3_600_000).toISOString() }).eq("id", lockedStarter.id);
 
     const lockedSwapResult = await updateLineup(
       league.clients[0],
