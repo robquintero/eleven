@@ -7,6 +7,7 @@ import {
   formatRoundWindow,
   isPlayerLocked,
   playerStateWord,
+  resolveMatchupSides,
   sortByStartingPositionOrder,
   starterBuckets,
 } from "./team-fixture.ts";
@@ -228,4 +229,42 @@ test("benchSwapRowState: same position, but already locked -- compatible-but-una
 test("benchSwapRowState: a player with no fixture at all is never locked, so same-position still reads as a valid target", () => {
   const state = benchSwapRowState(plainPlayer("p", "FWD"), "FWD");
   assert.deepEqual(state, { swapTarget: true, compatibleLocked: false, disabled: false });
+});
+
+// ---------------------------------------------------------------------
+// Pass 14.8: the logged-in user's team must always render on the left
+// throughout the Matchup page -- home/away is a database/scheduling
+// fact, never a display-order one.
+// ---------------------------------------------------------------------
+
+test("resolveMatchupSides: user is the database HOME team -- home stays on the left", () => {
+  const sides = resolveMatchupSides({
+    isUserHome: true,
+    homeTeamName: "Kaka FC",
+    awayTeamName: "Los Duros FC",
+    homeScore: 104.25,
+    awayScore: 88.75,
+  });
+  assert.deepEqual(sides, {
+    leftTeamName: "Kaka FC",
+    rightTeamName: "Los Duros FC",
+    leftScore: 104.25,
+    rightScore: 88.75,
+  });
+});
+
+test("resolveMatchupSides: user is the database AWAY team -- away must move to the left, never stay right", () => {
+  const sides = resolveMatchupSides({
+    isUserHome: false,
+    homeTeamName: "Los Duros FC",
+    awayTeamName: "Kaka FC",
+    homeScore: 88.75,
+    awayScore: 104.25,
+  });
+  assert.deepEqual(sides, {
+    leftTeamName: "Kaka FC",
+    rightTeamName: "Los Duros FC",
+    leftScore: 104.25,
+    rightScore: 88.75,
+  });
 });

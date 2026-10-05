@@ -1,5 +1,5 @@
 import type { CurrentMatchup, MatchupFixtureIntelligence } from "@/data-access/matchups";
-import { countStartersInFixture, formatKickoff, pad2 } from "@/lib/team-fixture";
+import { countStartersInFixture, formatKickoff, pad2, resolveMatchupSides } from "@/lib/team-fixture";
 import type { LineupSlot } from "@/lib/types/fantasy";
 
 /**
@@ -63,7 +63,20 @@ export function MatchupCommand({
   const homeScore = matchup.homeFinalPoints ?? matchup.homeLivePoints;
   const awayScore = matchup.awayFinalPoints ?? matchup.awayLivePoints;
   const total = homeScore + awayScore || 1;
-  const homeShare = (homeScore / total) * 100;
+  // Pass 14.8: the logged-in user's team is ALWAYS presented on the left
+  // throughout the Matchup page (matching MatchupLineups/MatchupPlayerCounts,
+  // which already do this) -- home/away is purely a database/scheduling
+  // fact, never a display-order one. Display-only: `matchup.homeTeamName`/
+  // `homeScore` etc. stay exactly what the database says; only WHICH SIDE
+  // of the screen they render on is normalized here.
+  const { leftTeamName, rightTeamName, leftScore, rightScore } = resolveMatchupSides({
+    isUserHome: matchup.isUserHome,
+    homeTeamName: matchup.homeTeamName,
+    awayTeamName: matchup.awayTeamName,
+    homeScore,
+    awayScore,
+  });
+  const leftShare = (leftScore / total) * 100;
 
   // Pass 13 (§4): before anything has kicked off, a "0 – 0" score + empty
   // progress bar is dead UI -- real telemetry (the next actual fixture
@@ -117,11 +130,9 @@ export function MatchupCommand({
         <div className="flex items-center justify-between gap-2 sm:gap-4">
           <div className="min-w-0 flex-1 text-left">
             <p className="truncate text-[13px] font-semibold text-foreground sm:text-[15px] md:text-base">
-              {matchup.homeTeamName}
+              {leftTeamName}
             </p>
-            {matchup.isUserHome && (
-              <p className="label-system text-[10px] text-accent">YOUR TEAM</p>
-            )}
+            <p className="label-system text-[10px] text-accent">YOUR TEAM</p>
           </div>
 
           <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-5">
@@ -130,11 +141,11 @@ export function MatchupCommand({
             ) : (
               <>
                 <p className="text-3xl font-semibold tracking-tight tabular-nums text-foreground sm:text-5xl md:text-6xl">
-                  {homeScore}
+                  {leftScore}
                 </p>
                 <span className="text-base font-medium text-foreground-tertiary sm:text-lg md:text-xl">–</span>
                 <p className="text-3xl font-semibold tracking-tight tabular-nums text-foreground sm:text-5xl md:text-6xl">
-                  {awayScore}
+                  {rightScore}
                 </p>
               </>
             )}
@@ -142,11 +153,8 @@ export function MatchupCommand({
 
           <div className="min-w-0 flex-1 text-right">
             <p className="truncate text-[13px] font-semibold text-foreground sm:text-[15px] md:text-base">
-              {matchup.awayTeamName}
+              {rightTeamName}
             </p>
-            {!matchup.isUserHome && (
-              <p className="label-system text-[10px] text-accent">YOUR TEAM</p>
-            )}
           </div>
         </div>
 
@@ -174,7 +182,7 @@ export function MatchupCommand({
         ) : (
           <>
             <div className="relative mt-4 h-1.5 overflow-hidden border border-border bg-muted sm:mt-6">
-              <div className="h-full bg-accent transition-all" style={{ width: `${homeShare}%` }} />
+              <div className="h-full bg-accent transition-all" style={{ width: `${leftShare}%` }} />
             </div>
 
             {isLive && (

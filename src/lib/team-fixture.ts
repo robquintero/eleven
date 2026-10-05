@@ -359,3 +359,35 @@ export function countStartersInFixture(
     return teamIds.includes(fixture.homeClubId) || teamIds.includes(fixture.awayClubId);
   }).length;
 }
+
+/**
+ * Pass 14.8: normalizes a matchup's home/away team names and scores into
+ * the "logged-in user always on the left" presentation order every
+ * Matchup surface uses (MatchupLineups/MatchupPlayerCounts already did
+ * this at their own call sites; MatchupCommand's score header did not,
+ * rendering home-left/away-right unconditionally regardless of which side
+ * the viewer actually owns). Display only -- `isUserHome` and the real
+ * home/away database facts are never touched, only which side of the
+ * screen each one renders on.
+ */
+export function resolveMatchupSides(matchup: {
+  isUserHome: boolean;
+  homeTeamName: string;
+  awayTeamName: string;
+  homeScore: number;
+  awayScore: number;
+}): { leftTeamName: string; rightTeamName: string; leftScore: number; rightScore: number } {
+  return matchup.isUserHome
+    ? {
+        leftTeamName: matchup.homeTeamName,
+        rightTeamName: matchup.awayTeamName,
+        leftScore: matchup.homeScore,
+        rightScore: matchup.awayScore,
+      }
+    : {
+        leftTeamName: matchup.awayTeamName,
+        rightTeamName: matchup.homeTeamName,
+        leftScore: matchup.awayScore,
+        rightScore: matchup.homeScore,
+      };
+}
