@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Command as CommandPrimitive } from "cmdk";
 import { Search, Trophy, Users } from "lucide-react";
@@ -35,9 +34,7 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [playerResults, setPlayerResults] = useState<PlayerSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-  const router = useRouter();
-  const pathname = usePathname();
-  const { begin } = useNavigationTransition();
+  const { navigate } = useNavigationTransition();
   const keyBuffer = useRef<{ key: string; time: number } | null>(null);
 
   // Reacting to the query changing by resetting player-search state during
@@ -108,8 +105,7 @@ export function CommandPalette() {
         );
         if (match) {
           e.preventDefault();
-          if (match.href !== pathname) begin(match.href, match.label);
-          router.push(match.href);
+          navigate(match.href, match.label);
         }
         keyBuffer.current = null;
         return;
@@ -124,7 +120,7 @@ export function CommandPalette() {
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, router, pathname, begin]);
+  }, [open, navigate]);
 
   function handleOpenChange(next: boolean) {
     setOpen(next);
@@ -136,15 +132,13 @@ export function CommandPalette() {
 
   function go(href: string, label: string) {
     handleOpenChange(false);
-    if (href !== pathname) begin(href, label);
-    router.push(href);
+    navigate(href, label);
   }
 
   function goToPlayer(player: PlayerSearchResult) {
     handleOpenChange(false);
     const href = `/players?q=${encodeURIComponent(player.name)}`;
-    begin(href, player.name);
-    router.push(href);
+    navigate(href, player.name);
   }
 
   const normalizedQuery = query.trim().toLowerCase();

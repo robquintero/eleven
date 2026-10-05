@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { CurrentMatchup, MatchupFixtureIntelligence } from "@/data-access/matchups";
 import { countStartersInFixture, formatKickoff, pad2, resolveMatchupSides } from "@/lib/team-fixture";
 import type { LineupSlot } from "@/lib/types/fantasy";
@@ -15,7 +16,9 @@ export function MatchupCommand({
   fixtureIntel,
   starters,
   teamIdsByPlayerId,
+  scheduledDetails,
 }: {
+  scheduledDetails?: ReactNode;
   matchup: CurrentMatchup | null;
   hasLeague: boolean;
   /** Explicit clock (never read internally via `Date.now()` — see this codebase's clock-injection convention, e.g. `determineFixtureSyncCadence`) — the caller passes `new Date()`. */
@@ -77,13 +80,6 @@ export function MatchupCommand({
     awayScore,
   });
   const leftShare = (leftScore / total) * 100;
-
-  // Pass 13 (§4): before anything has kicked off, a "0 – 0" score + empty
-  // progress bar is dead UI -- real telemetry (the next actual fixture
-  // involving either roster, and how many of the caller's own starters it
-  // affects) replaces it whenever that data genuinely exists.
-  const nextFixture = fixtureIntel?.nextFixture ?? null;
-  const involvedCount = starters ? countStartersInFixture(starters, nextFixture, teamIdsByPlayerId) : 0;
 
   // Pass 12D: truthful freshness, never implied by the "LIVE" label alone
   // — if the automated sync hasn't actually run recently (e.g. the
@@ -160,24 +156,7 @@ export function MatchupCommand({
 
         {isScheduled ? (
           <div className="mt-4 flex flex-col items-center gap-1 border-t border-border pt-4 text-center sm:mt-6">
-            {nextFixture ? (
-              <>
-                <p className="label-system text-[10px] text-foreground-tertiary">NEXT KICKOFF</p>
-                <p className="text-sm font-semibold text-foreground">
-                  {nextFixture.homeClubShortName} – {nextFixture.awayClubShortName}
-                </p>
-                <p className="label-system text-[11px] text-foreground-secondary">
-                  {formatKickoff(nextFixture.kickoffAt)}
-                </p>
-                {involvedCount > 0 && (
-                  <p className="label-system mt-1 text-[10px] text-accent">
-                    {involvedCount} OF YOUR XI INVOLVED
-                  </p>
-                )}
-              </>
-            ) : (
-              <p className="label-system text-[11px] text-foreground-tertiary">KICKOFF NOT YET SCHEDULED</p>
-            )}
+            {scheduledDetails ?? <MatchupAnticipation fixtureIntel={fixtureIntel} starters={starters} teamIdsByPlayerId={teamIdsByPlayerId} />}
           </div>
         ) : (
           <>
@@ -201,4 +180,34 @@ export function MatchupCommand({
       </div>
     </div>
   );
+}
+
+/** Secondary fixture intelligence can stream without holding back the score/teams/XI. */
+export function MatchupAnticipation({ fixtureIntel, starters, teamIdsByPlayerId }: {
+  fixtureIntel?: MatchupFixtureIntelligence | null;
+  starters?: LineupSlot[];
+  teamIdsByPlayerId?: Map<string, string[]>;
+}) {
+  const nextFixture = fixtureIntel?.nextFixture ?? null;
+  const involvedCount = starters ? countStartersInFixture(starters, nextFixture, teamIdsByPlayerId) : 0;
+  return <>
+            {nextFixture ? (
+              <>
+                <p className="label-system text-[10px] text-foreground-tertiary">NEXT KICKOFF</p>
+                <p className="text-sm font-semibold text-foreground">
+                  {nextFixture.homeClubShortName} – {nextFixture.awayClubShortName}
+                </p>
+                <p className="label-system text-[11px] text-foreground-secondary">
+                  {formatKickoff(nextFixture.kickoffAt)}
+                </p>
+                {involvedCount > 0 && (
+                  <p className="label-system mt-1 text-[10px] text-accent">
+                    {involvedCount} OF YOUR XI INVOLVED
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="label-system text-[11px] text-foreground-tertiary">KICKOFF NOT YET SCHEDULED</p>
+            )}
+  </>;
 }

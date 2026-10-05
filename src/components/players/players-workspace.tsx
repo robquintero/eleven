@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@base-ui/react/unstable-use-media-query";
 import { dropPlayerAction, signPlayerAction } from "@/app/(app)/players/actions";
@@ -61,6 +61,11 @@ export function PlayersWorkspace({
   fantasyTeamId: string | null;
 }) {
   const router = useRouter();
+  const [isNavigating, startNavigation] = useTransition();
+  const [visibleFilters, applyFilters] = useOptimistic(filters, (_previous, next: PlayerFilters) => next);
+  const [isMutating, startMutation] = useTransition();
+  const mutationInFlight = useRef(false);
+  const [selectedSnapshot, setSelectedSnapshot] = useState<Player | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -71,57 +76,77 @@ export function PlayersWorkspace({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [previousQuery, setPreviousQuery] = useState(filters.query);
+  if (previousQuery !== filters.query) {
+    setPreviousQuery(filters.query);
+    if (debounceRef.current === null) setQueryDraft(filters.query);
+  }
+  useEffect(() => () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
   const canTransact = Boolean(leagueId && fantasyTeamId);
 
-  async function handleAdd(player: Player) {
-    if (!leagueId) return;
+  function persistMarketAction(player: Player, action: typeof signPlayerAction, dropping = false) {
+    if (!leagueId || mutationInFlight.current || isMutating) return;
+    mutationInFlight.current = true;
     setActionError(null);
     setPendingPlayerId(player.id);
-    const result = await signPlayerAction(leagueId, player.id);
-    setPendingPlayerId(null);
-    if (result?.error) {
-      setActionError({ message: result.error, kind: result.kind });
-      return;
-    }
-    router.refresh();
+    startMutation(async () => {
+      try {
+        const result = await action(leagueId, player.id);
+        if (result?.error) setActionError({ message: result.error, kind: result.kind });
+        else {
+          if (dropping) setDropTarget(null);
+          if (selectedId === player.id) {
+            // A roster mutation changes ownership; discard a retained inspector
+            // snapshot rather than present stale ownership outside the results.
+            setSelectedSnapshot(null);
+            setSelectedId(null);
+            setInspectorOpen(false);
+          }
+        }
+        // Both actions revalidate /players and return fresh Flight. No second refresh.
+      } catch {
+        setActionError({ message: "Couldn't update your roster — please try again.", kind: "error" });
+      } finally {
+        mutationInFlight.current = false;
+        setPendingPlayerId(null);
+      }
+    });
   }
 
+  function handleAdd(player: Player) { persistMarketAction(player, signPlayerAction); }
   function requestDrop(player: Player) {
+    if (mutationInFlight.current || isMutating) return;
     setActionError(null);
     setDropTarget(player);
   }
-
-  async function confirmDrop() {
-    if (!leagueId || !dropTarget) return;
-    const player = dropTarget;
-    setActionError(null);
-    setPendingPlayerId(player.id);
-    const result = await dropPlayerAction(leagueId, player.id);
-    setPendingPlayerId(null);
-    setDropTarget(null);
-    if (result?.error) {
-      setActionError({ message: result.error, kind: result.kind });
-      return;
-    }
-    router.refresh();
-  }
+  function confirmDrop() { if (dropTarget) persistMarketAction(dropTarget, dropPlayerAction, true); }
 
   const isDesktopTable = useMediaQuery("(min-width: 768px)", { defaultMatches: true });
   const isInlineInspector = useMediaQuery("(min-width: 1280px)", { defaultMatches: false });
 
   const players = data.players;
-  const selectedPlayer = players.find((p) => p.id === selectedId) ?? null;
-  const selectedIndex = selectedPlayer ? players.findIndex((p) => p.id === selectedPlayer.id) : undefined;
+  const selectedPlayer = players.find((p) => p.id === selectedId) ?? selectedSnapshot;
+  const resultIndex = selectedPlayer ? players.findIndex((p) => p.id === selectedPlayer.id) : -1;
+  const selectedIndex = resultIndex >= 0 ? resultIndex : undefined;
   const totalPages = Math.max(1, Math.ceil(data.total / data.pageSize));
 
   function navigate(nextFilters: PlayerFilters, nextPage: number) {
+    if (selectedPlayer) setSelectedSnapshot(selectedPlayer);
     const params = filtersToSearchParams(nextFilters, nextPage);
     const qs = params.toString();
-    router.push(qs ? `/players?${qs}` : "/players");
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = null;
+    startNavigation(() => {
+      applyFilters(nextFilters);
+      router.push(qs ? `/players?${qs}` : "/players", { scroll: false });
+    });
   }
 
   function updateFilters(patch: Partial<PlayerFilters>) {
-    navigate({ ...filters, ...patch }, 1);
+    navigate({ ...visibleFilters, query: queryDraft, ...patch }, 1);
   }
 
   function onQueryChange(value: string) {
@@ -131,10 +156,11 @@ export function PlayersWorkspace({
   }
 
   function goToPage(nextPage: number) {
-    navigate(filters, Math.min(Math.max(1, nextPage), totalPages));
+    navigate(visibleFilters, Math.min(Math.max(1, nextPage), totalPages));
   }
 
   function selectPlayer(player: Player) {
+    setSelectedSnapshot(player);
     setSelectedId(player.id);
     setHighlightedId(player.id);
     if (!isInlineInspector) setInspectorOpen(true);
@@ -209,7 +235,7 @@ export function PlayersWorkspace({
 
       <div className="mt-4">
         <PlayerDatabaseToolbar
-          filters={{ ...filters, query: queryDraft }}
+          filters={{ ...visibleFilters, query: queryDraft }}
           onChange={(patch) => {
             if ("query" in patch && patch.query !== undefined) {
               onQueryChange(patch.query);
@@ -227,7 +253,7 @@ export function PlayersWorkspace({
           clubOptions={[
             { value: "ALL", label: "ALL" },
             ...clubs
-              .filter((c) => filters.competitionId === "ALL" || c.competitionId === filters.competitionId)
+              .filter((c) => visibleFilters.competitionId === "ALL" || c.competitionId === visibleFilters.competitionId)
               .map((c) => ({ value: c.id, label: clubDisplayLabel(c) })),
           ]}
           competitionOptions={[{ value: "ALL", label: "ALL" }, ...competitions.map((c) => ({ value: c.id, label: c.code }))]}
@@ -235,9 +261,11 @@ export function PlayersWorkspace({
         />
       </div>
 
+      <p role="status" className="label-system mt-2 min-h-4 text-[10px] text-foreground-tertiary">{isNavigating ? "UPDATING PLAYERS…" : ""}</p>
       {actionError && <ActionFeedback kind={actionError.kind} message={actionError.message} />}
 
       <div
+        aria-busy={isNavigating || isMutating}
         className={
           isInlineInspector && selectedPlayer
             ? "mt-4 grid grid-cols-[1fr_360px] items-start divide-x divide-border"
@@ -251,7 +279,7 @@ export function PlayersWorkspace({
                 players={players}
                 selectedId={selectedId}
                 highlightedId={highlightedId}
-                sort={filters.sort}
+                sort={visibleFilters.sort}
                 onSort={(sort) => updateFilters({ sort })}
                 onSelect={selectPlayer}
                 onAdd={canTransact ? handleAdd : undefined}

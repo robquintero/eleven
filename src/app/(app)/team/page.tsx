@@ -104,6 +104,7 @@ export default async function TeamPage() {
       )}
 
       <TeamWorkspace
+        key={`${league.id}:${team?.id ?? "none"}:${matchup?.roundId ?? "none"}`}
         squad={squad}
         matchdayNumber={matchup?.roundNumber ?? null}
         hasActiveRound={matchup !== null && matchup.roundStatus !== "completed"}

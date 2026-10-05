@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { signPlayerAction } from "@/app/(app)/players/actions";
 import { FormSparkline } from "@/components/football/form-sparkline";
 import { MarketAction } from "@/components/players/market-action";
@@ -34,7 +33,6 @@ export function FormIntelligence({
   leagueId: string | null;
   canTransact: boolean;
 }) {
-  const router = useRouter();
   const [selected, setSelected] = useState<Player | null>(null);
   const [open, setOpen] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -50,7 +48,7 @@ export function FormIntelligence({
       setError({ message: result.error, kind: result.kind });
       return;
     }
-    router.refresh();
+    // Installed Next returns current-route Flight after this action revalidates.
   }
 
   if (agents.length === 0) return null;

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Check } from "lucide-react";
 import {
   getTradeRostersAction,
@@ -48,7 +47,6 @@ export function TradeCenter({
   incoming: TradeView[];
   outgoing: TradeView[];
 }) {
-  const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
   const [proposeOpen, setProposeOpen] = useState(false);
@@ -62,7 +60,7 @@ export function TradeCenter({
       setError({ message: result.error, kind: result.kind });
       return;
     }
-    router.refresh();
+    // The trade action revalidates /league; Next supplies canonical Flight.
   }
 
   return (
@@ -133,7 +131,7 @@ export function TradeCenter({
         otherTeams={otherTeams}
         onProposed={() => {
           setProposeOpen(false);
-          router.refresh();
+          // The trade action revalidates /league; Next supplies canonical Flight.
         }}
       />
     </div>

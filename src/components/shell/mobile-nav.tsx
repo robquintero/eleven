@@ -1,14 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { usePathname } from "next/navigation";
-import { isPlainLeftClick, useNavigationTransition } from "@/components/shell/navigation-transition";
 import { primaryNav } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 export function MobileNav() {
   const pathname = usePathname();
-  const { begin } = useNavigationTransition();
 
   return (
     <nav
@@ -25,12 +23,10 @@ export function MobileNav() {
 
           return (
             <li key={item.href} className="flex-1">
-              <Link
+              <TransitionLink
                 href={item.href}
+                label={item.label}
                 aria-current={isActive ? "page" : undefined}
-                onClick={(event) => {
-                  if (!isActive && isPlainLeftClick(event)) begin(item.href, item.label);
-                }}
                 className="flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors active:bg-surface"
               >
                 <Icon
@@ -48,7 +44,7 @@ export function MobileNav() {
                 >
                   {item.label}
                 </span>
-              </Link>
+              </TransitionLink>
             </li>
           );
         })}

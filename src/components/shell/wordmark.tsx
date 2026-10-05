@@ -13,13 +13,14 @@ import { TransitionLink } from "@/components/shell/transition-link";
  *
  * Pass 12F (§9): the authenticated app shell renders this via
  * `authenticated` — outside AppShell (marketing/auth pages) it stays a
- * bare Link since there's no NavigationTransitionProvider there.
+ * bare Link to the public entrance. Authenticated clicks go directly to /home
+ * without a second root auth lookup and redirect.
  */
 export function Wordmark({ authenticated = false }: { authenticated?: boolean }) {
   if (authenticated) {
     return (
       <TransitionLink
-        href="/"
+        href="/home"
         label="Home"
         aria-label="Eleven — home"
         className="flex items-center text-[15px] font-semibold tracking-tight text-foreground"

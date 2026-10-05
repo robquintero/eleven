@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   acceptTradeAction,
   cancelTradeAction,
@@ -37,7 +36,6 @@ export function TradeDesk({
   incoming: TradeView[];
   outgoing: TradeView[];
 }) {
-  const router = useRouter();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [proposeOpen, setProposeOpen] = useState(false);
@@ -51,7 +49,7 @@ export function TradeDesk({
       setError(result.error);
       return;
     }
-    router.refresh();
+    // Installed Next returns current-route Flight after this action revalidates.
   }
 
   const totalPending = incoming.length + outgoing.length;
@@ -123,7 +121,7 @@ export function TradeDesk({
         otherTeams={otherTeams}
         onProposed={() => {
           setProposeOpen(false);
-          router.refresh();
+          // Installed Next returns current-route Flight after this action revalidates.
         }}
       />
     </div>

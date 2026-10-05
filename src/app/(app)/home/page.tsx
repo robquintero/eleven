@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { ModuleLoading } from "@/components/shell/workspace-loading";
 import type { Metadata } from "next";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
@@ -20,7 +22,7 @@ import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads, get
 import { getCurrentProfile } from "@/data-access/profiles";
 import { getTeamRosterPlayers } from "@/data-access/roster";
 import { getUserSquad } from "@/data-access/roster";
-import { getLeagueTeams, getUserTeamInLeague, type Team } from "@/data-access/teams";
+import { getLeagueTeams, getUserTeamInLeague } from "@/data-access/teams";
 import { getRecentActivity } from "@/data-access/transactions";
 import { getTeamTrades } from "@/data-access/trades";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
@@ -63,14 +65,15 @@ export default async function HomePage() {
     ]);
     return { matchup, matchupSquads, fixtureIntel, fallbackSquad };
   })();
-  const [{ matchup, matchupSquads, fixtureIntel, fallbackSquad }, standings, activity, allTeams, hotFreeAgents, activeRoster, trades] = await Promise.all([
+  const standingsPromise = getStandings(league.id);
+  const activityPromise = getRecentActivity(league.id);
+  const teamsPromise = team ? getLeagueTeams(league.id) : Promise.resolve([]);
+  const agentsPromise = getHotFreeAgents(league.id);
+  const tradesPromise = team ? getTeamTrades(league.id, team.id) : Promise.resolve({ incoming: [], outgoing: [] });
+  for (const read of [standingsPromise, activityPromise, teamsPromise, agentsPromise, tradesPromise]) void read.catch(() => {});
+  const [{ matchup, matchupSquads, fixtureIntel, fallbackSquad }, activeRoster] = await Promise.all([
     matchupPromise,
-    getStandings(league.id),
-    getRecentActivity(league.id),
-    team ? getLeagueTeams(league.id) : Promise.resolve<Team[]>([]),
-    getHotFreeAgents(league.id),
     team ? getTeamRosterPlayers(league.id, team.id) : Promise.resolve([]),
-    team ? getTeamTrades(league.id, team.id) : Promise.resolve({ incoming: [], outgoing: [] }),
   ]);
   // Vacancy counts describe CURRENT ownership; matchup lineups can retain
   // locked historical players after a trade. Do not count those as roster.
@@ -81,11 +84,6 @@ export default async function HomePage() {
     ? (matchup.isUserHome ? matchupSquads.home : matchupSquads.away)
     : fallbackSquad ?? { formation: "—", starters: [], bench: [] };
   const teamIdsByPlayerId = matchupSquads?.teamIdsByPlayerId;
-  const tradeDeskProps = team ? {
-    myTeamId: team.id,
-    otherTeams: allTeams.filter((t) => t.id !== team.id),
-    ...trades,
-  } : null;
 
   const topPerformer = matchupSquads
     ? [...matchupSquads.home.starters, ...matchupSquads.away.starters]
@@ -173,39 +171,66 @@ export default async function HomePage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <OperationsRail
-            starters={mySquad.starters}
-            standings={standings}
-            hasActiveRound={matchup !== null && matchup.roundStatus !== "completed"}
-            fixtureIntel={fixtureIntel}
-            myTeamId={team?.id ?? null}
-          />
-
-          {tradeDeskProps && (
-            <div className="border border-border p-4">
-              <p className="label-system text-[11px] text-foreground-tertiary">TRADE_DESK</p>
-              <div className="mt-2.5">
-                <TradeDesk
-                  leagueId={league.id}
-                  myTeamId={tradeDeskProps.myTeamId}
-                  otherTeams={tradeDeskProps.otherTeams}
-                  incoming={tradeDeskProps.incoming}
-                  outgoing={tradeDeskProps.outgoing}
-                />
-              </div>
-            </div>
-          )}
-
-          <FormIntelligence agents={hotFreeAgents} leagueId={league.id} canTransact={Boolean(team)} />
+          <Suspense fallback={<ModuleLoading title="OPERATIONS" rows={4} />}>
+            <HomeOperations standingsPromise={standingsPromise} starters={mySquad.starters} matchup={matchup} fixtureIntel={fixtureIntel} teamId={team?.id ?? null} />
+          </Suspense>
+          {team && <Suspense fallback={<ModuleLoading title="TRADE_DESK" rows={2} />}>
+            <HomeTrades leagueId={league.id} teamId={team.id} teamsPromise={teamsPromise} tradesPromise={tradesPromise} />
+          </Suspense>}
+          <Suspense fallback={<ModuleLoading title="FORM_INTELLIGENCE" rows={3} />}>
+            <HomeForm agentsPromise={agentsPromise} leagueId={league.id} canTransact={Boolean(team)} />
+          </Suspense>
         </div>
       </div>
 
-      <section>
-        <ModuleHeader title="OPERATIONS_FEED" meta={activity.length} />
-        <div className="mt-1">
-          <ActivityFeed items={activity} />
-        </div>
-      </section>
+      <Suspense fallback={<ModuleLoading title="OPERATIONS_FEED" rows={3} />}>
+        <HomeActivity activityPromise={activityPromise} />
+      </Suspense>
     </div>
   );
+}
+
+async function HomeOperations({ standingsPromise, starters, matchup, fixtureIntel, teamId }: {
+  standingsPromise: ReturnType<typeof getStandings>;
+  starters: import("@/lib/types/fantasy").LineupSlot[];
+  matchup: Awaited<ReturnType<typeof getCurrentMatchup>>;
+  fixtureIntel: Awaited<ReturnType<typeof getMatchupFixtureIntelligence>> | null;
+  teamId: string | null;
+}) {
+  const standings = await standingsPromise;
+  return <OperationsRail starters={starters} standings={standings}
+    hasActiveRound={matchup !== null && matchup.roundStatus !== "completed"} fixtureIntel={fixtureIntel} myTeamId={teamId} />;
+}
+
+async function HomeTrades({ leagueId, teamId, teamsPromise, tradesPromise }: {
+  leagueId: string; teamId: string; teamsPromise: ReturnType<typeof getLeagueTeams>; tradesPromise: ReturnType<typeof getTeamTrades>;
+}) {
+  const [allTeams, trades] = await Promise.all([teamsPromise, tradesPromise]);
+  return (
+  <div className="border border-border p-4">
+    <p className="label-system text-[11px] text-foreground-tertiary">TRADE_DESK</p>
+    <div className="mt-2.5">
+      <TradeDesk
+        leagueId={leagueId}
+        myTeamId={teamId}
+        otherTeams={allTeams.filter(team => team.id !== teamId)}
+        incoming={trades.incoming}
+        outgoing={trades.outgoing}
+      />
+    </div>
+  </div>
+  );
+}
+
+async function HomeForm({ agentsPromise, leagueId, canTransact }: {
+  agentsPromise: ReturnType<typeof getHotFreeAgents>; leagueId: string; canTransact: boolean;
+}) {
+  return <FormIntelligence agents={await agentsPromise} leagueId={leagueId} canTransact={canTransact} />;
+}
+
+async function HomeActivity({ activityPromise }: { activityPromise: ReturnType<typeof getRecentActivity> }) {
+  const activity = await activityPromise;
+  return <section><ModuleHeader title="OPERATIONS_FEED" meta={activity.length} />
+    <div className="mt-1"><ActivityFeed items={activity} /></div>
+  </section>;
 }

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { CommandPalette } from "@/components/command/command-palette";
 import { CommandTransitionOverlay } from "@/components/shell/command-transition-overlay";
@@ -57,16 +57,10 @@ async function loadStatusBarData(activeLeagueId: string | null): Promise<StatusB
 export async function AppShell({ children }: { children: ReactNode }) {
   const [profile, leagues] = await Promise.all([getCurrentProfile(), getUserLeagues()]);
   const activeLeagueId = await getActiveLeagueId(leagues);
-  const statusBarData = await loadStatusBarData(activeLeagueId);
 
   return (
     <NavigationTransitionProvider>
       <div className="mx-auto min-h-dvh max-w-[1920px] lg:grid lg:grid-cols-[240px_1fr]">
-        {/* z-30 (matching the header) -- MICRO FIX: now that
-            CommandTransitionOverlay is viewport-fixed (covers the whole
-            screen, not just the content pane), this sidebar needs an
-            explicit stacking order to stay visually un-dimmed above it,
-            same as the header/MobileNav already have. */}
         <aside className="hidden lg:sticky lg:top-0 lg:z-30 lg:flex lg:h-dvh lg:flex-col lg:gap-8 lg:border-r lg:border-border lg:px-5 lg:py-7">
           <Wordmark authenticated />
           <div className="border-t border-border" />
@@ -102,7 +96,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
                 <ProfileControl profile={profile} />
               </div>
             </div>
-            <StatusBar data={statusBarData} />
+            <Suspense fallback={<div role="status" className="label-system border-t border-border px-4 py-2 text-[10px] text-foreground-tertiary">LOADING ROUND STATUS</div>}><RoundStatus activeLeagueId={activeLeagueId} /></Suspense>
           </header>
 
           <main id="main-content" className="flex-1 px-4 pt-6 pb-28 sm:px-6 lg:px-8 lg:pb-12">
@@ -110,14 +104,14 @@ export async function AppShell({ children }: { children: ReactNode }) {
           </main>
         </div>
 
-        {/* MICRO FIX: CommandTransitionOverlay is `fixed inset-0` (viewport-
-            anchored, not anchored to <main> or any scroll container) --
-            rendered here as a plain sibling since its position no longer
-            depends on where it sits in the DOM tree. */}
         <CommandTransitionOverlay />
 
         <MobileNav />
       </div>
     </NavigationTransitionProvider>
   );
+}
+
+async function RoundStatus({ activeLeagueId }: { activeLeagueId: string | null }) {
+  return <StatusBar data={await loadStatusBarData(activeLeagueId)} />;
 }

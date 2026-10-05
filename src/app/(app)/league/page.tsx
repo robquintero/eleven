@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { ModuleLoading } from "@/components/shell/workspace-loading";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { TransitionLink } from "@/components/shell/transition-link";
@@ -65,38 +67,20 @@ export default async function LeaguePage() {
   const leagues = await getUserLeagues();
   const activeLeagueId = await getActiveLeagueId(leagues);
 
-  const [activeDetail, draftStatus, standings, activity, myTeam, competition, season, pastSeasons] = activeLeagueId
-    ? await Promise.all([
-        getLeagueDetail(activeLeagueId),
-        getDraftStatus(activeLeagueId),
-        getStandings(activeLeagueId),
-        getRecentActivity(activeLeagueId),
-        getUserTeamInLeague(activeLeagueId),
-        getLeagueCompetitionSummary(activeLeagueId),
-        getSeasonSummary(activeLeagueId),
-        listSeasons(activeLeagueId),
-      ])
-    : [null, null, [], [], null, null, null, []];
-
-  let tradeCenterProps: {
-    myTeamId: string;
-    otherTeams: Awaited<ReturnType<typeof getLeagueTeams>>;
-    incoming: Awaited<ReturnType<typeof getTeamTrades>>["incoming"];
-    outgoing: Awaited<ReturnType<typeof getTeamTrades>>["outgoing"];
-  } | null = null;
-
-  if (activeLeagueId && myTeam) {
-    const [allTeams, trades] = await Promise.all([
-      getLeagueTeams(activeLeagueId), getTeamTrades(activeLeagueId, myTeam.id),
-    ]);
-    const otherTeams = allTeams.filter((t) => t.id !== myTeam.id);
-    tradeCenterProps = {
-      myTeamId: myTeam.id,
-      otherTeams,
-      incoming: trades.incoming,
-      outgoing: trades.outgoing,
-    };
-  }
+  const myTeamPromise = activeLeagueId ? getUserTeamInLeague(activeLeagueId) : Promise.resolve(null);
+  const competitionPromise = activeLeagueId ? getLeagueCompetitionSummary(activeLeagueId) : Promise.resolve(null);
+  const activityPromise = activeLeagueId ? getRecentActivity(activeLeagueId) : Promise.resolve([]);
+  const archivePromise = activeLeagueId ? listSeasons(activeLeagueId) : Promise.resolve([]);
+  const tradePromise = myTeamPromise.then(async team => {
+    if (!activeLeagueId || !team) return null;
+    const [allTeams, trades] = await Promise.all([getLeagueTeams(activeLeagueId), getTeamTrades(activeLeagueId, team.id)]);
+    return { myTeamId: team.id, otherTeams: allTeams.filter(other => other.id !== team.id), ...trades };
+  });
+  // Attach rejection handlers immediately without swallowing errors when streamed.
+  for (const read of [competitionPromise, activityPromise, archivePromise, tradePromise]) void read.catch(() => {});
+  const [activeDetail, draftStatus, standings, myTeam, season] = activeLeagueId
+    ? await Promise.all([getLeagueDetail(activeLeagueId), getDraftStatus(activeLeagueId), getStandings(activeLeagueId), myTeamPromise, getSeasonSummary(activeLeagueId)])
+    : [null, null, [], null, null];
 
   const lifecycle = activeDetail
     ? deriveLeagueLifecycle({
@@ -217,58 +201,9 @@ export default async function LeaguePage() {
                 />
               </div>
 
-              {/* Current round + recent results merged into one module
-                  (was two identically-weighted boxes) -- they're the same
-                  kind of information (a round's results), just at
-                  different points in time. */}
-              <div className="border border-border">
-                <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
-                  <span className="label-system text-[11px] text-foreground-secondary">MATCHUPS</span>
-                  {myTeam && (
-                    <TransitionLink
-                      href="/matchup"
-                      label="My Matchup"
-                      className="label-system text-[10px] text-accent hover:underline"
-                    >
-                      MY MATCHUP ↗
-                    </TransitionLink>
-                  )}
-                </div>
-                <div>
-                  <p className="label-system px-4 pt-3 text-[10px] text-foreground-tertiary">THIS ROUND</p>
-                  <LeagueMatchups
-                    matchups={competition?.currentRoundMatchups ?? []}
-                    myTeamId={myTeam?.id ?? null}
-                    emptyLabel="NO MATCHUPS SCHEDULED YET"
-                  />
-                </div>
-                <div className="border-t border-border">
-                  <p className="label-system px-4 pt-3 text-[10px] text-foreground-tertiary">RECENT RESULTS</p>
-                  <LeagueMatchups
-                    matchups={competition?.recentResults ?? []}
-                    myTeamId={myTeam?.id ?? null}
-                    emptyLabel="NO RESULTS YET"
-                  />
-                </div>
-              </div>
-
-              {/* Bare workspace region, no border -- a handful of stat
-                  lines doesn't need its own frame (DESIGN.md §5). */}
-              <div>
-                <ModuleHeader title="LEAGUE_RECORDS" />
-                <LeagueRecordsList
-                  records={
-                    competition?.records ?? {
-                      highestScore: null,
-                      lowestScore: null,
-                      largestMargin: null,
-                      closestMatchup: null,
-                      mostPointsFor: null,
-                      mostPointsAgainst: null,
-                    }
-                  }
-                />
-              </div>
+              <Suspense fallback={<ModuleLoading title="MATCHUPS" rows={4} />}>
+                <LeagueCompetition competitionPromise={competitionPromise} myTeamId={myTeam?.id ?? null} />
+              </Suspense>
             </div>
 
             <div className="flex flex-col gap-6">
@@ -297,14 +232,7 @@ export default async function LeaguePage() {
                 </div>
               </div>
 
-              {pastSeasons.length > 1 && (
-                <div className="border border-border">
-                  <div className="border-b border-border px-4 py-2.5">
-                    <span className="label-system text-[11px] text-foreground-secondary">SEASON_ARCHIVE</span>
-                  </div>
-                  <SeasonArchiveList seasons={pastSeasons} />
-                </div>
-              )}
+              <Suspense fallback={null}><LeagueArchive archivePromise={archivePromise} /></Suspense>
 
               {/* Draft status + transactions merged into one OPERATIONS
                   module (was two separate boxes) -- both are small,
@@ -332,31 +260,14 @@ export default async function LeaguePage() {
                     </TransitionLink>
                   )}
                 </div>
-                <div className="border-t border-border px-4 py-3">
-                  <p className="label-system text-[10px] text-foreground-tertiary">TRANSACTIONS</p>
-                  {activity.length === 0 ? (
-                    <p className="mt-1 text-sm text-foreground-secondary">NO TRANSACTIONS YET</p>
-                  ) : (
-                    <div className="mt-2 divide-y divide-border">
-                      {activity.map((entry) => (
-                        <p key={entry.id} className="py-1.5 text-sm text-foreground-secondary">
-                          {entry.summary}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                <Suspense fallback={<div role="status" className="label-system border-t border-border px-4 py-3 text-[10px] text-foreground-tertiary">LOADING TRANSACTIONS</div>}>
+                  <LeagueTransactions activityPromise={activityPromise} />
+                </Suspense>
               </div>
 
-              {tradeCenterProps && (
-                <TradeCenter
-                  leagueId={activeLeagueId!}
-                  myTeamId={tradeCenterProps.myTeamId}
-                  otherTeams={tradeCenterProps.otherTeams}
-                  incoming={tradeCenterProps.incoming}
-                  outgoing={tradeCenterProps.outgoing}
-                />
-              )}
+              {myTeam && <Suspense fallback={<ModuleLoading title="TRADES" rows={2} />}>
+                <LeagueTrades leagueId={activeLeagueId!} tradePromise={tradePromise} />
+              </Suspense>}
             </div>
           </div>
         </section>
@@ -379,4 +290,106 @@ function SetActiveLeagueButton({ leagueId }: { leagueId: string }) {
       </button>
     </form>
   );
+}
+
+async function LeagueCompetition({ competitionPromise, myTeamId }: {
+  competitionPromise: Promise<Awaited<ReturnType<typeof getLeagueCompetitionSummary>> | null>; myTeamId: string | null;
+}) {
+  const competition = await competitionPromise;
+  return <>
+    {/* Current round + recent results merged into one module
+        (was two identically-weighted boxes) -- they're the same
+        kind of information (a round's results), just at
+        different points in time. */}
+    <div className="border border-border">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+        <span className="label-system text-[11px] text-foreground-secondary">MATCHUPS</span>
+        {myTeamId && (
+          <TransitionLink
+            href="/matchup"
+            label="My Matchup"
+            className="label-system text-[10px] text-accent hover:underline"
+          >
+            MY MATCHUP ↗
+          </TransitionLink>
+        )}
+      </div>
+      <div>
+        <p className="label-system px-4 pt-3 text-[10px] text-foreground-tertiary">THIS ROUND</p>
+        <LeagueMatchups
+          matchups={competition?.currentRoundMatchups ?? []}
+          myTeamId={myTeamId}
+          emptyLabel="NO MATCHUPS SCHEDULED YET"
+        />
+      </div>
+      <div className="border-t border-border">
+        <p className="label-system px-4 pt-3 text-[10px] text-foreground-tertiary">RECENT RESULTS</p>
+        <LeagueMatchups
+          matchups={competition?.recentResults ?? []}
+          myTeamId={myTeamId}
+          emptyLabel="NO RESULTS YET"
+        />
+      </div>
+    </div>
+
+    {/* Bare workspace region, no border -- a handful of stat
+        lines doesn't need its own frame (DESIGN.md §5). */}
+    <div>
+      <ModuleHeader title="LEAGUE_RECORDS" />
+      <LeagueRecordsList
+        records={
+          competition?.records ?? {
+            highestScore: null,
+            lowestScore: null,
+            largestMargin: null,
+            closestMatchup: null,
+            mostPointsFor: null,
+            mostPointsAgainst: null,
+          }
+        }
+      />
+    </div>
+  </>;
+}
+
+async function LeagueArchive({ archivePromise }: { archivePromise: ReturnType<typeof listSeasons> }) {
+  const pastSeasons = await archivePromise;
+  return <>
+    {pastSeasons.length > 1 && (
+      <div className="border border-border">
+        <div className="border-b border-border px-4 py-2.5">
+          <span className="label-system text-[11px] text-foreground-secondary">SEASON_ARCHIVE</span>
+        </div>
+        <SeasonArchiveList seasons={pastSeasons} />
+      </div>
+    )}
+  </>;
+}
+
+async function LeagueTransactions({ activityPromise }: { activityPromise: ReturnType<typeof getRecentActivity> }) {
+  const activity = await activityPromise;
+  return (
+      <div className="border-t border-border px-4 py-3">
+        <p className="label-system text-[10px] text-foreground-tertiary">TRANSACTIONS</p>
+        {activity.length === 0 ? (
+          <p className="mt-1 text-sm text-foreground-secondary">NO TRANSACTIONS YET</p>
+        ) : (
+          <div className="mt-2 divide-y divide-border">
+            {activity.map((entry) => (
+              <p key={entry.id} className="py-1.5 text-sm text-foreground-secondary">
+                {entry.summary}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
+  );
+}
+
+async function LeagueTrades({ leagueId, tradePromise }: {
+  leagueId: string;
+  tradePromise: Promise<{ myTeamId: string; otherTeams: Awaited<ReturnType<typeof getLeagueTeams>> } & Awaited<ReturnType<typeof getTeamTrades>> | null>;
+}) {
+  const props = await tradePromise;
+  return props ? <TradeCenter leagueId={leagueId} {...props} /> : null;
 }

@@ -1,8 +1,9 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
 import { Swords } from "lucide-react";
 import { ComingSoon } from "@/components/shell/coming-soon";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
-import { MatchupCommand } from "@/components/dashboard/matchup-command";
+import { MatchupAnticipation, MatchupCommand } from "@/components/dashboard/matchup-command";
 import { MatchupLineups } from "@/components/matchup/matchup-lineups";
 import { MatchupPlayerCounts } from "@/components/matchup/matchup-player-counts";
 import { RoundWindow } from "@/components/football/round-window";
@@ -47,10 +48,11 @@ export default async function MatchupPage() {
 
   const matchup = team ? await getCurrentMatchup(league.id, team.id) : null;
   const now = new Date();
-  const [squads, fixtureIntel] = await Promise.all([
-    matchup ? getMatchupSquads(matchup) : Promise.resolve(null),
-    matchup ? getMatchupFixtureIntelligence(matchup, now) : Promise.resolve(null),
-  ]);
+  // Fixture intelligence is only used by the pre-kickoff anticipation panel.
+  const fixturePromise = matchup?.roundStatus === "upcoming" ? getMatchupFixtureIntelligence(matchup, now) : Promise.resolve(null);
+  // Observe early rejection; the streamed component still receives the original error.
+  void fixturePromise.catch(() => {});
+  const squads = matchup ? await getMatchupSquads(matchup) : null;
   const myStarters = squads ? (matchup!.isUserHome ? squads.home.starters : squads.away.starters) : undefined;
   const teamIdsByPlayerId = squads?.teamIdsByPlayerId;
 
@@ -76,7 +78,9 @@ export default async function MatchupPage() {
           sibling components (DESIGN.md §5's hierarchy order puts
           whitespace ahead of borders for exactly this reason). */}
       <div className="flex flex-col gap-3">
-        <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={myStarters} teamIdsByPlayerId={teamIdsByPlayerId} />
+        <MatchupCommand matchup={matchup} hasLeague now={now} scheduledDetails={<Suspense fallback={<p role="status" className="label-system text-[11px] text-foreground-tertiary">LOADING NEXT KICKOFF</p>}>
+          <FixtureAnticipation fixturePromise={fixturePromise} starters={myStarters} teamIdsByPlayerId={teamIdsByPlayerId} />
+        </Suspense>} starters={myStarters} teamIdsByPlayerId={teamIdsByPlayerId} />
 
         {matchup && squads && (
           <>
@@ -99,4 +103,12 @@ export default async function MatchupPage() {
       </div>
     </div>
   );
+}
+
+async function FixtureAnticipation({ fixturePromise, starters, teamIdsByPlayerId }: {
+  fixturePromise: Promise<Awaited<ReturnType<typeof getMatchupFixtureIntelligence>> | null>;
+  starters?: import("@/lib/types/fantasy").LineupSlot[];
+  teamIdsByPlayerId?: Map<string, string[]>;
+}) {
+  return <MatchupAnticipation fixtureIntel={await fixturePromise} starters={starters} teamIdsByPlayerId={teamIdsByPlayerId} />;
 }

@@ -1,41 +1,22 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { ComponentProps, MouseEvent } from "react";
-import { isPlainLeftClick, useNavigationTransition } from "@/components/shell/navigation-transition";
+import Link, { useLinkStatus } from "next/link";
+import type { ComponentProps } from "react";
+import { cn } from "@/lib/utils";
 
-/**
- * Pass 12F (§9): the single interception point for the "ELEVEN / <LABEL>"
- * navigation overlay everywhere OUTSIDE the primary nav. DesktopNav and
- * MobileNav wire `begin()` directly against their own active-route
- * highlighting, but every other contextual in-page link (League → My
- * Matchup, League → Season Archive, Players/Account navigation, dashboard
- * shortcuts, etc.) rendered a bare next/link `Link` and never triggered the
- * overlay at all. Routing those call sites through this component instead
- * makes transition coverage a property of which component is used, not of
- * remembering to wire an onClick at every link -- the centralized fix the
- * brief asked for rather than patching each site individually.
- */
-export function TransitionLink({
-  href,
-  label,
-  onClick,
-  ...rest
-}: ComponentProps<typeof Link> & { label: string }) {
-  const pathname = usePathname();
-  const { begin } = useNavigationTransition();
-  const hrefString = typeof href === "string" ? href : (href.pathname ?? "");
-  const isActive = hrefString === pathname;
+/** Native auto prefetch stops at the destination loading boundary. No
+ * eager full-page prefetch, click interception, timers or extra requests. */
+export function TransitionLink({ label, children, className, ...props }: ComponentProps<typeof Link> & { label: string }) {
+  return <Link {...props} className={cn("relative focus-visible:outline-2 focus-visible:outline-accent", className)}>
+    {children}
+    <LinkFeedback label={label} />
+  </Link>;
+}
 
-  return (
-    <Link
-      href={href}
-      onClick={(event: MouseEvent<HTMLAnchorElement>) => {
-        onClick?.(event);
-        if (!isActive && isPlainLeftClick(event)) begin(hrefString, label);
-      }}
-      {...rest}
-    />
-  );
+function LinkFeedback({ label }: { label: string }) {
+  const { pending } = useLinkStatus();
+  return <>
+    <span aria-hidden="true" className={cn("pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-accent transition-opacity duration-150", pending ? "opacity-100" : "opacity-0")} />
+    <span role="status" className="sr-only">{pending ? `Opening ${label}` : ""}</span>
+  </>;
 }

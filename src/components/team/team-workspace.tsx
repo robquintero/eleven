@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 import { X } from "lucide-react";
 import { BenchRow, EmptySlotRow } from "@/components/team/bench-row";
 import { NextLock } from "@/components/team/next-lock";
@@ -15,6 +15,8 @@ import { FORMATION_RULES } from "@/domain/fantasy/constants";
 import { assignToSlots, formationSlots, type FormationSlot } from "@/lib/selectors/pitch-layout";
 import { benchSwapRowState, isPlayerLocked, nextLock, pad2, starterBuckets } from "@/lib/team-fixture";
 import type { LineupSlot, Player, PlayerAvailability, PlayerPosition, Squad } from "@/lib/types/fantasy";
+
+import { createLineupMutationGuard, optimisticLineupSwap, queueLineupFill, reconcileSquadOrder, type LineupSwap } from "@/lib/selectors/optimistic-lineup";
 
 const availabilityOrder: PlayerAvailability[] = ["available", "doubtful", "injured", "suspended"];
 
@@ -99,7 +101,7 @@ const XI_SECTIONS: { label: string; position: PlayerPosition }[] = [
  * there's no separate "is the server configured for this" gate anymore.
  */
 export function TeamWorkspace({
-  squad,
+  squad: canonicalSquad,
   matchdayNumber,
   hasActiveRound = false,
   leagueId,
@@ -112,6 +114,14 @@ export function TeamWorkspace({
   leagueId: string;
   fantasyTeamId: string | null;
 }) {
+  const [preferredOrder, setPreferredOrder] = useState(canonicalSquad);
+  // Keep the latest placement hint across either Flight/result arrival
+  // order. It only orders existing canonical members; it never substitutes
+  // players or retains old scores/locks. Scoped by the page's team/round key.
+  const [placementSwap, setPlacementSwap] = useState<LineupSwap | null>(null);
+  const orderedCanonical = reconcileSquadOrder(canonicalSquad, preferredOrder, placementSwap);
+  const [squad, applyOptimisticSwap] = useOptimistic(orderedCanonical, optimisticLineupSwap);
+  const mutationGuard = useRef(createLineupMutationGuard());
   const [selected, setSelected] = useState<Selection>(null);
   const [pendingAssignments, setPendingAssignments] = useState<Map<string, Player>>(new Map());
   const [error, setError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
@@ -127,6 +137,7 @@ export function TeamWorkspace({
   // payload commit. Next supplies that payload after revalidatePath.
   const [isSaving, startSaveTransition] = useTransition();
   const substitutionBusy = isSaving;
+  const editsBlocked = () => substitutionBusy || mutationGuard.current.isPending();
 
   const canEdit = Boolean(fantasyTeamId);
 
@@ -157,29 +168,31 @@ export function TeamWorkspace({
     Object.fromEntries(availabilityOrder.map((s) => [s, 0])) as Record<PlayerAvailability, number>
   );
 
-  /**
-   * Pass 10.5C.5A: immediate processing feedback for the authenticated
-   * write's real (roughly 1-2s) latency, without ever showing the
-   * replacement before the server confirms it -- the picker (`selected`)
-   * closes immediately, before the request even starts. `substitutionBusy`
-   * stays true until the action's server-confirmed payload commits, so every row's handler
-   * stays guarded against a second, conflicting lineup mutation through
-   * the full round-trip, not just the action call.
-   */
+  /** React's optimistic overlay is urgent and lasts through the action's
+   * fresh Flight commit. Rejection/throw drops it back to the exact prior
+   * canonical lineup; success uses the returned server state. */
   async function trySwap(starterOut: string, benchIn: string) {
-    if (!fantasyTeamId || substitutionBusy) return;
+    if (!fantasyTeamId || editsBlocked()) return;
+    const change = { starterOut, benchIn };
+    const preview = optimisticLineupSwap(squad, change);
+    if (preview === squad) {
+      setRuleError("That substitution is no longer available. Choose unlocked players in the same position.");
+      return;
+    }
+    if (!mutationGuard.current.begin()) return;
+    setPlacementSwap(change);
     setSelected(null);
     setError(null);
-    // The installed Next action handler renders a fresh Flight payload
-    // when revalidatePath marks this page. A second router.refresh would
-    // repeat the same Team read graph. Keep the transition pending until
-    // the action's confirmed payload commits; this is not optimistic UI.
     startSaveTransition(async () => {
+      applyOptimisticSwap(change);
       try {
         const result = await swapLineupAction(leagueId, fantasyTeamId, starterOut, benchIn);
         if (result?.error) setError({ message: result.error, kind: result.kind });
+        else setPreferredOrder(preview);
       } catch {
-        setError({ message: "Couldn't save your lineup — please try again.", kind: "error" });
+        setError({ message: "Couldn't confirm your lineup change. Your previous lineup is shown; reload to check before trying again.", kind: "error" });
+      } finally {
+        mutationGuard.current.finish();
       }
     });
   }
@@ -187,9 +200,8 @@ export function TeamWorkspace({
   /** Queues a bench player against a SPECIFIC slot id, purely client-side — see this component's own doc comment and `handleSaveFills`. */
   function queueFill(slotId: string, player: Player) {
     setPendingAssignments((prev) => {
-      const next = new Map(prev);
-      next.set(slotId, player);
-      return next;
+      const position = slots.find(slot => slot.id === slotId)?.position;
+      return position ? queueLineupFill(squad, prev, slotId, position, player) : prev;
     });
     setSelected(null);
     setError(null);
@@ -204,7 +216,7 @@ export function TeamWorkspace({
   }
 
   function handleSelectStarterOrPending(row: XiRow & { player: Player }) {
-    if (!canEdit || substitutionBusy) return;
+    if (!canEdit || editsBlocked()) return;
     if (pendingAssignments.has(row.slotId)) {
       unqueueFill(row.slotId);
       return;
@@ -225,7 +237,7 @@ export function TeamWorkspace({
   }
 
   function handleSelectEmptySlot(emptySlot: { slotId: string; position: PlayerPosition }) {
-    if (!canEdit || substitutionBusy) return;
+    if (!canEdit || editsBlocked()) return;
     if (selected?.kind === "bench") {
       if (selected.player.position !== emptySlot.position) {
         setRuleError(`That slot needs a ${emptySlot.position}.`);
@@ -242,7 +254,7 @@ export function TeamWorkspace({
   }
 
   function handleSelectBench(player: Player) {
-    if (!canEdit || substitutionBusy) return;
+    if (!canEdit || editsBlocked()) return;
     // Pass 14.6: a locked bench player cannot enter the lineup -- same
     // "immovable for the rest of the round" fact as a locked starter, with
     // the same explicit, non-guessable error. `BenchRow` deliberately still
@@ -287,7 +299,7 @@ export function TeamWorkspace({
    * necessarily identical layout.
    */
   async function handleSaveFills() {
-    if (!fantasyTeamId || substitutionBusy || pendingAssignments.size === 0) return;
+    if (!fantasyTeamId || editsBlocked() || pendingAssignments.size === 0 || !mutationGuard.current.begin()) return;
     setError(null);
     const fills = slots
       .filter((slot) => pendingAssignments.has(slot.id))
@@ -302,7 +314,9 @@ export function TeamWorkspace({
         setPendingAssignments(new Map());
         setSelected(null);
       } catch {
-        setError({ message: "Couldn't save your lineup — please try again.", kind: "error" });
+        setError({ message: "Couldn't confirm your lineup. Your selections are still queued; reload to check before trying again.", kind: "error" });
+      } finally {
+        mutationGuard.current.finish();
       }
     });
   }
@@ -311,9 +325,10 @@ export function TeamWorkspace({
     <div>
       {fantasyTeamId && (
         <div className="mt-4 flex items-center justify-between">
-          <p className="text-xs text-foreground-tertiary">
+          <p role="status" aria-live="polite" className="text-xs text-foreground-tertiary">
             {pendingAssignments.size > 0
               ? `Building lineup — ${totalAssigned} / ${FORMATION_RULES.startersTotal} selected. Click Done to save.`
+              : substitutionBusy ? "Saving lineup…"
               : "Select a starter, then a bench player (or vice versa) to swap them — or select an empty slot to fill it from the bench."}
           </p>
           {pendingAssignments.size > 0 && (
@@ -330,7 +345,7 @@ export function TeamWorkspace({
       )}
       {error && <ActionFeedback kind={error.kind} message={error.message} />}
 
-      <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_0.5fr] lg:items-start">
+      <div aria-busy={substitutionBusy} className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_0.5fr] lg:items-start">
         <section>
           <ModuleHeader title="STARTING_XI" meta={squad.formation} />
           {/* Pass 14.6: the pitch concept is removed entirely -- a dense,

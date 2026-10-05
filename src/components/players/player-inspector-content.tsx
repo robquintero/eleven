@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { Info, Lock, X } from "lucide-react";
 import { FormSparkline } from "@/components/football/form-sparkline";
 import { AvailabilityStatus } from "@/components/players/availability-status";
@@ -104,7 +104,6 @@ export function PlayerInspectorContent({
   /** Pass 11.5: forwarded to TerminalPanel — true only when this is rendered inside the overlay's own scrollable body, so the header (and the close button inside it) stay reachable no matter how far the body scrolls. */
   stickyHeader?: boolean;
 }) {
-  const router = useRouter();
   const [showNote, setShowNote] = useState(false);
 
   const ownership = player.ownership;
@@ -361,7 +360,8 @@ export function PlayerInspectorContent({
           <Button
             className="w-full rounded-control"
             variant="outline"
-            onClick={() => router.push("/league")}
+            nativeButton={false}
+            render={<TransitionLink href="/league" label="League" />}
           >
             Join a league to see roster actions
           </Button>

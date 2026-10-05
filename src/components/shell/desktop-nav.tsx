@@ -1,14 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import { TransitionLink } from "@/components/shell/transition-link";
 import { usePathname } from "next/navigation";
-import { isPlainLeftClick, useNavigationTransition } from "@/components/shell/navigation-transition";
 import { primaryNav } from "@/lib/navigation";
 import { cn } from "@/lib/utils";
 
 export function DesktopNav() {
   const pathname = usePathname();
-  const { begin } = useNavigationTransition();
 
   return (
     <nav className="flex flex-col gap-0.5">
@@ -18,14 +16,12 @@ export function DesktopNav() {
         const Icon = item.icon;
 
         return (
-          <Link
+          <TransitionLink
             key={item.href}
             href={item.href}
+            label={item.label}
             aria-current={isActive ? "page" : undefined}
             title={`${item.label} — G ${item.shortcutKey.toUpperCase()}`}
-            onClick={(event) => {
-              if (!isActive && isPlainLeftClick(event)) begin(item.href, item.label);
-            }}
             className={cn(
               "flex items-center gap-3 border-l-2 py-2 pr-3 pl-2.5 text-sm font-medium transition-colors active:bg-surface-elevated",
               isActive
@@ -43,7 +39,7 @@ export function DesktopNav() {
             </span>
             <Icon className="size-[18px] shrink-0" strokeWidth={isActive ? 2.25 : 1.75} />
             <span>{item.label}</span>
-          </Link>
+          </TransitionLink>
         );
       })}
     </nav>

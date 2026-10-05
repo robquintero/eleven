@@ -38,6 +38,7 @@ export default async function PlayersPage({ searchParams }: PageProps<"/players"
 
   return (
     <PlayersWorkspace
+      key={`${activeLeagueId ?? "none"}:${team?.id ?? "none"}`}
       data={data}
       filters={filters}
       page={page}
