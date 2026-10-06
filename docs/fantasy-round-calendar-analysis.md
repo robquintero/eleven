@@ -1,6 +1,9 @@
 # Eleven — Fantasy Round Calendar Analysis (Pass 10)
 
-This is the evidence behind Eleven's fixed weekly fantasy-round boundary.
+This is the original evidence for Eleven's Tuesday → Monday start day.
+The midnight candidates and dataset counts below are historical analysis,
+not the current hour-of-day policy. The product now rolls over at fixed
+Tuesday 06:00 UTC, end exclusive at the next Tuesday 06:00 UTC.
 The brief was explicit: do not assume Wednesday → Tuesday just because it
 had been discussed informally — evaluate it against the real, stored
 2026/27 fixture calendar the same as every other candidate. The
@@ -154,7 +157,10 @@ fixture's own stored `kickoff_at` — never from anything client-local.**
 
 ## Chosen boundary
 
-**Tuesday 00:00 UTC → the following Monday 23:59:59 UTC.**
+**Tuesday → Monday, rolling over Tuesday 06:00 UTC.** Windows are
+`[Tuesday 06:00 UTC, next Tuesday 06:00 UTC)`, independent of DST.
+The original midnight comparison above chose the day; the later product
+decision deliberately chose 06:00 UTC for U.S. Tuesday-morning readiness.
 
 See `docs/game-rules.md` for how this boundary is implemented
 (`src/domain/fantasy/round-calendar.ts`), how fixtures are deterministically

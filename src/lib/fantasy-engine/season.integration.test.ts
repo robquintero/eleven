@@ -29,7 +29,7 @@ const skip = !isSupabaseAdminConfigured();
 // anchor date draft-engine.integration.test.ts and simulate.ts already
 // rely on) -- lets `finalizeRoundIfReady` actually finalize without
 // waiting on real-world match timing.
-const HISTORICAL_START = new Date("2026-08-25T00:00:00Z");
+const HISTORICAL_START = new Date("2026-08-25T06:00:00Z");
 
 function settleClockFor(windowEndsAt: Date): Date {
   return new Date(windowEndsAt.getTime() + 25 * 3600 * 1000);

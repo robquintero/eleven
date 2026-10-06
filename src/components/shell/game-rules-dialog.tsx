@@ -121,9 +121,9 @@ export function GameRulesDialog({ version = SCORING_RULE_VERSION_V4 }: { version
             </Section>
 
             <Section title="ROUND WINDOW">
-              A fantasy round is a Tuesday 00:00 UTC → the following Tuesday 00:00 UTC window. All eligible
-              fixtures that kick off inside that window belong to that round, regardless of when they were
-              scheduled or discovered.
+              Fantasy weeks run Tuesday through Monday; Tuesday begins a fresh week. Weekly rollover is
+              Tuesday 06:00 UTC. Fixtures belong to the week containing their kickoff, even if they finish
+              or their statistics arrive after rollover. Players lock individually at kickoff, not at rollover.
             </Section>
 
             <Section title="MULTIPLE FIXTURES">

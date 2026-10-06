@@ -85,7 +85,9 @@ export const getCurrentMatchup = cache(async function getCurrentMatchup(
     .select("id, number, status, starts_at, ends_at, scoring_rule_version")
     .eq("league_id", leagueId)
     .in("status", ["in_progress", "upcoming"])
-    .order("starts_at", { ascending: true })
+    // A previous calendar week may still be reconciling. The latest
+    // opened week is the current matchup, not the oldest unsettled one.
+    .order("starts_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -935,12 +937,9 @@ export async function queryLeagueCompetitionSummary(
   const summaries = allMatchups.map(toSummary).sort((a, b) => b.roundNumber - a.roundNumber);
   const finalSummaries = summaries.filter((s) => s.status === "final");
 
-  // Current round: the lowest-numbered round that ISN'T final yet (the
-  // list is already sorted round-descending, so scan from the end) --
-  // same "in-progress, else soonest upcoming" notion `getCurrentMatchup`
-  // uses, just league-wide instead of one manager's own matchup.
+  // Latest opened week, including while older weeks await settlement.
   const nonFinal = summaries.filter((s) => s.status !== "final");
-  const currentRoundNumber = nonFinal.length > 0 ? Math.min(...nonFinal.map((s) => s.roundNumber)) : null;
+  const currentRoundNumber = nonFinal.length > 0 ? Math.max(...nonFinal.map((s) => s.roundNumber)) : null;
   const currentRoundMatchups = currentRoundNumber !== null ? nonFinal.filter((s) => s.roundNumber === currentRoundNumber) : [];
 
   const recentResults = finalSummaries.slice(0, 5);

@@ -25,6 +25,7 @@ export function testClient(respond: (query: RecordedQuery) => TestResponse | Pro
       is(column: string, value: unknown) { q.filters.push({ method: "is", column, value }); return chain; },
       not(column: string, operator: string, value: unknown) { q.filters.push({ method: operator, column, value }); return chain; },
       gte(column: string, value: unknown) { q.filters.push({ method: "gte", column, value }); return chain; },
+      gt(column: string, value: unknown) { q.filters.push({ method: "gt", column, value }); return chain; },
       lt(column: string, value: unknown) { q.filters.push({ method: "lt", column, value }); return chain; },
       lte(column: string, value: unknown) { q.filters.push({ method: "lte", column, value }); return chain; },
       ilike(column: string, value: unknown) { q.filters.push({ method: "ilike", column, value }); return chain; },

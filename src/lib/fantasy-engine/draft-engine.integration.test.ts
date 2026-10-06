@@ -192,7 +192,7 @@ test("an invalid starting formation (0 GK) is rejected server-side, and a valid 
     const draftId = draft![0].draft_id;
     await draftToCompletion(admin, draftId, 4, 16);
 
-    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T06:00:00Z"));
     assert.ok(openResult.ok, "round must open successfully against real stored fixture data");
     if (!openResult.ok) return;
 
@@ -206,7 +206,7 @@ test("an invalid starting formation (0 GK) is rejected server-side, and a valid 
       ...byPos.MID.slice(0, 5).map((id) => ({ rosterEntryId: id, starter: true, position: "MID" as const })),
       ...byPos.FWD.slice(0, 1).map((id) => ({ rosterEntryId: id, starter: true, position: "FWD" as const })),
     ];
-    const invalidResult = await updateLineup(admin, teamId, openResult.roundId, invalidZeroGk, new Date("2026-09-08T00:00:00Z"));
+    const invalidResult = await updateLineup(admin, teamId, openResult.roundId, invalidZeroGk, new Date("2026-09-08T06:00:00Z"));
     assert.deepEqual(invalidResult, { ok: false, error: "INVALID_FORMATION" });
 
     const validXi = [
@@ -215,7 +215,7 @@ test("an invalid starting formation (0 GK) is rejected server-side, and a valid 
       ...byPos.MID.slice(0, 4).map((id) => ({ rosterEntryId: id, starter: true, position: "MID" as const })),
       ...byPos.FWD.slice(0, 2).map((id) => ({ rosterEntryId: id, starter: true, position: "FWD" as const })),
     ];
-    const validResult = await updateLineup(admin, teamId, openResult.roundId, validXi, new Date("2026-09-08T00:00:00Z"));
+    const validResult = await updateLineup(admin, teamId, openResult.roundId, validXi, new Date("2026-09-08T06:00:00Z"));
     assert.deepEqual(validResult, { ok: true });
   } finally {
     await cleanupTestLeague(admin, league);
@@ -230,7 +230,7 @@ test("a locked starter cannot be moved, even long after the round has finalized"
     const draftId = draft![0].draft_id;
     await draftToCompletion(admin, draftId, 4, 16);
 
-    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-08-25T00:00:00Z"));
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-08-25T06:00:00Z"));
     assert.ok(openResult.ok);
     if (!openResult.ok) return;
 
@@ -244,7 +244,7 @@ test("a locked starter cannot be moved, even long after the round has finalized"
       ...byPos.MID.slice(0, 4).map((id) => ({ rosterEntryId: id, starter: true, position: "MID" as const })),
       ...byPos.FWD.slice(0, 2).map((id) => ({ rosterEntryId: id, starter: true, position: "FWD" as const })),
     ];
-    await updateLineup(admin, teamId, openResult.roundId, validXi, new Date("2026-08-25T00:00:00Z"));
+    await updateLineup(admin, teamId, openResult.roundId, validXi, new Date("2026-08-25T06:00:00Z"));
 
     // Scoped to THIS team's own roster entries -- since Pass 10.5, every
     // team's round 1 gets an automatic starting XI (not just this one
@@ -288,7 +288,7 @@ test("matchup scoring excludes bench points entirely -- a manually-set XI and an
     await draftToCompletion(admin, draftId, 4, 16);
 
     // A real historical window with confirmed final scores (see docs/scoring-model.md).
-    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-08-25T00:00:00Z"));
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-08-25T06:00:00Z"));
     assert.ok(openResult.ok);
     if (!openResult.ok) return;
 
@@ -310,7 +310,7 @@ test("matchup scoring excludes bench points entirely -- a manually-set XI and an
       ...byPos.MID.slice(0, 4).map((id) => ({ rosterEntryId: id, starter: true, position: "MID" as const })),
       ...byPos.FWD.slice(0, 2).map((id) => ({ rosterEntryId: id, starter: true, position: "FWD" as const })),
     ];
-    const setResult = await updateLineup(admin, teamWithLineup, openResult.roundId, validXi, new Date("2026-08-25T00:00:00Z"));
+    const setResult = await updateLineup(admin, teamWithLineup, openResult.roundId, validXi, new Date("2026-08-25T06:00:00Z"));
     assert.deepEqual(setResult, { ok: true });
 
     await refreshMatchupScores(admin, openResult.roundId);
@@ -456,7 +456,7 @@ test("a full 2-manager auto-drafted simulation: both teams end with legal 16-pla
     assert.equal(ownershipRows!.length, managers * squadSize);
     assert.equal(new Set(ownershipRows!.map((r) => r.player_id)).size, ownershipRows!.length, "zero ownership violations -- no player drafted twice");
 
-    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T06:00:00Z"));
     assert.ok(openResult.ok, "round 1 must open, so the auto-generated starting XI is queryable");
     if (!openResult.ok) return;
 
@@ -587,7 +587,7 @@ test("ensureFirstRoundOpened is a safe no-op once a round already exists -- neve
     const draftId = draft![0].draft_id;
     await draftToCompletion(admin, draftId, 2, 16);
 
-    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T06:00:00Z"));
     assert.ok(openResult.ok);
 
     await ensureFirstRoundOpened(admin, league.leagueId);
@@ -618,7 +618,7 @@ test("updateLineup: promoting bench players to fill every empty slot (building a
     const draftId = draft![0].draft_id;
     await draftToCompletion(admin, draftId, 2, 16);
 
-    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T06:00:00Z"));
     assert.ok(openResult.ok);
     if (!openResult.ok) return;
 
@@ -649,7 +649,7 @@ test("updateLineup: promoting bench players to fill every empty slot (building a
     ];
     assert.equal(fills.length, 11, "test setup: exactly 11 fills queued, matching 4-4-2");
 
-    const fillResult = await updateLineup(admin, teamId, openResult.roundId, fills, new Date("2026-09-08T00:00:00Z"));
+    const fillResult = await updateLineup(admin, teamId, openResult.roundId, fills, new Date("2026-09-08T06:00:00Z"));
     assert.deepEqual(fillResult, { ok: true });
 
     const { data: finalSlots } = await admin.from("lineup_slots").select("starter").eq("fantasy_round_id", openResult.roundId).in("roster_entry_id", rosterIds);
@@ -668,7 +668,7 @@ test("updateLineup: an incomplete fill (fewer than 11) is rejected -- an in-prog
     const draftId = draft![0].draft_id;
     await draftToCompletion(admin, draftId, 2, 16);
 
-    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T06:00:00Z"));
     assert.ok(openResult.ok);
     if (!openResult.ok) return;
 
@@ -688,7 +688,7 @@ test("updateLineup: an incomplete fill (fewer than 11) is rejected -- an in-prog
     ];
     assert.equal(partialFills.length, 5);
 
-    const result = await updateLineup(admin, teamId, openResult.roundId, partialFills, new Date("2026-09-08T00:00:00Z"));
+    const result = await updateLineup(admin, teamId, openResult.roundId, partialFills, new Date("2026-09-08T06:00:00Z"));
     assert.deepEqual(result, { ok: false, error: "INVALID_FORMATION" }, "5 starters is never a valid persisted lineup, even mid-edit");
 
     const { data: stillBench } = await admin.from("lineup_slots").select("starter").eq("fantasy_round_id", openResult.roundId).in("roster_entry_id", rosterIds);
@@ -712,7 +712,7 @@ test("a genuine starter<->bench substitution persists through the authenticated 
     const draftId = draft![0].draft_id;
     await draftToCompletion(admin, draftId, 2, 16);
 
-    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T06:00:00Z"));
     assert.ok(openResult.ok);
     if (!openResult.ok) return;
 
@@ -757,7 +757,7 @@ test("a genuine starter<->bench substitution persists through the authenticated 
         { rosterEntryId: defOut.roster_entry_id, starter: false },
         { rosterEntryId: defIn.roster_entry_id, starter: true, position: "DEF" },
       ],
-      new Date("2026-09-08T00:00:00Z")
+      new Date("2026-09-08T06:00:00Z")
     );
     assert.deepEqual(result, { ok: true });
 
@@ -803,7 +803,7 @@ test("the database itself rejects a manager writing another team's lineup_slots,
     const draftId = draft![0].draft_id;
     await draftToCompletion(admin, draftId, 2, 16);
 
-    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T00:00:00Z"));
+    const openResult = await openNextRound(admin, league.leagueId, new Date("2026-09-08T06:00:00Z"));
     assert.ok(openResult.ok);
     if (!openResult.ok) return;
 

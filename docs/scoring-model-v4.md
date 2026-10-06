@@ -348,7 +348,7 @@ Draft: `supabase/migrations/20261008000000_scoring_v4_foundation.sql` — **NOT 
 - `fantasy_rounds`: checked NOT NULL scoring_rule_version default V3. Applying gives existing roundsV3 metadata; does not recompute points/results.
 - New `scoring_version_activations`: effective timestampPK + checked version; one `-infinity, V3` baseline row. No V4 activation entry.
 - Two trigger-only `SECURITY DEFINER` functions with empty search_path and qualified relation references. PUBLIC/anon/authenticated execute revoked. Activation table has RLS and client permissions revoked; service hasSELECT/INSERT, no UPDATE/DELETE/TRUNCATE. Owner/admin can bypass or alter policy as a trusted DB operator; ordinary clients cannot.
-- Activation requires futureTuesday00UTC, no existing round ending after boundary, monotonic policy and advisory transaction lock441104 shared with round creation. The checks repeat after acquiring lock.
+- Activation requires future Tuesday 06:00 UTC, no existing round ending after boundary, monotonic policy and advisory transaction lock441104 shared with round creation. The checks repeat after acquiring lock.
 - Read-only `get_catalog_scoring_version()` SQL/STABLE/SECURITY DEFINER RPC uses empty search_path, fully qualified policy table and database statement time; no caller clock/version argument. Only authenticated/service may execute. It does not expose the future activation ledger or change rows. Missing/unknown policy fails closed in the server selector.
 - No new index; existing primary policy timestamp covers lookup. No score/breakdown precision/type change; structured breakdown uses existingJSONB.
 - Additive schema but migration is **run once through repository Supabase history**, not manually re-executable idempotent SQL (`ADD COLUMN`/`CREATE` intentionally fail on duplicate objects). Transactional migration application failure should roll back; do not manually run fragments.
@@ -379,7 +379,7 @@ Both request and affected-row estimates exceed100. **No operation was executed. 
 
 1. Review table, new-negative rules, whole-fixture clean sheets and incomplete-calibration caveats. Establish uniform advanced-field coverage using explicitly authorized data and full V4 recalibration; do not enable inconsistent categories by assumption.
 2. Separately approve/apply dormant migration; deploy reviewed version-aware app/ingestion. Verify existing V3 round/model/result reads. Capture future rich statistics naturally without rewriting history.
-3. Choose a **futureTuesday00UTC boundary at or after every already-created round's ends_at**, using fresh actual round data. Existing next/upcomingV3 rounds finishV3. No fixed date is hardcoded here.
+3. Choose a **future Tuesday 06:00 UTC boundary at or after every already-created round's ends_at**, using fresh actual round data. Existing next/upcomingV3 rounds finishV3. No fixed date is hardcoded here.
 4. Explicitly approve and insert a future V4 activation policy using authorized service/operator tooling. Never UPDATE an existing round version.
 5. When new rounds are created with starts_at>=boundary, trigger pinsV4; earlier/already-created rounds stayV3. All later newly-created rounds use the policy until an explicit future change.
 6. Verify real V4 snapshot completeness, canonical model rows, aggregation, Game Rules and inspector. Catalog/market scoring remainsV3 in this pass: decide its eventual display transition explicitly; simply activating round policy does not silently retag season totals.

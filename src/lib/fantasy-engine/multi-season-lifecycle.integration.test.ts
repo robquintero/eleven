@@ -22,7 +22,7 @@ import { createTestLeague, cleanupTestLeague, type TestLeague } from "./integrat
 
 const skip = !isSupabaseAdminConfigured();
 
-const HISTORICAL_START = new Date("2026-08-25T00:00:00Z");
+const HISTORICAL_START = new Date("2026-08-25T06:00:00Z");
 
 function settleClockFor(windowEndsAt: Date): Date {
   return new Date(windowEndsAt.getTime() + 25 * 3600 * 1000);

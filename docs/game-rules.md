@@ -90,22 +90,23 @@ explicitly deferred, not implemented "lightly."
 
 ## Fantasy round boundary
 
-**Tuesday 00:00 UTC → the following Monday 23:59:59 UTC.** Chosen from
-real 2026/27 fixture-calendar evidence — see
-`docs/fantasy-round-calendar-analysis.md` for the full analysis. Every
-other candidate (Mon→Sun, Wed→Tue, Thu→Wed) either splits a real domestic
-weekend or a real UEFA matchday in the stored data; Tue→Mon splits
-neither.
+**Tuesday → Monday.** Tuesday begins a fresh fantasy week. The fixed weekly
+rollover is **Tuesday 06:00 UTC → next Tuesday 06:00 UTC**, with half-open
+intervals `[starts_at, ends_at)`. Tuesday 00:00–05:59:59.999 UTC is still
+in the previous week; exactly 06:00 UTC begins the new week.
 
-**Canonical timezone: UTC.** `fixtures.kickoff_at` is already UTC, and no
-fixture in the real dataset falls within 3 hours of a UTC midnight
-boundary — the choice of timezone doesn't change any fixture's round
-assignment for this calendar, and UTC avoids CET/CEST's October DST
-transition (which falls inside this season) being a source of
-boundary ambiguity. Kickoff times are still *displayed* in the viewer's
-local time via the existing `formatKickoff` helpers — this only governs
-which round a fixture's raw UTC timestamp belongs to, and that resolution
-is identical for every user regardless of where they are.
+**Canonical timezone: UTC.** The boundary never moves with U.S. daylight
+saving time (approximately 02:00 EDT / 01:00 EST). Kickoff display remains
+local to the viewer. Fixture ownership uses kickoff, never full time,
+provider arrival time, or the reconciliation clock. A match starting before
+rollover stays wholly in its old week even if it finishes afterward.
+
+Calendar rollover is independent of settlement: the next week opens when
+the previous window ends, while an older round may remain unfinished until
+its existing terminal-status, post-FT reconciliation and V4-evidence checks
+pass. Closed unfinished windows continue to reconcile against their stored
+timestamps. Completed fantasy results remain immutable. There is no global
+Tuesday lineup deadline; each player locks at their first eligible kickoff.
 
 ## Round generation ("skip blank weeks")
 
@@ -120,19 +121,16 @@ representing as a "round" at all.
 Concretely (`src/domain/fantasy/round-calendar.ts`):
 
 - `roundWindowContaining(date)` — pure, given any instant returns the
-  Tue→Mon window it falls in. No I/O, no league concept.
-- `nextEligibleRoundWindow(afterWindowEnd, fixtureWindows)` — pure, given
-  the set of windows that actually contain a stored fixture, returns the
-  next one strictly after a given window's end. This is what "advance to
-  next round" walks forward through — international-break windows are
-  simply never returned.
+  Tuesday 06:00 UTC window it falls in. No I/O, no league concept.
+- `nextRoundWindow(window)` — returns the next canonical recurring window;
+  it never carries a legacy midnight anchor into newly-created weeks.
+- `findNextEligibleWindow` (`src/lib/fantasy-engine/round-eligibility.ts`) —
+  checks stored fixture evidence and skips blank weeks.
 
-**Rounds are created one at a time**, not pre-generated for the whole
-season: a league's `fantasy_rounds` row for round *N+1* is created only
-when round *N* finalizes (or, for round 1, when the draft completes).
-This matches the brief's own lifecycle diagram (open round → ... →
-finalize round → advance to next round) and is what the simulation
-harness (`docs/game-rules.md` "Simulation," `src/lib/fantasy-engine/simulate.ts`)
+**Rounds are created one at a time**, at calendar rollover (or, for round 1,
+when the draft completes). Settlement of the previous round may finish later.
+
+The simulation harness (`docs/game-rules.md` "Simulation," `src/lib/fantasy-engine/simulate.ts`)
 drives through repeatedly with a controlled clock.
 
 ## Fixture → round assignment

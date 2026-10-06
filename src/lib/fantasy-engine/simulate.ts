@@ -89,7 +89,7 @@ export async function runSimulation(
   options: SimulationOptions
 ): Promise<{ result: SimulationResult; testUserIds: string[]; leagueId: string }> {
   const squadSize = options.squadSize ?? 16;
-  const startAt = options.startAt ? new Date(options.startAt) : new Date("2026-08-11T00:00:00Z");
+  const startAt = options.startAt ? new Date(options.startAt) : new Date("2026-08-11T06:00:00Z");
 
   const testUserIds: string[] = [];
   const clients: SupabaseClient<Database>[] = [];

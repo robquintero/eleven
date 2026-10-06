@@ -86,7 +86,7 @@ test("querySquad: starter shows real round points + FINAL state, bench shows rea
       .in("player_id", [starterPlayerId, benchPlayerId]);
 
     // Deliberately NON-canonical window: Wednesday noon -> Sunday noon,
-    // nowhere near a Tuesday 00:00 UTC boundary -- proves no code here
+    // nowhere near a Tuesday 06:00 UTC boundary -- proves no code here
     // assumes/relies on the standard calendar alignment. Set safely in
     // the real PAST (unlike this suite's usual isolatedWindow(2090+) --
     // the `locked`/`isPlayerLocked` booleans this test asserts on are

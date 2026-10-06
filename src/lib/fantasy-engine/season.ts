@@ -51,11 +51,10 @@ export type ProgressSeasonResult =
 
 /**
  * The one authoritative, idempotent season-progression operation (brief
- * §6): finalize the current round if its fixtures are all settled, then
- * either open the next scheduled round or — if that was the season's
- * final round — complete the season and crown a champion. Reuses
- * `finalizeRoundIfReady`/`openNextRound` exactly as they already exist;
- * no second scoring/finalization path.
+ * §6): reconcile every unfinished round, settle when its fixture evidence
+ * is ready, and open the next week at calendar rollover independently.
+ * Complete the season and crown a champion only after all rounds settle.
+ * Reuses `finalizeRoundIfReady`/`openNextRound`; no second scoring path.
  *
  * Idempotency: calling this twice in immediate succession never
  * duplicates a round or re-completes a season. `finalizeRoundIfReady`
@@ -78,13 +77,22 @@ export async function progressSeason(admin: SupabaseClient<Database>, leagueId: 
 
   const { data: currentRound } = await admin
     .from("fantasy_rounds")
-    .select("id, number, status")
+    .select("id, number, status, ends_at")
     .eq("season_id", season.id)
     .order("number", { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (currentRound && currentRound.status !== "completed") {
+  // Older calendar-closed rounds can still be awaiting late evidence.
+  // Keep using their persisted windows until the normal settlement checks
+  // pass; never let opening a new week strand their reconciliation.
+  const { data: pendingRounds, error: pendingError } = await admin.from("fantasy_rounds")
+    .select("id, number, ends_at")
+    .eq("season_id", season.id).neq("status", "completed")
+    .order("number", { ascending: true });
+  if (pendingError) throw new Error(`Cannot inspect pending rounds: ${pendingError.message}`);
+  let pendingSettlement = false;
+  for (const pending of pendingRounds ?? []) {
     // Pass 12D: refresh live_points EVERY call, not only once the round is
     // actually ready to finalize — this is what keeps Live Matchday
     // truthful during the match itself, not just at the final whistle.
@@ -94,13 +102,14 @@ export async function progressSeason(admin: SupabaseClient<Database>, leagueId: 
     // `matchup_scores`. Reuses the exact same `refreshMatchupScores` the
     // finalize path already uses — never a second scoring/aggregation
     // implementation.
-    await refreshMatchupScores(admin, currentRound.id);
-    await finalizeRoundIfReady(admin, currentRound.id, now);
+    await refreshMatchupScores(admin, pending.id);
+    const settled = await finalizeRoundIfReady(admin, pending.id, now);
+    if (!settled.finalized) pendingSettlement = true;
   }
 
   if (currentRound && season.total_rounds !== null && currentRound.number >= season.total_rounds) {
     const { data: confirmedRound } = await admin.from("fantasy_rounds").select("status").eq("id", currentRound.id).single();
-    if (confirmedRound?.status === "completed") {
+    if (confirmedRound?.status === "completed" && !pendingSettlement) {
       const championFantasyTeamId = await computeChampion(admin, season.id);
       await admin
         .from("seasons")

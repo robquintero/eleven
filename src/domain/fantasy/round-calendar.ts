@@ -1,6 +1,6 @@
 /**
- * Eleven's fixed weekly fantasy-round boundary — Tuesday 00:00 UTC to the
- * following Monday 23:59:59.999 UTC. See docs/fantasy-round-calendar-analysis.md
+ * Eleven's Tuesday → Monday calendar: Tuesday 06:00 UTC to the following
+ * Tuesday 06:00 UTC, end exclusive. See docs/fantasy-round-calendar-analysis.md
  * for the empirical evidence and docs/game-rules.md "Fantasy round boundary"
  * for why. Pure calendar math only — knows nothing about leagues, fixtures,
  * or which weeks actually have eligible football in them (that's
@@ -19,8 +19,10 @@ export interface RoundWindow {
 }
 
 const ROUND_LENGTH_MS = 7 * 24 * 60 * 60 * 1000;
-/** 2000-01-04T00:00:00Z is a Tuesday — an arbitrary, stable anchor for the windowing math below. Any Tuesday 00:00 UTC works identically; this one predates any real Eleven data by decades so there's no risk of it ever needing to change. */
-const ANCHOR_TUESDAY_UTC = Date.UTC(2000, 0, 4);
+/** Fixed UTC hour; never a local-time/DST rule. */
+export const ROUND_BOUNDARY_UTC_HOUR = 6;
+/** An arbitrary Tuesday before any real Eleven data. */
+const ANCHOR_TUESDAY_UTC = Date.UTC(2000, 0, 4, ROUND_BOUNDARY_UTC_HOUR);
 
 /** The Tue→Mon window a given instant falls inside. */
 export function roundWindowContaining(date: Date): RoundWindow {
@@ -31,9 +33,13 @@ export function roundWindowContaining(date: Date): RoundWindow {
   return { startsAt, endsAt };
 }
 
-/** The window immediately following `window` — adjacent, non-overlapping, same length. */
+/** Next canonical window — adjacent for canonical inputs, never overlapping. */
 export function nextRoundWindow(window: RoundWindow): RoundWindow {
-  return { startsAt: window.endsAt, endsAt: new Date(window.endsAt.getTime() + ROUND_LENGTH_MS) };
+  // Legacy persisted windows can end at midnight. New recurring windows
+  // always use the canonical boundary, never propagate that old anchor.
+  const containingEnd = roundWindowContaining(window.endsAt);
+  const startsAt = containingEnd.startsAt < window.endsAt ? containingEnd.endsAt : window.endsAt;
+  return { startsAt, endsAt: new Date(startsAt.getTime() + ROUND_LENGTH_MS) };
 }
 
 /** Whether `date` falls inside `window` — start inclusive, end exclusive. */

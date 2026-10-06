@@ -189,13 +189,76 @@ test("canonical upgrade: immediate V4, frozen 102–98 result/winner/standings, 
   } finally { await db.close(); }
 });
 
-test("complete 35-migration clean installation includes raw storage and immutable settlement without activating V4", async () => {
+test("complete 36-migration clean installation includes raw storage and immutable settlement without activating V4", async () => {
   const db = await bootstrap();
   try {
     const files=(await readdir(folder)).filter(f=>f.endsWith('.sql')).sort();
     for(const file of files){const sql=await readFile(new URL(file,folder),'utf8');await db.transaction(tx=>tx.exec(sql));}
-    assert.equal(files.length,35);
+    assert.equal(files.length,36);
     assert.equal((await db.query<{v:string}>('select get_catalog_scoring_version() v')).rows[0].v,'ELEVEN_STANDARD_V3');
     assert.equal((await db.query<{n:number}>('select count(*)::int n from football_provider_snapshots')).rows[0].n,0);
+  } finally { await db.close(); }
+});
+
+test("Tuesday 06:00 migration is metadata-only and redeploy-safe; settlement guards and pinned history survive", async () => {
+  const db = await bootstrap();
+  try {
+    await migrations(db, true);
+    await seed(db);
+    await db.exec(await readFile(new URL("20261009000000_scoring_v4_canonical_and_raw_evidence.sql", folder), "utf8"));
+    const before = await snapshot(db);
+    const rounds = (await db.query("select * from fantasy_rounds order by id")).rows;
+    const activation = (await db.query("select effective_from::text, scoring_rule_version from scoring_version_activations order by effective_from")).rows;
+    const boundarySQL = await readFile(new URL("20261010000000_tuesday_six_utc_boundary.sql", folder), "utf8");
+    await db.exec(boundarySQL);
+    await db.exec(boundarySQL);
+    assert.deepEqual(await snapshot(db), before);
+    assert.deepEqual((await db.query("select * from fantasy_rounds order by id")).rows, rounds);
+    assert.deepEqual((await db.query("select effective_from::text, scoring_rule_version from scoring_version_activations order by effective_from")).rows, activation);
+    await assert.rejects(db.exec("insert into scoring_version_activations values('2090-01-03 00:00:00+00','ELEVEN_STANDARD_V4')"), /ACTIVATION_REQUIRES/);
+    await db.exec("insert into scoring_version_activations values('2090-01-03 06:00:00+00','ELEVEN_STANDARD_V4')");
+    await assert.rejects(db.exec(`update fantasy_rounds set ends_at='2026-10-06 06:00:00+00' where id='${id(7)}'`), /IMMUTABLE/);
+    await assert.rejects(db.exec(`update fantasy_rounds set ends_at='2026-10-13 06:00:00+00' where id='${id(8)}'`), /WINDOW_IMMUTABLE/);
+    await assert.rejects(db.exec("update matchup_scores set final_points=999"), /IMMUTABLE/);
+  } finally { await db.close(); }
+});
+
+test("exact one-off calendar transaction fails closed, adjusts only approved windows/locks and restores the guard", async () => {
+  const db = await bootstrap();
+  try {
+    await migrations(db, true); await seed(db);
+    await db.exec(await readFile(new URL("20261009000000_scoring_v4_canonical_and_raw_evidence.sql", folder), "utf8"));
+    await db.exec("select activate_scoring_v4_now()");
+    const roundIds = ["ea80c33d-8d80-41d6-9267-fb303bc3e576", "d4116438-42ef-4ed8-a62c-04d8471fa780", "7d81b42a-18fd-4f74-a09a-458eb98588f4"];
+    for (const [i, roundId] of roundIds.entries()) await db.exec(`
+      insert into fantasy_leagues(id,name,invite_code,created_by_user_id,status) values('${id(200+i)}','Cutover ${i}','CUTOVER${i}','${id(1)}','active');
+      insert into seasons(id,league_id,season_number,status) values('${id(300+i)}','${id(200+i)}',1,'ACTIVE');
+      insert into fantasy_teams(id,league_id,owner_user_id,name,abbreviation) values('${id(400+i)}','${id(200+i)}','${id(1)}','Owner','OWN');
+      insert into fantasy_rounds(id,league_id,season_id,number,starts_at,ends_at,status) values('${roundId}','${id(200+i)}','${id(300+i)}',1,'${i===2 ? "2026-10-06" : "2026-09-29"}','${i===2 ? "2026-10-13" : "2026-10-06"}','in_progress');`);
+    for (let i=0;i<15;i++) await db.exec(`
+      insert into players(id,club_id,competition_id,name,short_name,position) values('${id(500+i)}','${id(11)}','${id(10)}','Cutover ${i}','C${i}','MID');
+      insert into roster_entries(id,league_id,fantasy_team_id,player_id,acquisition_type) values('${id(600+i)}','${id(202)}','${id(402)}','${id(500+i)}','draft');
+      insert into lineup_slots(roster_entry_id,fantasy_round_id,slot,starter,locked_at) values('${id(600+i)}','${roundIds[2]}','BENCH',false,${i===14 ? "null" : "'2026-10-10 15:00:00+00'"});`);
+    const historical = async () => (await db.query(`select to_jsonb(r) as row from fantasy_rounds r where id='${id(7)}' union all select to_jsonb(m) from matchups m where id='${id(14)}' union all select to_jsonb(s) from matchup_scores s where matchup_id='${id(14)}'`)).rows;
+    const originalHistory = await historical();
+    const rosterBefore = (await db.query("select to_jsonb(r) as row from roster_entries r order by id")).rows;
+    const guardBefore = (await db.query("select pg_get_functiondef('pin_round_scoring_version()'::regprocedure) as definition")).rows;
+    // Inject the reviewed cutover clock in this isolated rehearsal only.
+    const sql = (await readFile(new URL("../../../scripts/one-off/calendar-cutover-2026-10-06.sql", import.meta.url), "utf8"))
+      .replaceAll("statement_timestamp()", "timestamptz '2026-10-06 15:30:00+00'");
+    await assert.rejects(db.exec(sql), /EXPECTED_FUTURE_LOCKS_CHANGED/);
+    await db.exec("rollback");
+    assert.equal((await db.query<{n:number}>("select count(*)::int n from fantasy_rounds where ends_at='2026-10-06 06:00:00+00'")).rows[0].n,0);
+    assert.deepEqual((await db.query("select pg_get_functiondef('pin_round_scoring_version()'::regprocedure) as definition")).rows,guardBefore);
+    await db.exec(`update lineup_slots set locked_at='2026-10-10 15:00:00+00' where roster_entry_id='${id(614)}'`);
+    await db.exec(sql);
+    assert.equal((await db.query<{n:number}>("select count(*)::int n from fantasy_rounds where ends_at='2026-10-06 06:00:00+00'")).rows[0].n,3);
+    assert.equal((await db.query<{n:number}>(`select count(*)::int n from lineup_slots where fantasy_round_id='${roundIds[2]}' and locked_at is null`)).rows[0].n,15);
+    assert.deepEqual((await db.query("select to_jsonb(r) as row from roster_entries r order by id")).rows,rosterBefore);
+    assert.deepEqual(await historical(),originalHistory);
+    assert.deepEqual((await db.query("select pg_get_functiondef('pin_round_scoring_version()'::regprocedure) as definition")).rows,guardBefore);
+    await assert.rejects(db.exec(sql),/CUTOVER_ALREADY_APPLIED/); await db.exec("rollback");
+    await assert.rejects(db.exec(`update fantasy_rounds set ends_at='2026-10-07' where id='${roundIds[0]}'`),/WINDOW_IMMUTABLE/);
+    await assert.rejects(db.exec("update matchup_scores set final_points=999"),/IMMUTABLE/);
   } finally { await db.close(); }
 });

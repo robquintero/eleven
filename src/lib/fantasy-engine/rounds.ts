@@ -169,7 +169,9 @@ export async function openNextRound(
     .limit(1)
     .maybeSingle();
 
-  if (previousRound && previousRound.status !== "completed") {
+  // Calendar rollover and settlement are independent. A closed window can
+  // keep reconciling while the next week opens; an active window cannot.
+  if (previousRound && new Date(previousRound.ends_at) > now) {
     return { ok: false, error: "PREVIOUS_ROUND_STILL_OPEN" };
   }
 
@@ -387,11 +389,10 @@ async function ensureRoundOneOpenedForSeason(
  * lineup_slots row is never touched here, whether or not its count looks
  * complete — once `createRoundLineupSlots` has run for a team, a manager
  * may have already edited that lineup, and this must never overwrite
- * that. Only ever called for round 1 (see `ensureFirstRoundOpened`) — by
- * the time a league has moved on to round 2, round 1 is provably complete
- * already, since `openNextRound`'s own `PREVIOUS_ROUND_STILL_OPEN` guard
- * requires the previous round to already be `completed` before a new one
- * can open at all.
+ * that. Only ever called while round 1 is the latest opened week (see
+ * `ensureFirstRoundOpened`). After calendar rollover, never backfill an
+ * earlier week's lineup; its existing slots remain its scoring evidence
+ * while settlement finishes. New weeks carry the current roster normally.
  */
 async function repairIncompleteRoundOne(admin: SupabaseClient<Database>, leagueId: string, roundId: string, window: RoundWindow): Promise<void> {
   // A left embed keeps roster entries with NO slots. As before, even one
@@ -562,7 +563,7 @@ export async function finalizeRoundIfReady(
     .select("starts_at, ends_at, status, league_id, number")
     .eq("id", roundId)
     .maybeSingle();
-  if (!round || round.status === "completed") return { finalized: false };
+  if (!round || round.status === "completed" || now < new Date(round.ends_at)) return { finalized: false };
 
   const window: RoundWindow = { startsAt: new Date(round.starts_at), endsAt: new Date(round.ends_at) };
   const { data: fixtures } = await admin

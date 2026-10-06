@@ -1,0 +1,1797 @@
+{
+  "canonical_boundary": "Tuesday 06:00 UTC, fixed across DST; [start,end)",
+  "cutover_at": "2026-10-06T06:00:00Z",
+  "verified_at": "2026-10-06T15:28:04.708408+00:00",
+  "migration": "20261010000000_tuesday_six_utc_boundary.sql",
+  "previous_round_updates": [
+    {
+      "id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "starts_at_before": "2026-10-06T00:00:00+00:00",
+      "starts_at_after": "2026-10-06T00:00:00+00:00",
+      "ends_at_before": "2026-10-13T00:00:00+00:00",
+      "ends_at_after": "2026-10-06T06:00:00+00:00",
+      "status": "in_progress",
+      "scoring_rule_version": "ELEVEN_STANDARD_V4"
+    },
+    {
+      "id": "d4116438-42ef-4ed8-a62c-04d8471fa780",
+      "starts_at_before": "2026-09-29T00:00:00+00:00",
+      "starts_at_after": "2026-09-29T00:00:00+00:00",
+      "ends_at_before": "2026-10-06T00:00:00+00:00",
+      "ends_at_after": "2026-10-06T06:00:00+00:00",
+      "status": "in_progress",
+      "scoring_rule_version": "ELEVEN_STANDARD_V4"
+    },
+    {
+      "id": "ea80c33d-8d80-41d6-9267-fb303bc3e576",
+      "starts_at_before": "2026-09-29T00:00:00+00:00",
+      "starts_at_after": "2026-09-29T00:00:00+00:00",
+      "ends_at_before": "2026-10-06T00:00:00+00:00",
+      "ends_at_after": "2026-10-06T06:00:00+00:00",
+      "status": "in_progress",
+      "scoring_rule_version": "ELEVEN_STANDARD_V4"
+    }
+  ],
+  "previous_lock_updates": [
+    {
+      "id": "0acab82b-4ea1-4073-ad5a-0efa1c56febd",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-11T15:15:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "19044110-8641-4c5f-97f1-dcafd3d1f3a0",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-11T13:00:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "327980af-ef51-4df5-864f-8c5ad71fbaea",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-09T18:30:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "4108f1bc-89b4-4b8f-8a6f-6135f05f1048",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-10T18:45:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "4265367b-ce7a-4ae8-adc9-ba99d7847819",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-10T16:00:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "4c2efd07-b0a2-4ca5-bda3-7f845f4e83c8",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-10T18:45:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "65367a52-a274-422b-8260-f56ffa6cbf38",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-11T15:30:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "712a3106-3edb-42df-8a73-274a31f56903",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-12T16:30:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "72f781b7-fc70-4ebd-84c1-d364d49ad132",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-12T16:30:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "746074fa-a6c8-4d53-beb0-d7494a5e7562",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-10T13:00:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "ba524865-dc4a-4199-bf96-485dbf10faf6",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-09T18:45:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "c00b37ad-3dc6-48ff-838e-c962ea21994b",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-10T18:45:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "d2903b93-1f0b-4700-b841-42bfa0d9c24c",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-11T15:30:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "e56c1564-82ed-46ad-a61a-f00b2d6a4044",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-10T13:30:00+00:00",
+      "locked_at_after": null
+    },
+    {
+      "id": "e6d19123-0933-4c8e-8989-b0c610ba950b",
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+      "locked_at_before": "2026-10-11T18:45:00+00:00",
+      "locked_at_after": null
+    }
+  ],
+  "new_rounds": [
+    {
+      "end": "2026-10-13T06:00:00+00:00",
+      "id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "league_id": "517dd351-95fe-4ab9-9206-ea1be153f097",
+      "matchup_count": 1,
+      "number": 2,
+      "season_id": "b621632b-9557-4d7a-86b8-11aabec3838d",
+      "slot_count": 32,
+      "start": "2026-10-06T06:00:00+00:00",
+      "status": "in_progress",
+      "version": "ELEVEN_STANDARD_V4"
+    },
+    {
+      "end": "2026-10-13T06:00:00+00:00",
+      "id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "league_id": "009434f3-c004-4b10-9d43-5d84d5eb1250",
+      "matchup_count": 2,
+      "number": 2,
+      "season_id": "4b243feb-835b-457e-87d3-1004722cfeae",
+      "slot_count": 64,
+      "start": "2026-10-06T06:00:00+00:00",
+      "status": "in_progress",
+      "version": "ELEVEN_STANDARD_V4"
+    },
+    {
+      "end": "2026-10-13T06:00:00+00:00",
+      "id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "league_id": "80f9181f-2c11-4dec-bffc-60a22ee0345f",
+      "matchup_count": 1,
+      "number": 2,
+      "season_id": "451ef9f0-b4bd-448b-bf54-7129aeb01644",
+      "slot_count": 32,
+      "start": "2026-10-06T06:00:00+00:00",
+      "status": "in_progress",
+      "version": "ELEVEN_STANDARD_V4"
+    }
+  ],
+  "new_matchups": [
+    {
+      "away_fantasy_team_id": "2a60000a-7448-4ce9-a17c-c3c3a5acd957",
+      "created_at": "2026-10-06T15:25:51.806612+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "home_fantasy_team_id": "f3125810-83c4-42ca-8f16-239be54cf529",
+      "id": "53721626-da17-4d28-ab1d-e0a557c17ca2",
+      "league_id": "009434f3-c004-4b10-9d43-5d84d5eb1250",
+      "status": "live",
+      "updated_at": "2026-10-06T15:27:32.356458+00:00"
+    },
+    {
+      "away_fantasy_team_id": "46d72a85-78da-4b9f-a2c6-fd3b3a8fe960",
+      "created_at": "2026-10-06T15:26:02.705411+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "home_fantasy_team_id": "904c58dc-eed5-4df4-a88c-baca7a7c79cb",
+      "id": "a8b9b8dd-c6aa-44f4-a95a-874a0b303485",
+      "league_id": "517dd351-95fe-4ab9-9206-ea1be153f097",
+      "status": "live",
+      "updated_at": "2026-10-06T15:27:31.451055+00:00"
+    },
+    {
+      "away_fantasy_team_id": "fa6071e3-9487-47e3-b907-40b18783ed44",
+      "created_at": "2026-10-06T15:25:51.806612+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "home_fantasy_team_id": "b39ad172-0984-48f5-b0db-8e9307925ace",
+      "id": "b08d3a72-68a9-49f2-99b1-d72c55d478e5",
+      "league_id": "009434f3-c004-4b10-9d43-5d84d5eb1250",
+      "status": "live",
+      "updated_at": "2026-10-06T15:27:32.356458+00:00"
+    },
+    {
+      "away_fantasy_team_id": "6ac5cb42-8d51-41d5-b545-728e31b7ad15",
+      "created_at": "2026-10-06T15:25:58.092807+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "home_fantasy_team_id": "7defe394-d8ae-4494-b123-86c554bc0978",
+      "id": "efc41f2a-1094-408e-80b7-27e73a33d6dd",
+      "league_id": "80f9181f-2c11-4dec-bffc-60a22ee0345f",
+      "status": "live",
+      "updated_at": "2026-10-06T15:27:33.153706+00:00"
+    }
+  ],
+  "new_score_rows": [
+    {
+      "fantasy_team_id": "b39ad172-0984-48f5-b0db-8e9307925ace",
+      "final_points": null,
+      "id": "4d2dc69e-5138-4d4b-88bd-31ebaaaf2331",
+      "live_points": 0,
+      "matchup_id": "b08d3a72-68a9-49f2-99b1-d72c55d478e5",
+      "projected_points": null,
+      "updated_at": "2026-10-06T15:25:56.441355+00:00"
+    },
+    {
+      "fantasy_team_id": "46d72a85-78da-4b9f-a2c6-fd3b3a8fe960",
+      "final_points": null,
+      "id": "4d577f9f-9754-418a-8457-6a8904b31a17",
+      "live_points": 0,
+      "matchup_id": "a8b9b8dd-c6aa-44f4-a95a-874a0b303485",
+      "projected_points": null,
+      "updated_at": "2026-10-06T15:26:05.357589+00:00"
+    },
+    {
+      "fantasy_team_id": "6ac5cb42-8d51-41d5-b545-728e31b7ad15",
+      "final_points": null,
+      "id": "5fa75e9e-e81c-476f-aba7-52f2e97c81fc",
+      "live_points": 0,
+      "matchup_id": "efc41f2a-1094-408e-80b7-27e73a33d6dd",
+      "projected_points": null,
+      "updated_at": "2026-10-06T15:26:01.401418+00:00"
+    },
+    {
+      "fantasy_team_id": "904c58dc-eed5-4df4-a88c-baca7a7c79cb",
+      "final_points": null,
+      "id": "92d10c26-0983-4d92-8e7f-ebec058039e7",
+      "live_points": 0,
+      "matchup_id": "a8b9b8dd-c6aa-44f4-a95a-874a0b303485",
+      "projected_points": null,
+      "updated_at": "2026-10-06T15:26:05.357589+00:00"
+    },
+    {
+      "fantasy_team_id": "f3125810-83c4-42ca-8f16-239be54cf529",
+      "final_points": null,
+      "id": "9f78fbbb-1443-4738-9c22-457936385194",
+      "live_points": 0,
+      "matchup_id": "53721626-da17-4d28-ab1d-e0a557c17ca2",
+      "projected_points": null,
+      "updated_at": "2026-10-06T15:25:56.441355+00:00"
+    },
+    {
+      "fantasy_team_id": "fa6071e3-9487-47e3-b907-40b18783ed44",
+      "final_points": null,
+      "id": "b7a67bf9-65d3-44f8-8fbe-94b0230bccce",
+      "live_points": 0,
+      "matchup_id": "b08d3a72-68a9-49f2-99b1-d72c55d478e5",
+      "projected_points": null,
+      "updated_at": "2026-10-06T15:25:56.441355+00:00"
+    },
+    {
+      "fantasy_team_id": "7defe394-d8ae-4494-b123-86c554bc0978",
+      "final_points": null,
+      "id": "c7ab64bb-7006-4aba-8810-0db81b1434fd",
+      "live_points": 0,
+      "matchup_id": "efc41f2a-1094-408e-80b7-27e73a33d6dd",
+      "projected_points": null,
+      "updated_at": "2026-10-06T15:26:01.401418+00:00"
+    },
+    {
+      "fantasy_team_id": "2a60000a-7448-4ce9-a17c-c3c3a5acd957",
+      "final_points": null,
+      "id": "e3cfe6b3-b049-4658-9e1c-fe07078ca6cb",
+      "live_points": 0,
+      "matchup_id": "53721626-da17-4d28-ab1d-e0a557c17ca2",
+      "projected_points": null,
+      "updated_at": "2026-10-06T15:25:56.441355+00:00"
+    }
+  ],
+  "new_lineup_slots": [
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "00456dde-8e62-4341-90e6-f4ba4715117a",
+      "locked_at": "2026-10-10T12:00:00+00:00",
+      "roster_entry_id": "a4879f01-68a0-4f09-877a-fcef437f709e",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "00a319c9-7e13-4bb6-a490-d37de7a80eb0",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "ad6e361a-9e2d-489e-8530-c8edafea8c9f",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "00d8af7c-4369-4b98-ab3b-69188c9d404f",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "445e2434-3e34-470f-a940-bc16513eb59e",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "02693c10-2d60-440b-98a9-7314a3204769",
+      "locked_at": "2026-10-10T19:00:00+00:00",
+      "roster_entry_id": "9fbc30a7-8549-4b6d-8e7b-584ec0572c85",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "030970cc-34f2-4fc9-a6a8-8292d2111370",
+      "locked_at": "2026-10-10T16:30:00+00:00",
+      "roster_entry_id": "c49d2184-a461-4b5f-bfb1-882305407812",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "057a867e-a77d-4a94-85ff-9f31f324f075",
+      "locked_at": "2026-10-10T14:00:00+00:00",
+      "roster_entry_id": "c8ca5cb9-344e-4268-b300-171cc5fdb926",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "0712b1cf-9b58-4e74-9e3f-68e63a0b46de",
+      "locked_at": "2026-10-11T13:00:00+00:00",
+      "roster_entry_id": "803073c3-ae5e-4445-877a-ea721e83b9f8",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "0723a99d-57f3-45c4-bf09-228f661be2e8",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "7373a53f-e5a5-4562-abcc-356b453c81bb",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "07df8c88-59a9-4505-9057-f5a23e52422c",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "5f0f5ec2-4b39-462a-9522-4d4f15cdd3d3",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "0b08b46e-7a24-463c-aca6-ee36ff4dc4fd",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "d8ae9d90-4636-48e6-8d27-8ea5d753b7f5",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "0c7de360-ec11-4e28-a111-27a573f47268",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "da958c43-1df3-429f-8ec6-4cf880b1f5b8",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "1089a4ff-a31a-40ff-a1d7-758bfe83dfa3",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "c9077a11-5156-4397-b2bd-8dc12aae371f",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "10adbee5-7351-4cc4-a022-3b97b3bc77d9",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "3d808c98-c66e-4504-a702-c9ae29fd2cc8",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "1864a905-4a61-445e-90d4-bce60a8e614a",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "c946d17d-27e3-4a68-8bd4-5c7d32df97f4",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "192c7818-fb86-4b54-b7b8-ff10dd2fb3e5",
+      "locked_at": "2026-10-10T16:30:00+00:00",
+      "roster_entry_id": "f42356a9-35ef-4394-952f-7123e471022d",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "19d5a3a6-ae21-4118-bd46-d3d66b7a82d7",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "b3b5eb42-81f7-4327-b318-2b6dda603c3d",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "1a08b08b-750c-4030-92e0-f9213e40132e",
+      "locked_at": "2026-10-10T16:00:00+00:00",
+      "roster_entry_id": "f05b09de-131a-4bb4-b558-3d6e7246d40d",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "1a5424d0-050d-4780-bfe1-296f596a6f51",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "2653dfa4-119d-46a2-a4b9-d982d247651a",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "1c664585-9626-4e83-b1b4-6cd1a6b484b2",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "d29bde13-54c8-4e5d-b4d8-a5d3c5cec2b6",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "1d6ac8ac-40f6-49ac-8bcf-2843611a068c",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "d21208f0-da85-4dd5-98af-1a8ea1dbede1",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "2083f2c9-1af6-474c-b045-1f8330e50831",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "a33b1905-b13b-4ac1-ac90-b52e5ff5758e",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "21b5bbec-9c5a-4802-ae89-a5512b360d21",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "d034b316-a1be-4f0f-b4d0-9d584969516f",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "22fc20a0-51bb-4ef8-868d-39a6cad6c916",
+      "locked_at": "2026-10-10T16:00:00+00:00",
+      "roster_entry_id": "63d8d6fe-55c5-4a7e-abae-91dff9cd16e5",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "2543bfaf-2bf5-44c0-ad14-c6f3998085e8",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "6a8f82e4-42a2-4f7f-a8de-2484c651d4b5",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "29a4bbb3-b262-4518-8792-40f29b8d7cb5",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "56b38a28-c0fc-4680-8483-9df45bdaa9ec",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "2a6f3fe6-ff1b-472d-aab4-79210ac2d6b1",
+      "locked_at": "2026-10-10T16:30:00+00:00",
+      "roster_entry_id": "71336882-a55c-4f31-bba1-285424106537",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "2d4ab84c-d84c-44e6-8f0b-f5c009dcfc6d",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "a6f8281d-1bb1-4369-a5d5-852bec2ac21d",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "361b2e9a-10e3-49ab-bbcd-011ed56c5ee4",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "0eb9b635-4e08-4a04-a363-de5b7da0e661",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "3652e632-6fc0-4469-bf03-d9a5c87a9a00",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "6f15de40-c6f7-4309-babe-de993f223b8a",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "369c8e2e-1832-4032-a973-5376401e6a39",
+      "locked_at": "2026-10-10T14:00:00+00:00",
+      "roster_entry_id": "e514751d-d1af-4aac-8323-ac96acf6ecac",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "3717b486-cec6-488d-863e-bb3df2addb0e",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "7c6c672f-4603-4c11-a217-ee2173015bce",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "37dd6996-f0a8-470f-bf29-e3fb2ea6f79d",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "1d5f0eab-8b49-4d27-a368-ceeb861aa50b",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "3be9ba71-2caf-41d3-adb6-bf929e38ffc5",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "f815ab36-73bc-44e6-96cd-7da1ed1163f6",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "3f099077-84fa-449c-a9c0-2df5b76721f2",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "0e690bbd-cb61-4771-838f-badbd11fe6a4",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "407b5731-5b1c-4091-bad9-eb215f6606c5",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "e091b5c8-39c9-4e1a-8b15-34ea3013bc60",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "424bd756-ef5b-43c7-bda3-4153b158c5ec",
+      "locked_at": "2026-10-10T11:30:00+00:00",
+      "roster_entry_id": "d1e3f166-a706-4369-8d23-015350a2a221",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "43e42015-a60f-4f72-a767-75df734cbb46",
+      "locked_at": "2026-10-11T13:00:00+00:00",
+      "roster_entry_id": "38103f0d-b8a9-4c78-a87f-db9304f346f7",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "43f2d99d-89f0-4508-8cb3-bfb96cfd6867",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "4b170e3e-6e9f-46a5-bbf1-4474079b041b",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "4e73ab39-78a1-4f2c-b9ef-dfabcce2eabc",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "45908529-e7f0-451a-ae20-ffa3af2647bc",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "4e77d1b0-4400-415c-b579-a32221226eef",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "10598de1-43d4-42d8-93ea-86288731380d",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "4ed3c01c-13b6-46e7-9fc3-58a26e46fea4",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "25427397-5c61-4bed-b63c-90aeada11cc6",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "51ee484c-d6e1-41eb-8743-ebd5561a8581",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "5d574579-ff5c-4ace-b506-95a03f05a527",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "528fcbdf-0f5c-4d6b-85dc-bff804998cae",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "c723772f-2a2d-4b9a-90b3-89d67f137b0b",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "52e666b1-d366-4858-92f3-046876964c68",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "f70aeaa7-984e-4750-92af-f067daefa773",
+      "slot": "GK",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "582edb89-1d84-4624-933e-efa370a5dc83",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "8bc91f46-35e7-4bcb-92cf-c71c680ed320",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "5abf746a-7321-4e19-aae4-edd6458a8abe",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "0b069548-1879-43bf-ad8c-21f422d0e272",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "5ac1f50f-370a-49b4-a037-069203794d1f",
+      "locked_at": "2026-10-10T13:00:00+00:00",
+      "roster_entry_id": "18b39868-0eba-411d-86f5-88b2864f638e",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "5f142cde-3ded-4fa8-8568-ffb2226f3ab6",
+      "locked_at": "2026-10-11T15:15:00+00:00",
+      "roster_entry_id": "b9b148b4-ca8c-47bb-854d-352d99d3e971",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "654dc3bb-f743-445d-b713-1e79b050fd95",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "d40d4f0d-ce12-454b-9bde-fbdd1a3003fb",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "681608dd-d74a-4eac-9cce-5fe2e7a01b0a",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "73d6b856-a235-4309-b9db-0de57cad3021",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "68a2353a-9d94-40a9-9015-3e442493810a",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "76935f1e-f052-4e5e-b6d9-2de792e2890c",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "6c634c8b-0333-430a-a4fd-62a939f48963",
+      "locked_at": "2026-10-10T16:30:00+00:00",
+      "roster_entry_id": "6faff420-bbfa-425c-aec1-e56d5af217e4",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "6d6c987e-5585-44ae-aa47-3f56d2db94e8",
+      "locked_at": "2026-10-10T19:00:00+00:00",
+      "roster_entry_id": "75a14df9-e3c0-4664-83c6-d1bdb2970aba",
+      "slot": "GK",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "6d8c5661-36c7-4352-83cc-b69a87705304",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "88619ef9-481f-4d45-a053-888e03175399",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "6e850893-84c6-476d-845c-097239a9d419",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "e70c87fe-3672-47bd-9073-2d4ff44e052c",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "720a068a-f613-4379-a60e-aec72eee6853",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "4a0bb265-8a31-47b9-a7f5-2263b92e8190",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "7655cc42-4c8b-4edb-af47-aef9b3e4e689",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "f4a1d6a4-2c84-4bdd-8694-efb47eccb4d1",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "7abd7859-7d1d-4ffe-a0be-38d04ccd1628",
+      "locked_at": "2026-10-10T16:30:00+00:00",
+      "roster_entry_id": "83879f78-b6f0-4b02-b520-fa8f731d77a6",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "7e0d26e0-70d9-4519-86ba-f8791cb4cd25",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "3dd4f341-bad8-4190-96ba-476c578e8504",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "81a88157-18f4-4d1a-be54-3ea023fab2a9",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "2c457241-2db1-40f7-bbae-04fd67480547",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "8363573c-b967-424a-a197-0c6bac698f2a",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "e5fee453-1131-4181-b04b-ff4dc01435cc",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "83e87423-9bd5-484b-b6ba-a2646a182a98",
+      "locked_at": "2026-10-10T16:30:00+00:00",
+      "roster_entry_id": "671f3aeb-1541-471e-b3cf-8caa87e010db",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "86827d96-95b7-41bf-96e9-6f8b8278065a",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "88f5484e-9908-4fff-91fe-00aa88ca627b",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "8a753d2a-4e5d-452e-8c99-a6840711d025",
+      "locked_at": "2026-10-09T18:45:00+00:00",
+      "roster_entry_id": "8022c0a0-7c4c-4514-acc6-ef7a7c4a7193",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "8b6bfde0-aafe-438b-8e05-038f8ab72f82",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "7334d819-0263-4600-bcf9-666b283f14d4",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "8fb16626-21bd-4182-85e7-38a20f6d0522",
+      "locked_at": "2026-10-10T16:30:00+00:00",
+      "roster_entry_id": "5eef631f-4ab9-4283-b334-d1d1badc90ef",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "908aee7e-478c-401a-9430-bb60c35c0c05",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "8ac55db0-9064-40ae-b785-ea46da9ef373",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "938b7ab7-7b0e-43be-bf0e-38da6337385e",
+      "locked_at": "2026-10-12T16:30:00+00:00",
+      "roster_entry_id": "da1e8e51-d926-4d49-bbef-daa1b14d269e",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "971e250e-62e7-4388-b0dc-9fc1f2731075",
+      "locked_at": "2026-10-10T19:00:00+00:00",
+      "roster_entry_id": "1636e171-1a80-48e4-b4d1-5a18e7883765",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "9780ac23-a123-4705-9448-94a2313c7ed8",
+      "locked_at": "2026-10-10T19:00:00+00:00",
+      "roster_entry_id": "3dab09e5-06a6-451a-a7b6-6a0607374ed8",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "98a83dc2-62b1-4a9d-9aa5-1a469ddd4084",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "e4e252de-8f9a-4d2a-a37f-665b6a8239d9",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "98e37692-50ef-4ef1-9d67-257918ab8383",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "b07e2ae0-2020-428f-95d0-3bcb2738cc50",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "9cff04bc-648f-4de0-a90b-fa140790177e",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "3c998513-7a35-4328-beff-ae634d46c5a5",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "a4049230-45cd-4bd5-803e-2b4174f2a323",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "072eb951-49ba-45ad-b1cc-555661333c38",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "a46e08fc-d246-4593-b860-75f1f5e612be",
+      "locked_at": "2026-10-10T16:00:00+00:00",
+      "roster_entry_id": "6097cb78-2c55-4af9-baff-cee8a4879945",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "a73c43c4-b763-4469-9994-b0811c4c563c",
+      "locked_at": "2026-10-10T14:15:00+00:00",
+      "roster_entry_id": "7219261f-c24c-4df0-9f42-0da2952bf67a",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "aa10c7a1-fb52-4aa8-b248-6df810cd578a",
+      "locked_at": "2026-10-10T14:00:00+00:00",
+      "roster_entry_id": "329555f1-4c18-4c77-940d-322ab3c3a0b1",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "aa756569-16ad-4226-b210-253eab27e260",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "42b7008a-0583-4295-ac51-0bfd6bbaf761",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "ab0dea93-a278-4857-a9de-c08f92e2c56c",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "37cce165-97e1-4c8f-acaa-c2bad676bde9",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "aee6a54e-35e9-4c75-b79e-6c6ba7ce058e",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "ede9a78c-2164-4b9d-a2f5-afc24959ea32",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "b0b721e6-d5ee-4644-b17d-63bb1579b5c0",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "4e392a2a-8c89-4f0d-b695-4e1300116256",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "b18eb7e3-604f-4a86-8a4d-5ffb9398a339",
+      "locked_at": "2026-10-10T14:15:00+00:00",
+      "roster_entry_id": "eb7319f0-e145-41de-aaa2-594c0f8e3da1",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "b19418c0-a011-46c4-aad8-6151f9e60b9e",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "fc7cdd6f-a3a3-4a95-ba03-136ff260f709",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "b1f64a78-5080-434c-84c7-6c00b5c505e1",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "fdf81423-31c8-45f0-bd57-7de981be6975",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "b8b47641-273a-47a1-9ee6-5a99abb70d37",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "fe72d9f5-b48c-47e5-8b73-03f81e5b1a73",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "b8ebfcfa-0610-45fd-87e7-63a0763811f1",
+      "locked_at": "2026-10-10T16:30:00+00:00",
+      "roster_entry_id": "cbb713a9-10f8-4cf4-a895-3e1a1a76243b",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "b9484861-1fa8-4149-a9dc-115ed5fccd2b",
+      "locked_at": null,
+      "roster_entry_id": "edc98b92-b146-40e0-8d0d-d1f79934a521",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "ba57a90c-a3af-420d-80c4-5be6d9c21a29",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "2d7505d3-7a69-4a6c-a16b-894c83196448",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "be17f364-b9c8-4d43-bd73-fb750bfd3ea2",
+      "locked_at": "2026-10-10T11:30:00+00:00",
+      "roster_entry_id": "e6d635e7-2b3a-4fc7-ac04-e3ad285cf3ec",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "be66c4c8-ed62-4d09-8907-7679218f574e",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "278b4a2c-a3b1-4b9d-9fbd-9e7da7aa5cde",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "c12c6af5-4e72-483a-9697-ddfbfe8d17ba",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "dc09f9b3-752f-4adf-abfb-631f9f9e4cd0",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "c16a51ca-6ebc-4e9f-a563-da276e5d7d43",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "034273b8-c45f-4dbb-8fa2-fafaab44ed7f",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "c18c6ca1-3966-4f26-860f-6c5050c27c2c",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "4ad8d117-d1c4-49a9-863c-dcd048c75e92",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "c5235785-9a7e-4d9a-879e-2ff9d0d5e517",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "205a4a6a-9cf9-4de5-b1a0-1ac0e117844c",
+      "slot": "GK",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "c6e9b6dd-c879-4fbf-b7fe-5cd6eafb9f74",
+      "locked_at": "2026-10-12T16:30:00+00:00",
+      "roster_entry_id": "6a4bf31d-eea2-4c0f-b218-47fada30c753",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "c885a95e-e48c-40c8-a0c3-4917877355db",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "d377f6d0-5fb7-4e7f-a162-4a91a4e36c21",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "c8870023-9579-45eb-850e-a88710b88204",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "4a869fca-8086-42dd-a273-22565bb5d28e",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "ca44f81d-42e1-444a-93d2-c34a6e2f5357",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "4a502952-ecbb-481d-abe2-79c0047706be",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "ca7c2510-abc5-42c5-82f3-21e2475c8b36",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "1fb9275a-2be5-49af-97d3-4913212345e4",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "cb334fed-2012-4228-920b-8e338ddb8fbb",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "01799ecf-c862-4e1b-93ef-e1e1126e7729",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "cb640dce-8df5-4aac-92d0-4105bf091974",
+      "locked_at": "2026-10-10T19:00:00+00:00",
+      "roster_entry_id": "7eca3e1e-fd40-4b72-8fe1-66f4244fa26d",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "ceb70013-5583-4413-bfa6-5e20ee3dd390",
+      "locked_at": "2026-10-10T19:00:00+00:00",
+      "roster_entry_id": "5bb4ecbd-6cba-4481-9123-6b367b04ebf2",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "d0a1ced3-c2b4-45a4-8841-00c3e452cec1",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "9cb5c89e-e1e7-4340-bc00-f04272519785",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "d177b57a-3867-41dd-92c4-042ed8f3db0f",
+      "locked_at": "2026-10-10T14:00:00+00:00",
+      "roster_entry_id": "bfcf5bd9-37d9-488f-addb-f4d00d6a8a0f",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "d6919bb9-d95d-4967-9799-6df817f54bf9",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "f902508a-67d5-444c-8735-2e5c628ae909",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:59.396309+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "d7db5564-5660-4cf4-bda6-61bf1b2fa4b3",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "67271943-445c-40de-aad2-7f8b451db6c0",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:59.396309+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "dcb264c4-1e5c-4c53-9a54-42b84d7cb3fa",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "13c00727-8715-4576-826b-c6a286fca8e1",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "dd1598ce-a301-4dc5-9ab9-b45938b164e1",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "0189e6ef-e34c-4160-bbb0-1887a5e9f680",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "e00c9179-81e5-4645-b60e-bc2b594a7429",
+      "locked_at": null,
+      "roster_entry_id": "4db28dde-90ac-47b0-a7e6-8c1eba02d929",
+      "slot": "GK",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "e134023a-4c7f-4fa8-912e-ff41dd89d92d",
+      "locked_at": "2026-10-11T13:00:00+00:00",
+      "roster_entry_id": "747d2889-75b7-4c16-b23b-0780e7dc5a04",
+      "slot": "DEF",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "e39259ab-e57f-4a93-a720-99d0b36c4d78",
+      "locked_at": "2026-10-11T15:30:00+00:00",
+      "roster_entry_id": "76c06f2c-e500-481d-bdd6-f33e6854d227",
+      "slot": "GK",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "e519477f-546e-48cf-8ec2-97ee2ec28e40",
+      "locked_at": "2026-10-12T19:00:00+00:00",
+      "roster_entry_id": "6122b7f7-84be-4db3-a22d-1ec4f6f2dd7f",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "e5992536-4554-4ae6-acf5-091a612a7d05",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "26cc7936-b0a0-4505-9397-3cdb5a17d97b",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "e6da6c8b-7bf1-49b5-a91e-ebc4c24c5f52",
+      "locked_at": "2026-10-09T18:30:00+00:00",
+      "roster_entry_id": "e97b8b35-47a7-4ea4-9fe8-22807a38e321",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "e7203cdf-5b55-429f-8445-f3eccee96932",
+      "locked_at": "2026-10-09T18:45:00+00:00",
+      "roster_entry_id": "2c9c0b30-cf60-4173-a51d-689c7a07449a",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "eb45e6cd-805e-43f4-9769-a1f947f6e797",
+      "locked_at": "2026-10-10T19:00:00+00:00",
+      "roster_entry_id": "48127caa-0db6-4fbd-bb63-4834415a39d4",
+      "slot": "GK",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "eb5c0130-f182-4c70-adc2-c6181710a23d",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "6027d052-7e19-4cb9-9b55-307b40e5f4a5",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "eb63ab2d-0bc9-46d1-ac65-81b3d2a42902",
+      "locked_at": "2026-10-10T16:30:00+00:00",
+      "roster_entry_id": "ee679331-7a53-48e1-903c-f880b35682fd",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "ecffc66e-62c4-4464-a0f7-a95959677ff7",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "f3b565f1-5f3a-4953-abb5-e6b564baf105",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "ed7bd197-cfc7-4028-9b0c-96b829f19155",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "909f3c82-5d07-491c-9df6-3d1de8cfc8bb",
+      "slot": "GK",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.760472+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "ef12a414-976c-464f-a775-a46856a7be12",
+      "locked_at": "2026-10-11T13:00:00+00:00",
+      "roster_entry_id": "2dd27b22-fa0d-4d90-8958-b1e1e6be42f1",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:26:03.760472+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "f1f7767d-1a3c-4746-ae5b-7a210faa82fd",
+      "locked_at": "2026-10-10T13:30:00+00:00",
+      "roster_entry_id": "c8f7568f-6006-42cf-ba2f-01f00fe99481",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.179324+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "f246f1ee-d5ed-4d54-a075-87a95b6d52a6",
+      "locked_at": "2026-10-06T18:45:00+00:00",
+      "roster_entry_id": "3f20ca48-e9ad-4875-af67-82901b62b51f",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:53.179324+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:26:03.117674+00:00",
+      "fantasy_round_id": "5de76764-a025-44e0-886c-d976da5dca32",
+      "id": "f2563c9f-de4c-49d7-bc5c-5d4897fa1ff0",
+      "locked_at": "2026-10-11T18:45:00+00:00",
+      "roster_entry_id": "6bb4b8b2-5229-4f8b-a083-4497fe80ccbc",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:26:03.117674+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:52.629413+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "f3340e54-cea1-4221-ab2a-a5593d3eb606",
+      "locked_at": "2026-10-10T18:45:00+00:00",
+      "roster_entry_id": "b722be64-0f18-453f-976e-25c413e3d934",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:52.629413+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:54.471513+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "f6acd782-fc06-41b1-a7bc-b0242e048cc6",
+      "locked_at": "2026-10-11T16:00:00+00:00",
+      "roster_entry_id": "e5fa16e2-13b7-46a4-bcb2-fb7609494a1a",
+      "slot": "BENCH",
+      "starter": false,
+      "updated_at": "2026-10-06T15:25:54.471513+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:58.793453+00:00",
+      "fantasy_round_id": "8197ca15-343e-457f-a6de-f9a472b0c10a",
+      "id": "f9364dc3-ab48-476d-9ec5-efaf2d96df8a",
+      "locked_at": "2026-10-10T19:00:00+00:00",
+      "roster_entry_id": "0211a8ff-0914-4656-80c5-d1aeb708fb44",
+      "slot": "MID",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:58.793453+00:00"
+    },
+    {
+      "created_at": "2026-10-06T15:25:53.808757+00:00",
+      "fantasy_round_id": "7e8d1e30-4ef2-4937-8288-fb6069575a6b",
+      "id": "faffc34b-bd04-4bde-9b59-d6b215babb36",
+      "locked_at": "2026-10-10T11:30:00+00:00",
+      "roster_entry_id": "428fab50-84e7-4113-9ee7-cb93df5c31da",
+      "slot": "FWD",
+      "starter": true,
+      "updated_at": "2026-10-06T15:25:53.808757+00:00"
+    }
+  ],
+  "new_round_event_ids": [
+    "0c39be34-a65c-42fa-8caf-1935ffe6ea78",
+    "78babba7-4f84-4ff4-8e28-d964b3affa7d",
+    "ef0a79d1-7af2-49ca-9cbf-3ae63f1f39ac"
+  ],
+  "refreshed_existing_matchup_ids": [
+    "04b1be72-82f8-4902-a2b3-0e9a143c6208",
+    "082c123c-1f10-4f8f-9582-624d7e72aedd",
+    "8b1ed1dc-2008-4a42-acad-e3a5eba3efee",
+    "e95bed14-7848-4f15-9a80-3ab8e6254827"
+  ],
+  "refreshed_existing_score_ids": [
+    "399865fc-55bf-432a-b5c3-04e5818138bd",
+    "453f4e13-ee27-4e67-afe7-1f7349616c86",
+    "6a1e70c2-2b50-4439-beb2-f6c6a3bbc4fa",
+    "78fd11de-58cc-453e-a37b-c5f847f5d2d6",
+    "86214738-aaed-4c56-8553-16c3a6912dbd",
+    "90a792ef-ef4e-42f1-9d9e-c259d386c8c8",
+    "aefb9b16-4e04-48f1-b38e-f76f6692861a",
+    "d8574336-da35-4d26-9037-d1698143986a"
+  ],
+  "existing_matchup_score_values_unchanged": true,
+  "previous_rounds_pending_settlement": 3,
+  "completed_rounds_before_and_after": 0,
+  "settled_scores_before_and_after": 0,
+  "current_round_counts": [
+    {
+      "current_count": 1,
+      "season_id": "451ef9f0-b4bd-448b-bf54-7129aeb01644"
+    },
+    {
+      "current_count": 1,
+      "season_id": "4b243feb-835b-457e-87d3-1004722cfeae"
+    },
+    {
+      "current_count": 1,
+      "season_id": "b621632b-9557-4d7a-86b8-11aabec3838d"
+    }
+  ],
+  "delta_fixture_ownership": [
+    {
+      "fixture_id": "5851f220-4984-40a8-948e-19ec6359eb66",
+      "kickoff": "2026-10-06T00:00:00+00:00",
+      "number": 1,
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4"
+    },
+    {
+      "fixture_id": "5851f220-4984-40a8-948e-19ec6359eb66",
+      "kickoff": "2026-10-06T00:00:00+00:00",
+      "number": 1,
+      "round_id": "d4116438-42ef-4ed8-a62c-04d8471fa780"
+    },
+    {
+      "fixture_id": "5851f220-4984-40a8-948e-19ec6359eb66",
+      "kickoff": "2026-10-06T00:00:00+00:00",
+      "number": 1,
+      "round_id": "ea80c33d-8d80-41d6-9267-fb303bc3e576"
+    },
+    {
+      "fixture_id": "8301fc36-a076-414f-b708-17c4ad68274f",
+      "kickoff": "2026-10-06T00:00:00+00:00",
+      "number": 1,
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4"
+    },
+    {
+      "fixture_id": "8301fc36-a076-414f-b708-17c4ad68274f",
+      "kickoff": "2026-10-06T00:00:00+00:00",
+      "number": 1,
+      "round_id": "d4116438-42ef-4ed8-a62c-04d8471fa780"
+    },
+    {
+      "fixture_id": "8301fc36-a076-414f-b708-17c4ad68274f",
+      "kickoff": "2026-10-06T00:00:00+00:00",
+      "number": 1,
+      "round_id": "ea80c33d-8d80-41d6-9267-fb303bc3e576"
+    },
+    {
+      "fixture_id": "90e6d9d5-265f-400a-947b-878d96470a53",
+      "kickoff": "2026-10-06T00:00:00+00:00",
+      "number": 1,
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4"
+    },
+    {
+      "fixture_id": "90e6d9d5-265f-400a-947b-878d96470a53",
+      "kickoff": "2026-10-06T00:00:00+00:00",
+      "number": 1,
+      "round_id": "d4116438-42ef-4ed8-a62c-04d8471fa780"
+    },
+    {
+      "fixture_id": "90e6d9d5-265f-400a-947b-878d96470a53",
+      "kickoff": "2026-10-06T00:00:00+00:00",
+      "number": 1,
+      "round_id": "ea80c33d-8d80-41d6-9267-fb303bc3e576"
+    },
+    {
+      "fixture_id": "f8053982-2bb8-4679-93ba-88a42b2d63b0",
+      "kickoff": "2026-10-06T02:00:00+00:00",
+      "number": 1,
+      "round_id": "7d81b42a-18fd-4f74-a09a-458eb98588f4"
+    },
+    {
+      "fixture_id": "f8053982-2bb8-4679-93ba-88a42b2d63b0",
+      "kickoff": "2026-10-06T02:00:00+00:00",
+      "number": 1,
+      "round_id": "d4116438-42ef-4ed8-a62c-04d8471fa780"
+    },
+    {
+      "fixture_id": "f8053982-2bb8-4679-93ba-88a42b2d63b0",
+      "kickoff": "2026-10-06T02:00:00+00:00",
+      "number": 1,
+      "round_id": "ea80c33d-8d80-41d6-9267-fb303bc3e576"
+    }
+  ],
+  "new_week_fixture_count": 64,
+  "roster_coverage_mismatches": 0,
+  "starter_carry_mismatches": 0,
+  "new_lock_mismatches": 0,
+  "round_overlap_count": 0,
+  "settlement_guard_definitions_unchanged": true,
+  "catalog_before": "ELEVEN_STANDARD_V4",
+  "catalog_after": "ELEVEN_STANDARD_V4",
+  "unchanged_table_digests": [
+    {
+      "digest": "7954ff3a8d263db6dc58fba90eeb3461",
+      "name": "draft_orders",
+      "rows": 4
+    },
+    {
+      "digest": "7fec880c436c58932dfd6cbac79e10aa",
+      "name": "draft_picks",
+      "rows": 64
+    },
+    {
+      "digest": "126baeabf1e7c4b4b8b6a99970430804",
+      "name": "drafts",
+      "rows": 3
+    },
+    {
+      "digest": "3277ea16c58db47ac19957b391a0e287",
+      "name": "fantasy_leagues",
+      "rows": 5
+    },
+    {
+      "digest": "5f59b796f5fa72bbd4073d5585e89cda",
+      "name": "fantasy_player_scores",
+      "rows": 49453
+    },
+    {
+      "digest": "e47ffafe0c1d7fe21b4cbd1043062b0e",
+      "name": "fantasy_teams",
+      "rows": 10
+    },
+    {
+      "digest": "9dbe0880c2e5b9a0ef19e856ea14d296",
+      "name": "league_memberships",
+      "rows": 10
+    },
+    {
+      "digest": "348630451f700bf642989c82f15326cb",
+      "name": "league_player_ownership",
+      "rows": 128
+    },
+    {
+      "digest": "b59dce4d6719ed85b9d11b8707481ab6",
+      "name": "player_match_stats",
+      "rows": 14180
+    },
+    {
+      "digest": "d5b2dd73fe96c4abb198a49d9de0637b",
+      "name": "players",
+      "rows": 2767
+    },
+    {
+      "digest": "02718da4ba058a4e797affa53fc84cd2",
+      "name": "roster_entries",
+      "rows": 132
+    },
+    {
+      "digest": "6a08f36ef5d19d71e60874f9a7e205d2",
+      "name": "scoring_version_activations",
+      "rows": 3
+    },
+    {
+      "digest": "29ff0767fcea3bb9541f4680dde9ced4",
+      "name": "seasons",
+      "rows": 4
+    },
+    {
+      "digest": "3ffebdcac407d325c36a3c3259375ff5",
+      "name": "trade_assets",
+      "rows": 12
+    },
+    {
+      "digest": "d560c56425506e7b24dd661bbc28794a",
+      "name": "trades",
+      "rows": 6
+    },
+    {
+      "digest": "52b731c944ed87e293f3c5943aa50771",
+      "name": "transactions",
+      "rows": 69
+    },
+    {
+      "digest": "d41d8cd98f00b204e9800998ecf8427e",
+      "name": "waiver_claims",
+      "rows": 0
+    }
+  ],
+  "concurrent_background_changes": [
+    {
+      "table": "football_provider_snapshots",
+      "before_rows": 1002,
+      "after_rows": 1002,
+      "note": "The existing live-sync cron remained active. The bounded cutover made no archive or provider requests."
+    }
+  ],
+  "agent_provider_requests": 0,
+  "agent_mutation_tables": [
+    "fantasy_rounds",
+    "lineup_slots",
+    "matchups",
+    "matchup_scores",
+    "domain_events"
+  ],
+  "tests": {
+    "focused_pass": 78,
+    "focused_guarded_skips": 43,
+    "full_pass": 651,
+    "full_guarded_skips": 104,
+    "typecheck": "pass",
+    "lint": "known player-avatar image warning only",
+    "production_build": "pass",
+    "diff_check": "pass"
+  }
+}
