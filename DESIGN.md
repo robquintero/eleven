@@ -340,9 +340,12 @@ count), column headers (`POS` / `PLAYER` / `CLUB` / `FIXTURE` / `STATUS`).
 
 **Football abbreviations:**
 
-- **Position labels** (`GK`/`DEF`/`MID`/`FWD`): uppercase mono chip
-  (`.label-system`, `rounded-md bg-muted`). Never color-coded by hue —
-  position is typographic, not chromatic.
+- **Position labels** (`GK`/`DEF`/`MID`/`FWD`): uppercase mono chip via
+  `PositionBadge`, or inline `PositionLabel` where geometry must stay unchanged.
+  Shared `--position-*` tokens give GK muted gold, DEF steel blue, MID sage teal,
+  and FWD dusty coral; dark/light text tones preserve contrast. Badge backgrounds
+  use 10% tint and inset borders 20%. Keep visible role text and accessible full
+  labels; these quiet identity tones do not replace operational status colors.
 - **Club · position**, compact: `"ARS · MID"` — used in command palette
   results and tactical markers. **Club · league**, descriptive:
   `"ARS · Premier League"` — used in list rows and detail sheets. Pick

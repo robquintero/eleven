@@ -1,7 +1,7 @@
 "use client";
 
 import { TeamName } from "@/components/ui/team-name";
-import { PositionBadge } from "@/components/players/position-badge";
+import { PositionBadge, PositionLabel } from "@/components/players/position-badge";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -235,7 +235,7 @@ export function DraftWorkspace({
                     belowMin ? "font-semibold text-accent" : atMax ? "text-foreground-tertiary" : "text-foreground-secondary"
                   }`}
                 >
-                  {position} {count}/{min === max ? min : `${min}+`}
+                  <PositionLabel position={position} /> {count}/{min === max ? min : `${min}+`}
                 </span>
               );
             })}
@@ -431,7 +431,7 @@ export function DraftWorkspace({
                   <div className="min-w-0">
                     <p className="truncate text-xs text-foreground">{pick.playerName}</p>
                     <p className="label-system truncate text-[10px] text-foreground-tertiary">
-                      {pick.teamName} · {pick.clubShortName} · {pick.position}
+                      {pick.teamName} · {pick.clubShortName} · <PositionLabel position={pick.position} />
                     </p>
                   </div>
                   <span className="label-system shrink-0 text-[10px] text-foreground-tertiary">
@@ -526,7 +526,7 @@ function DraftCompleteRecap({
             const count = myCounts[position] ?? 0;
             return (
               <span key={position} className="label-system text-[10px] text-foreground-secondary">
-                {position} {count}/{min === max ? min : `${min}–${max}`}
+                <PositionLabel position={position} /> {count}/{min === max ? min : `${min}–${max}`}
               </span>
             );
           })}
@@ -544,7 +544,7 @@ function DraftCompleteRecap({
               <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
                 {team.picks.map((pick) => (
                   <span key={pick.pickNumber} className="label-system text-[11px] text-foreground-tertiary">
-                    {pick.position} <span className="text-foreground-secondary">{pick.playerName}</span>
+                    <PositionLabel position={pick.position} /> <span className="text-foreground-secondary">{pick.playerName}</span>
                   </span>
                 ))}
               </div>

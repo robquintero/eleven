@@ -1,6 +1,6 @@
 "use client";
 
-import { PositionBadge } from "@/components/players/position-badge";
+import { PositionBadge, PositionLabel } from "@/components/players/position-badge";
 
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
@@ -181,7 +181,7 @@ export function TradeList({
                     <p className="label-system text-[10px] text-foreground-tertiary">YOU RECEIVE</p>
                     {youReceive.map((p) => (
                       <p key={p.playerId} className="truncate text-xs text-foreground">
-                        {p.playerName} <span className="text-foreground-tertiary">{p.position}</span>
+                        {p.playerName} <PositionLabel position={p.position} />
                       </p>
                     ))}
                   </div>
@@ -189,7 +189,7 @@ export function TradeList({
                     <p className="label-system text-[10px] text-foreground-tertiary">YOU SEND</p>
                     {youSend.map((p) => (
                       <p key={p.playerId} className="truncate text-xs text-foreground">
-                        {p.playerName} <span className="text-foreground-tertiary">{p.position}</span>
+                        {p.playerName} <PositionLabel position={p.position} />
                       </p>
                     ))}
                   </div>

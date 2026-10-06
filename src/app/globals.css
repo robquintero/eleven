@@ -26,6 +26,11 @@
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
 
+  --color-position-gk: var(--position-gk);
+  --color-position-def: var(--position-def);
+  --color-position-mid: var(--position-mid);
+  --color-position-fwd: var(--position-fwd);
+
   --font-sans: var(--font-sans);
   --font-mono: var(--font-mono);
 
@@ -99,6 +104,12 @@
   --live-foreground: #ffffff;
   --warning: #c96a00;
   --warning-foreground: #ffffff;
+
+  /* Position identity — restrained hues, separate from operational status. */
+  --position-gk: #72551f;
+  --position-def: #315d7f;
+  --position-mid: #2f6654;
+  --position-fwd: #854b45;
 
   /* shadcn semantic aliases */
   --card: var(--surface);
@@ -175,6 +186,11 @@
   --live-foreground: #04140a;
   --warning: #ff9f0a;
   --warning-foreground: #1a0f00;
+
+  --position-gk: #c7ac72;
+  --position-def: #8bafcf;
+  --position-mid: #83b6a3;
+  --position-fwd: #cf9993;
 
   --card: var(--surface);
   --card-foreground: var(--foreground);

@@ -64,6 +64,50 @@ test("all position badges identify the complete role even in compact comparison 
   }
 });
 
+test("normal, compact and inline position labels share one semantic tone without changing badge geometry", () => {
+  const { PositionBadge, PositionLabel } = load("src/components/players/position-badge.tsx");
+  for (const position of ["GK", "DEF", "MID", "FWD"]) {
+    const badge = PositionBadge({ position });
+    const compact = PositionBadge({ position, compact: true });
+    const label = PositionLabel({ position });
+    const tone = `text-position-${position.toLowerCase()}`;
+    for (const element of [badge, compact, label]) {
+      assert.ok(String(element.props.className).split(" ").includes(tone));
+      assert.equal(element.props["aria-label"], position);
+    }
+    assert.equal(text(label), position);
+    assert.match(String(badge.props.className), /w-9 py-1/);
+    assert.match(String(compact.props.className), /w-3 py-0\.5/);
+  }
+  const unknown = PositionLabel({ position: "UNKNOWN" });
+  assert.equal(text(unknown), "UNKNOWN");
+  assert.equal(unknown.props.className, undefined);
+});
+
+test("position text meets 4.5:1 contrast on dark/light surfaces and selected, hover and subtle badge backgrounds", () => {
+  const css = readFileSync(resolve(root, "src/app/globals.css"), "utf8");
+  type RGB = [number, number, number];
+  const rgb = (hex: string): RGB => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16)) as RGB;
+  const mix = (front: RGB, back: RGB, alpha: number): RGB => front.map((n, i) => n * alpha + back[i] * (1 - alpha)) as RGB;
+  const luminance = (color: RGB) => color.map(n => n / 255).map(n => n <= 0.04045 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, n, i) => sum + n * [0.2126, 0.7152, 0.0722][i], 0);
+  const contrast = (a: RGB, b: RGB) => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
+  for (const theme of [":root", ".dark"]) {
+    const block = css.slice(css.indexOf(`${theme} {`)).split("}")[0];
+    const token = (name: string) => rgb(block.match(new RegExp(`--${name}: (#[0-9a-f]{6});`))![1]);
+    const surfaces = ["background", "surface", "surface-elevated"].map(token);
+    const rowBackgrounds = surfaces.flatMap(surface => [surface, mix(token("accent"), surface, 0.1), mix(token("warning"), surface, 0.05), mix(token("foreground"), surface, 0.05)]);
+    for (const position of ["gk", "def", "mid", "fwd"]) {
+      const color = token(`position-${position}`);
+      for (const surface of rowBackgrounds) {
+        for (const background of [surface, mix(color, surface, 0.1)]) {
+          assert.ok(contrast(color, background) >= 4.5, `${theme} ${position}: ${contrast(color, background).toFixed(2)}:1`);
+        }
+      }
+    }
+  }
+});
+
 test("scoreboard keeps user's full identity and exact score on the left in home and away matchups", () => {
   const { MatchupCommand } = load("src/components/dashboard/matchup-command.tsx");
   for (const isUserHome of [true, false]) {

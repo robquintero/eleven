@@ -1,5 +1,7 @@
 "use client";
 
+import { PositionLabel } from "@/components/players/position-badge";
+
 import { useEffect, useRef, useState } from "react";
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog";
 import { Command as CommandPrimitive } from "cmdk";
@@ -249,7 +251,7 @@ export function CommandPalette() {
                           />
                           <span className="flex-1 truncate">{player.name}</span>
                           <span className="label-system shrink-0 text-[10px] text-foreground-tertiary">
-                            {player.position} · {player.clubShortName}
+                            <PositionLabel position={player.position} /> · {player.clubShortName}
                           </span>
                         </CommandPrimitive.Item>
                       ))
