@@ -1431,6 +1431,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      delete_fantasy_league: { Args: { p_league_id: string; p_confirmation: string }; Returns: string };
       update_team_lineup: {
         Args: { p_fantasy_team_id: string; p_round_id: string; p_changes: Json; p_now?: string }
         Returns: undefined

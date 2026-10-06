@@ -1,3 +1,5 @@
+import { DeleteLeagueSection } from "@/components/league/delete-league-section";
+import { canDeleteLeague } from "@/lib/league-deletion";
 import { Suspense } from "react";
 import { ModuleLoading } from "@/components/shell/workspace-loading";
 import type { Metadata } from "next";
@@ -277,6 +279,9 @@ export default async function LeaguePage() {
         <CreateLeagueForm />
         <JoinLeagueForm />
       </div>
+      {activeDetail && canDeleteLeague(activeDetail.role, activeDetail.createdByUserId, profile.id) && (
+        <DeleteLeagueSection key={activeDetail.id} leagueId={activeDetail.id} leagueName={activeDetail.name} />
+      )}
     </div>
   );
 }

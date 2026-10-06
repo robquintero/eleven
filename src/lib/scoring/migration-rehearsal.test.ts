@@ -192,12 +192,12 @@ test("canonical upgrade: immediate V4, frozen 102–98 result/winner/standings, 
   } finally { await db.close(); }
 });
 
-test("complete 37-migration clean installation includes raw storage and immutable settlement without activating V4", async () => {
+test("complete 38-migration clean installation includes raw storage and immutable settlement without activating V4", async () => {
   const db = await bootstrap();
   try {
     const files=(await readdir(folder)).filter(f=>f.endsWith('.sql')).sort();
     for(const file of files){const sql=await readFile(new URL(file,folder),'utf8');await db.transaction(tx=>tx.exec(sql));}
-    assert.equal(files.length,37);
+    assert.equal(files.length,38);
     assert.equal((await db.query<{v:string}>('select get_catalog_scoring_version() v')).rows[0].v,'ELEVEN_STANDARD_V3');
     assert.equal((await db.query<{n:number}>('select count(*)::int n from football_provider_snapshots')).rows[0].n,0);
   } finally { await db.close(); }
