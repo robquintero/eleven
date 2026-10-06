@@ -81,7 +81,7 @@ test("a historical round's matchup lineup reflects that round's real lineup_slot
       .single();
     const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at, number").eq("id", opened.roundId).single();
 
-    const matchup: CurrentMatchup = {
+    const matchup: CurrentMatchup = { scoringRuleVersion: "ELEVEN_STANDARD_V3",
       id: "test-matchup",
       roundId: opened.roundId,
       roundNumber: round!.number,
@@ -207,7 +207,7 @@ test("a player dropped (unlocked) then re-signed by the SAME team within the sam
       .single();
     const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at, number").eq("id", opened.roundId).single();
 
-    const matchup: CurrentMatchup = {
+    const matchup: CurrentMatchup = { scoringRuleVersion: "ELEVEN_STANDARD_V3",
       id: "test-matchup",
       roundId: opened.roundId,
       roundNumber: round!.number,
@@ -287,7 +287,7 @@ test("queryMatchupSquads stamps truthful ownership on every player -- 'mine' for
     const teamNameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
 
     const isUserHome = matchupRow!.home_fantasy_team_id === league.teamIds[0];
-    const matchup: CurrentMatchup = {
+    const matchup: CurrentMatchup = { scoringRuleVersion: "ELEVEN_STANDARD_V3",
       id: "test-matchup",
       roundId: opened.roundId,
       roundNumber: round!.number,
@@ -357,7 +357,7 @@ test("getMatchupSquads returns a complete 4-4-2-shaped squad for a fully-rostere
       .single();
     const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at, number").eq("id", opened.roundId).single();
 
-    const matchup: CurrentMatchup = {
+    const matchup: CurrentMatchup = { scoringRuleVersion: "ELEVEN_STANDARD_V3",
       id: "test-matchup",
       roundId: opened.roundId,
       roundNumber: round!.number,
@@ -483,7 +483,7 @@ test("getMatchupSquads resolves the canonical club for a rostered player who als
       .single();
     const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at, number").eq("id", opened.roundId).single();
 
-    const matchup: CurrentMatchup = {
+    const matchup: CurrentMatchup = { scoringRuleVersion: "ELEVEN_STANDARD_V3",
       id: "test-matchup",
       roundId: opened.roundId,
       roundNumber: round!.number,

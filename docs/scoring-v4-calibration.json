@@ -1,0 +1,2446 @@
+{
+  "capturedAt": "2026-10-06T01:20:41.004Z",
+  "warning": "V4 PARTIAL/INCOMPLETE: historical shots, duels, dribbles, fouls and penalties were not stored. Unknown contributions are NOT measured zero. Legacy counts lost provider null provenance.",
+  "excludedUnmappedRows": 25,
+  "allStored": {
+    "v3": {
+      "count": 14170,
+      "mean": 4.26106210303458,
+      "median": 3,
+      "p25": 0,
+      "p75": 6,
+      "p90": 11,
+      "p95": 13.25,
+      "min": -5,
+      "max": 50.75
+    },
+    "v4Partial": {
+      "count": 14170,
+      "mean": 3.9017784050811013,
+      "median": 2.5,
+      "p25": 0,
+      "p75": 5.75,
+      "p90": 10.5,
+      "p95": 13,
+      "min": -5,
+      "max": 42.5
+    },
+    "byPosition": {
+      "GK": {
+        "v3": {
+          "count": 1505,
+          "mean": 2.702325581395349,
+          "median": 0,
+          "p25": 0,
+          "p75": 5,
+          "p90": 9,
+          "p95": 10.5,
+          "min": -1,
+          "max": 16.5
+        },
+        "v4Partial": {
+          "count": 1505,
+          "mean": 3.487541528239203,
+          "median": 0,
+          "p25": 0,
+          "p75": 7,
+          "p90": 11,
+          "p95": 13,
+          "min": -1,
+          "max": 19
+        }
+      },
+      "DEF": {
+        "v3": {
+          "count": 4622,
+          "mean": 4.302087840761575,
+          "median": 3.5,
+          "p25": 0,
+          "p75": 6.1875,
+          "p90": 11,
+          "p95": 12.5,
+          "min": -4,
+          "max": 28.75
+        },
+        "v4Partial": {
+          "count": 4622,
+          "mean": 4.057983556901774,
+          "median": 3.25,
+          "p25": 0,
+          "p75": 6,
+          "p90": 10.5,
+          "p95": 12,
+          "min": -4,
+          "max": 25.25
+        }
+      },
+      "MID": {
+        "v3": {
+          "count": 4919,
+          "mean": 4.692213864606627,
+          "median": 3.5,
+          "p25": 1,
+          "p75": 7,
+          "p90": 11.25,
+          "p95": 14.5,
+          "min": -5,
+          "max": 50.75
+        },
+        "v4Partial": {
+          "count": 4919,
+          "mean": 3.8674527342955884,
+          "median": 2.5,
+          "p25": 1,
+          "p75": 5.75,
+          "p90": 9.25,
+          "p95": 12.75,
+          "min": -5,
+          "max": 42.5
+        }
+      },
+      "FWD": {
+        "v3": {
+          "count": 3124,
+          "mean": 4.272407170294494,
+          "median": 2.25,
+          "p25": 1,
+          "p75": 5.5,
+          "p90": 11.25,
+          "p95": 14.25,
+          "min": -5,
+          "max": 40.75
+        },
+        "v4Partial": {
+          "count": 3124,
+          "mean": 3.924279769526308,
+          "median": 1.65,
+          "p25": 1,
+          "p75": 5,
+          "p90": 11.5,
+          "p95": 14.492499999999996,
+          "min": -5,
+          "max": 38.85
+        }
+      }
+    },
+    "contributions": {
+      "goals": {
+        "observedRows": 14170,
+        "meanObserved": 0.5048694424841214,
+        "meanPartial": 0.5048694424841214
+      },
+      "shots": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "shotsOnTarget": {
+        "observedRows": 14170,
+        "meanObserved": 0.46422018348623856,
+        "meanPartial": 0.46422018348623856
+      },
+      "assists": {
+        "observedRows": 14170,
+        "meanObserved": 0.2108680310515173,
+        "meanPartial": 0.2108680310515173
+      },
+      "penaltiesWon": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "keyPasses": {
+        "observedRows": 14170,
+        "meanObserved": 0.1290225829216655,
+        "meanPartial": 0.1290225829216655
+      },
+      "successfulDribbles": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "foulsDrawn": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "tackles": {
+        "observedRows": 14170,
+        "meanObserved": 0.2545624558927279,
+        "meanPartial": 0.2545624558927279
+      },
+      "interceptions": {
+        "observedRows": 14170,
+        "meanObserved": 0.15604093154551785,
+        "meanPartial": 0.15604093154551785
+      },
+      "blocks": {
+        "observedRows": 14170,
+        "meanObserved": 0.06426958362738207,
+        "meanPartial": 0.06426958362738207
+      },
+      "duelsWon": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "saves": {
+        "observedRows": 14170,
+        "meanObserved": 0.1450952717007763,
+        "meanPartial": 0.1450952717007763
+      },
+      "penaltiesSaved": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "yellowCards": {
+        "observedRows": 14170,
+        "meanObserved": -0.08440366972477065,
+        "meanPartial": -0.08440366972477065
+      },
+      "redCards": {
+        "observedRows": 14170,
+        "meanObserved": -0.013549752999294284,
+        "meanPartial": -0.013549752999294284
+      },
+      "foulsCommitted": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "penaltiesMissed": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "minutes": {
+        "observedRows": 14170,
+        "meanObserved": 1.5296400846859561,
+        "meanPartial": 1.5296400846859561
+      },
+      "cleanSheet": {
+        "observedRows": 13810,
+        "meanObserved": 0.5552498189717596,
+        "meanPartial": 0.5411432604093155
+      }
+    },
+    "coverageByCompetition": {
+      "AFCON_Q": {
+        "count": 288,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 288,
+          "shots": 0,
+          "shotsOnTarget": 288,
+          "assists": 288,
+          "penaltiesWon": 0,
+          "keyPasses": 288,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 288,
+          "interceptions": 288,
+          "blocks": 288,
+          "duelsWon": 0,
+          "saves": 288,
+          "penaltiesSaved": 0,
+          "yellowCards": 288,
+          "redCards": 288,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 288,
+          "cleanSheet": 167
+        }
+      },
+      "CONCACAF_GOLD_CUP": {
+        "count": 29,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 29,
+          "shots": 0,
+          "shotsOnTarget": 29,
+          "assists": 29,
+          "penaltiesWon": 0,
+          "keyPasses": 29,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 29,
+          "interceptions": 29,
+          "blocks": 29,
+          "duelsWon": 0,
+          "saves": 29,
+          "penaltiesSaved": 0,
+          "yellowCards": 29,
+          "redCards": 29,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 29,
+          "cleanSheet": 27
+        }
+      },
+      "CONCACAF_NL": {
+        "count": 52,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 52,
+          "shots": 0,
+          "shotsOnTarget": 52,
+          "assists": 52,
+          "penaltiesWon": 0,
+          "keyPasses": 52,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 52,
+          "interceptions": 52,
+          "blocks": 52,
+          "duelsWon": 0,
+          "saves": 52,
+          "penaltiesSaved": 0,
+          "yellowCards": 52,
+          "redCards": 52,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 52,
+          "cleanSheet": 34
+        }
+      },
+      "ENG": {
+        "count": 2013,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 2013,
+          "shots": 0,
+          "shotsOnTarget": 2013,
+          "assists": 2013,
+          "penaltiesWon": 0,
+          "keyPasses": 2013,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 2013,
+          "interceptions": 2013,
+          "blocks": 2013,
+          "duelsWon": 0,
+          "saves": 2013,
+          "penaltiesSaved": 0,
+          "yellowCards": 2013,
+          "redCards": 2013,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 2013,
+          "cleanSheet": 1972
+        }
+      },
+      "ESP": {
+        "count": 3147,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 3147,
+          "shots": 0,
+          "shotsOnTarget": 3147,
+          "assists": 3147,
+          "penaltiesWon": 0,
+          "keyPasses": 3147,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 3147,
+          "interceptions": 3147,
+          "blocks": 3147,
+          "duelsWon": 0,
+          "saves": 3147,
+          "penaltiesSaved": 0,
+          "yellowCards": 3147,
+          "redCards": 3147,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 3147,
+          "cleanSheet": 3137
+        }
+      },
+      "FIFA_WCQ_CONCACAF": {
+        "count": 52,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 52,
+          "shots": 0,
+          "shotsOnTarget": 52,
+          "assists": 52,
+          "penaltiesWon": 0,
+          "keyPasses": 52,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 52,
+          "interceptions": 52,
+          "blocks": 52,
+          "duelsWon": 0,
+          "saves": 52,
+          "penaltiesSaved": 0,
+          "yellowCards": 52,
+          "redCards": 52,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 52,
+          "cleanSheet": 52
+        }
+      },
+      "FIFA_WCQ_SAM": {
+        "count": 769,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 769,
+          "shots": 0,
+          "shotsOnTarget": 769,
+          "assists": 769,
+          "penaltiesWon": 0,
+          "keyPasses": 769,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 769,
+          "interceptions": 769,
+          "blocks": 769,
+          "duelsWon": 0,
+          "saves": 769,
+          "penaltiesSaved": 0,
+          "yellowCards": 769,
+          "redCards": 769,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 769,
+          "cleanSheet": 769
+        }
+      },
+      "FRA": {
+        "count": 1794,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1794,
+          "shots": 0,
+          "shotsOnTarget": 1794,
+          "assists": 1794,
+          "penaltiesWon": 0,
+          "keyPasses": 1794,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1794,
+          "interceptions": 1794,
+          "blocks": 1794,
+          "duelsWon": 0,
+          "saves": 1794,
+          "penaltiesSaved": 0,
+          "yellowCards": 1794,
+          "redCards": 1794,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1794,
+          "cleanSheet": 1770
+        }
+      },
+      "GER": {
+        "count": 1442,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1442,
+          "shots": 0,
+          "shotsOnTarget": 1442,
+          "assists": 1442,
+          "penaltiesWon": 0,
+          "keyPasses": 1442,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1442,
+          "interceptions": 1442,
+          "blocks": 1442,
+          "duelsWon": 0,
+          "saves": 1442,
+          "penaltiesSaved": 0,
+          "yellowCards": 1442,
+          "redCards": 1442,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1442,
+          "cleanSheet": 1416
+        }
+      },
+      "ITA": {
+        "count": 2399,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 2399,
+          "shots": 0,
+          "shotsOnTarget": 2399,
+          "assists": 2399,
+          "penaltiesWon": 0,
+          "keyPasses": 2399,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 2399,
+          "interceptions": 2399,
+          "blocks": 2399,
+          "duelsWon": 0,
+          "saves": 2399,
+          "penaltiesSaved": 0,
+          "yellowCards": 2399,
+          "redCards": 2399,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 2399,
+          "cleanSheet": 2322
+        }
+      },
+      "UCL": {
+        "count": 467,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 467,
+          "shots": 0,
+          "shotsOnTarget": 467,
+          "assists": 467,
+          "penaltiesWon": 0,
+          "keyPasses": 467,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 467,
+          "interceptions": 467,
+          "blocks": 467,
+          "duelsWon": 0,
+          "saves": 467,
+          "penaltiesSaved": 0,
+          "yellowCards": 467,
+          "redCards": 467,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 467,
+          "cleanSheet": 457
+        }
+      },
+      "UEFA_NL": {
+        "count": 1447,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1447,
+          "shots": 0,
+          "shotsOnTarget": 1447,
+          "assists": 1447,
+          "penaltiesWon": 0,
+          "keyPasses": 1447,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1447,
+          "interceptions": 1447,
+          "blocks": 1447,
+          "duelsWon": 0,
+          "saves": 1447,
+          "penaltiesSaved": 0,
+          "yellowCards": 1447,
+          "redCards": 1447,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1447,
+          "cleanSheet": 1427
+        }
+      },
+      "UEL": {
+        "count": 271,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 271,
+          "shots": 0,
+          "shotsOnTarget": 271,
+          "assists": 271,
+          "penaltiesWon": 0,
+          "keyPasses": 271,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 271,
+          "interceptions": 271,
+          "blocks": 271,
+          "duelsWon": 0,
+          "saves": 271,
+          "penaltiesSaved": 0,
+          "yellowCards": 271,
+          "redCards": 271,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 271,
+          "cleanSheet": 260
+        }
+      }
+    }
+  },
+  "eligibleFinal2026": {
+    "v3": {
+      "count": 12967,
+      "mean": 4.16302922804041,
+      "median": 3,
+      "p25": 0,
+      "p75": 6,
+      "p90": 10.75,
+      "p95": 13,
+      "min": -5,
+      "max": 50.75
+    },
+    "v4Partial": {
+      "count": 12967,
+      "mean": 3.8116796483380333,
+      "median": 2.3,
+      "p25": 0,
+      "p75": 5.5,
+      "p90": 10.5,
+      "p95": 12.834999999999944,
+      "min": -5,
+      "max": 42.5
+    },
+    "byPosition": {
+      "GK": {
+        "v3": {
+          "count": 1427,
+          "mean": 2.6797477224947444,
+          "median": 0,
+          "p25": 0,
+          "p75": 5,
+          "p90": 9,
+          "p95": 10.5,
+          "min": -1,
+          "max": 16.5
+        },
+        "v4Partial": {
+          "count": 1427,
+          "mean": 3.4707428170988086,
+          "median": 0,
+          "p25": 0,
+          "p75": 7,
+          "p90": 11,
+          "p95": 13,
+          "min": -1,
+          "max": 19
+        }
+      },
+      "DEF": {
+        "v3": {
+          "count": 4167,
+          "mean": 4.147168226541877,
+          "median": 3,
+          "p25": 0,
+          "p75": 6,
+          "p90": 11,
+          "p95": 12.5,
+          "min": -4,
+          "max": 28.75
+        },
+        "v4Partial": {
+          "count": 4167,
+          "mean": 3.9026877849772017,
+          "median": 3,
+          "p25": 0,
+          "p75": 5.75,
+          "p90": 10.5,
+          "p95": 12,
+          "min": -4,
+          "max": 25.25
+        }
+      },
+      "MID": {
+        "v3": {
+          "count": 4506,
+          "mean": 4.623723923657346,
+          "median": 3.25,
+          "p25": 1,
+          "p75": 7,
+          "p90": 11.125,
+          "p95": 14.25,
+          "min": -3,
+          "max": 50.75
+        },
+        "v4Partial": {
+          "count": 4506,
+          "mean": 3.7975477141588994,
+          "median": 2.5,
+          "p25": 1,
+          "p75": 5.5,
+          "p90": 9,
+          "p95": 12.5,
+          "min": -4,
+          "max": 42.5
+        }
+      },
+      "FWD": {
+        "v3": {
+          "count": 2867,
+          "mean": 4.200296477153819,
+          "median": 2,
+          "p25": 1,
+          "p75": 5.25,
+          "p90": 11.25,
+          "p95": 14,
+          "min": -5,
+          "max": 40.75
+        },
+        "v4Partial": {
+          "count": 2867,
+          "mean": 3.871311475409892,
+          "median": 1.55,
+          "p25": 1,
+          "p75": 5,
+          "p90": 11.45,
+          "p95": 14.349999999999998,
+          "min": -5,
+          "max": 38.85
+        }
+      }
+    },
+    "contributions": {
+      "goals": {
+        "observedRows": 12967,
+        "meanObserved": 0.49718516233515847,
+        "meanPartial": 0.49718516233515847
+      },
+      "shots": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "shotsOnTarget": {
+        "observedRows": 12967,
+        "meanObserved": 0.4602452379116218,
+        "meanPartial": 0.4602452379116218
+      },
+      "assists": {
+        "observedRows": 12967,
+        "meanObserved": 0.20760391763707875,
+        "meanPartial": 0.20760391763707875
+      },
+      "penaltiesWon": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "keyPasses": {
+        "observedRows": 12967,
+        "meanObserved": 0.12792087607002392,
+        "meanPartial": 0.12792087607002392
+      },
+      "successfulDribbles": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "foulsDrawn": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "tackles": {
+        "observedRows": 12967,
+        "meanObserved": 0.24769800262203756,
+        "meanPartial": 0.24769800262203756
+      },
+      "interceptions": {
+        "observedRows": 12967,
+        "meanObserved": 0.15350505128402803,
+        "meanPartial": 0.15350505128402803
+      },
+      "blocks": {
+        "observedRows": 12967,
+        "meanObserved": 0.06423228194647977,
+        "meanPartial": 0.06423228194647977
+      },
+      "duelsWon": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "saves": {
+        "observedRows": 12967,
+        "meanObserved": 0.1530037788231665,
+        "meanPartial": 0.1530037788231665
+      },
+      "penaltiesSaved": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "yellowCards": {
+        "observedRows": 12967,
+        "meanObserved": -0.08351970386365389,
+        "meanPartial": -0.08351970386365389
+      },
+      "redCards": {
+        "observedRows": 12967,
+        "meanObserved": -0.013264440502814837,
+        "meanPartial": -0.013264440502814837
+      },
+      "foulsCommitted": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "penaltiesMissed": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "minutes": {
+        "observedRows": 12967,
+        "meanObserved": 1.504434333307627,
+        "meanPartial": 1.504434333307627
+      },
+      "cleanSheet": {
+        "observedRows": 12761,
+        "meanObserved": 0.5005877282344644,
+        "meanPartial": 0.49263515076733244
+      }
+    },
+    "coverageByCompetition": {
+      "ENG": {
+        "count": 2000,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 2000,
+          "shots": 0,
+          "shotsOnTarget": 2000,
+          "assists": 2000,
+          "penaltiesWon": 0,
+          "keyPasses": 2000,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 2000,
+          "interceptions": 2000,
+          "blocks": 2000,
+          "duelsWon": 0,
+          "saves": 2000,
+          "penaltiesSaved": 0,
+          "yellowCards": 2000,
+          "redCards": 2000,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 2000,
+          "cleanSheet": 1972
+        }
+      },
+      "ESP": {
+        "count": 3147,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 3147,
+          "shots": 0,
+          "shotsOnTarget": 3147,
+          "assists": 3147,
+          "penaltiesWon": 0,
+          "keyPasses": 3147,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 3147,
+          "interceptions": 3147,
+          "blocks": 3147,
+          "duelsWon": 0,
+          "saves": 3147,
+          "penaltiesSaved": 0,
+          "yellowCards": 3147,
+          "redCards": 3147,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 3147,
+          "cleanSheet": 3137
+        }
+      },
+      "FRA": {
+        "count": 1794,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1794,
+          "shots": 0,
+          "shotsOnTarget": 1794,
+          "assists": 1794,
+          "penaltiesWon": 0,
+          "keyPasses": 1794,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1794,
+          "interceptions": 1794,
+          "blocks": 1794,
+          "duelsWon": 0,
+          "saves": 1794,
+          "penaltiesSaved": 0,
+          "yellowCards": 1794,
+          "redCards": 1794,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1794,
+          "cleanSheet": 1770
+        }
+      },
+      "GER": {
+        "count": 1442,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1442,
+          "shots": 0,
+          "shotsOnTarget": 1442,
+          "assists": 1442,
+          "penaltiesWon": 0,
+          "keyPasses": 1442,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1442,
+          "interceptions": 1442,
+          "blocks": 1442,
+          "duelsWon": 0,
+          "saves": 1442,
+          "penaltiesSaved": 0,
+          "yellowCards": 1442,
+          "redCards": 1442,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1442,
+          "cleanSheet": 1416
+        }
+      },
+      "ITA": {
+        "count": 2399,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 2399,
+          "shots": 0,
+          "shotsOnTarget": 2399,
+          "assists": 2399,
+          "penaltiesWon": 0,
+          "keyPasses": 2399,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 2399,
+          "interceptions": 2399,
+          "blocks": 2399,
+          "duelsWon": 0,
+          "saves": 2399,
+          "penaltiesSaved": 0,
+          "yellowCards": 2399,
+          "redCards": 2399,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 2399,
+          "cleanSheet": 2322
+        }
+      },
+      "UCL": {
+        "count": 467,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 467,
+          "shots": 0,
+          "shotsOnTarget": 467,
+          "assists": 467,
+          "penaltiesWon": 0,
+          "keyPasses": 467,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 467,
+          "interceptions": 467,
+          "blocks": 467,
+          "duelsWon": 0,
+          "saves": 467,
+          "penaltiesSaved": 0,
+          "yellowCards": 467,
+          "redCards": 467,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 467,
+          "cleanSheet": 457
+        }
+      },
+      "UEFA_NL": {
+        "count": 1447,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1447,
+          "shots": 0,
+          "shotsOnTarget": 1447,
+          "assists": 1447,
+          "penaltiesWon": 0,
+          "keyPasses": 1447,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1447,
+          "interceptions": 1447,
+          "blocks": 1447,
+          "duelsWon": 0,
+          "saves": 1447,
+          "penaltiesSaved": 0,
+          "yellowCards": 1447,
+          "redCards": 1447,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1447,
+          "cleanSheet": 1427
+        }
+      },
+      "UEL": {
+        "count": 271,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 271,
+          "shots": 0,
+          "shotsOnTarget": 271,
+          "assists": 271,
+          "penaltiesWon": 0,
+          "keyPasses": 271,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 271,
+          "interceptions": 271,
+          "blocks": 271,
+          "duelsWon": 0,
+          "saves": 271,
+          "penaltiesSaved": 0,
+          "yellowCards": 271,
+          "redCards": 271,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 271,
+          "cleanSheet": 260
+        }
+      }
+    }
+  },
+  "appearancesOnly": {
+    "v3": {
+      "count": 9475,
+      "mean": 5.697941952506596,
+      "median": 4.5,
+      "p25": 2,
+      "p75": 7.75,
+      "p90": 11.75,
+      "p95": 14.75,
+      "min": -5,
+      "max": 50.75
+    },
+    "v4Partial": {
+      "count": 9475,
+      "mean": 5.217102902374593,
+      "median": 4,
+      "p25": 1.75,
+      "p75": 7,
+      "p90": 11.5,
+      "p95": 14,
+      "min": -5,
+      "max": 42.5
+    },
+    "byPosition": {
+      "GK": {
+        "v3": {
+          "count": 623,
+          "mean": 6.139646869983949,
+          "median": 5,
+          "p25": 4,
+          "p75": 9,
+          "p90": 10.5,
+          "p95": 11,
+          "min": 1,
+          "max": 16.5
+        },
+        "v4Partial": {
+          "count": 623,
+          "mean": 7.951444622792938,
+          "median": 7,
+          "p25": 5,
+          "p75": 10,
+          "p90": 13,
+          "p95": 14,
+          "min": 1,
+          "max": 19
+        }
+      },
+      "DEF": {
+        "v3": {
+          "count": 2965,
+          "mean": 5.830101180438448,
+          "median": 4.5,
+          "p25": 2.5,
+          "p75": 8.25,
+          "p90": 11.5,
+          "p95": 14.199999999999932,
+          "min": -3,
+          "max": 28.75
+        },
+        "v4Partial": {
+          "count": 2965,
+          "mean": 5.486509274873525,
+          "median": 4.5,
+          "p25": 2.5,
+          "p75": 7.75,
+          "p90": 11,
+          "p95": 12.75,
+          "min": -3,
+          "max": 25.25
+        }
+      },
+      "MID": {
+        "v3": {
+          "count": 3607,
+          "mean": 5.776129747712781,
+          "median": 4.5,
+          "p25": 2,
+          "p75": 7.75,
+          "p90": 12.25,
+          "p95": 15.25,
+          "min": -3,
+          "max": 50.75
+        },
+        "v4Partial": {
+          "count": 3607,
+          "mean": 4.744039367895758,
+          "median": 3.5,
+          "p25": 1.5,
+          "p75": 6.5,
+          "p90": 10.5,
+          "p95": 13.5,
+          "min": -4,
+          "max": 42.5
+        }
+      },
+      "FWD": {
+        "v3": {
+          "count": 2280,
+          "mean": 5.281688596491228,
+          "median": 3,
+          "p25": 1.5,
+          "p75": 7.25,
+          "p90": 12,
+          "p95": 16,
+          "min": -5,
+          "max": 40.75
+        },
+        "v4Partial": {
+          "count": 2280,
+          "mean": 4.868004385964982,
+          "median": 2.55,
+          "p25": 1.1,
+          "p75": 6.35,
+          "p90": 12.35,
+          "p95": 15.802499999999986,
+          "min": -5,
+          "max": 38.85
+        }
+      }
+    },
+    "contributions": {
+      "goals": {
+        "observedRows": 9475,
+        "meanObserved": 0.6804221635883905,
+        "meanPartial": 0.6804221635883905
+      },
+      "shots": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "shotsOnTarget": {
+        "observedRows": 9475,
+        "meanObserved": 0.629868073878628,
+        "meanPartial": 0.629868073878628
+      },
+      "assists": {
+        "observedRows": 9475,
+        "meanObserved": 0.2841160949868074,
+        "meanPartial": 0.2841160949868074
+      },
+      "penaltiesWon": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "keyPasses": {
+        "observedRows": 9475,
+        "meanObserved": 0.175065963060686,
+        "meanPartial": 0.175065963060686
+      },
+      "successfulDribbles": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "foulsDrawn": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "tackles": {
+        "observedRows": 9475,
+        "meanObserved": 0.3389868073878587,
+        "meanPartial": 0.3389868073878587
+      },
+      "interceptions": {
+        "observedRows": 9475,
+        "meanObserved": 0.21007915567282234,
+        "meanPartial": 0.21007915567282234
+      },
+      "blocks": {
+        "observedRows": 9475,
+        "meanObserved": 0.08790501319261249,
+        "meanPartial": 0.08790501319261249
+      },
+      "duelsWon": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "saves": {
+        "observedRows": 9475,
+        "meanObserved": 0.20939313984168864,
+        "meanPartial": 0.20939313984168864
+      },
+      "penaltiesSaved": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "yellowCards": {
+        "observedRows": 9475,
+        "meanObserved": -0.11408970976253298,
+        "meanPartial": -0.11408970976253298
+      },
+      "redCards": {
+        "observedRows": 9475,
+        "meanObserved": -0.017730870712401054,
+        "meanPartial": -0.017730870712401054
+      },
+      "foulsCommitted": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "penaltiesMissed": {
+        "observedRows": 0,
+        "meanObserved": null,
+        "meanPartial": null
+      },
+      "minutes": {
+        "observedRows": 9475,
+        "meanObserved": 2.058891820580475,
+        "meanPartial": 2.058891820580475
+      },
+      "cleanSheet": {
+        "observedRows": 9339,
+        "meanObserved": 0.6840132776528536,
+        "meanPartial": 0.6741952506596306
+      }
+    },
+    "coverageByCompetition": {
+      "ENG": {
+        "count": 1538,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1538,
+          "shots": 0,
+          "shotsOnTarget": 1538,
+          "assists": 1538,
+          "penaltiesWon": 0,
+          "keyPasses": 1538,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1538,
+          "interceptions": 1538,
+          "blocks": 1538,
+          "duelsWon": 0,
+          "saves": 1538,
+          "penaltiesSaved": 0,
+          "yellowCards": 1538,
+          "redCards": 1538,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1538,
+          "cleanSheet": 1523
+        }
+      },
+      "ESP": {
+        "count": 2189,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 2189,
+          "shots": 0,
+          "shotsOnTarget": 2189,
+          "assists": 2189,
+          "penaltiesWon": 0,
+          "keyPasses": 2189,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 2189,
+          "interceptions": 2189,
+          "blocks": 2189,
+          "duelsWon": 0,
+          "saves": 2189,
+          "penaltiesSaved": 0,
+          "yellowCards": 2189,
+          "redCards": 2189,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 2189,
+          "cleanSheet": 2181
+        }
+      },
+      "FRA": {
+        "count": 1413,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1413,
+          "shots": 0,
+          "shotsOnTarget": 1413,
+          "assists": 1413,
+          "penaltiesWon": 0,
+          "keyPasses": 1413,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1413,
+          "interceptions": 1413,
+          "blocks": 1413,
+          "duelsWon": 0,
+          "saves": 1413,
+          "penaltiesSaved": 0,
+          "yellowCards": 1413,
+          "redCards": 1413,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1413,
+          "cleanSheet": 1393
+        }
+      },
+      "GER": {
+        "count": 1137,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1137,
+          "shots": 0,
+          "shotsOnTarget": 1137,
+          "assists": 1137,
+          "penaltiesWon": 0,
+          "keyPasses": 1137,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1137,
+          "interceptions": 1137,
+          "blocks": 1137,
+          "duelsWon": 0,
+          "saves": 1137,
+          "penaltiesSaved": 0,
+          "yellowCards": 1137,
+          "redCards": 1137,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1137,
+          "cleanSheet": 1118
+        }
+      },
+      "ITA": {
+        "count": 1590,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1590,
+          "shots": 0,
+          "shotsOnTarget": 1590,
+          "assists": 1590,
+          "penaltiesWon": 0,
+          "keyPasses": 1590,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1590,
+          "interceptions": 1590,
+          "blocks": 1590,
+          "duelsWon": 0,
+          "saves": 1590,
+          "penaltiesSaved": 0,
+          "yellowCards": 1590,
+          "redCards": 1590,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1590,
+          "cleanSheet": 1550
+        }
+      },
+      "UCL": {
+        "count": 337,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 337,
+          "shots": 0,
+          "shotsOnTarget": 337,
+          "assists": 337,
+          "penaltiesWon": 0,
+          "keyPasses": 337,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 337,
+          "interceptions": 337,
+          "blocks": 337,
+          "duelsWon": 0,
+          "saves": 337,
+          "penaltiesSaved": 0,
+          "yellowCards": 337,
+          "redCards": 337,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 337,
+          "cleanSheet": 330
+        }
+      },
+      "UEFA_NL": {
+        "count": 1073,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 1073,
+          "shots": 0,
+          "shotsOnTarget": 1073,
+          "assists": 1073,
+          "penaltiesWon": 0,
+          "keyPasses": 1073,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 1073,
+          "interceptions": 1073,
+          "blocks": 1073,
+          "duelsWon": 0,
+          "saves": 1073,
+          "penaltiesSaved": 0,
+          "yellowCards": 1073,
+          "redCards": 1073,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 1073,
+          "cleanSheet": 1055
+        }
+      },
+      "UEL": {
+        "count": 198,
+        "reportedSnapshots": 0,
+        "available": {
+          "goals": 198,
+          "shots": 0,
+          "shotsOnTarget": 198,
+          "assists": 198,
+          "penaltiesWon": 0,
+          "keyPasses": 198,
+          "successfulDribbles": 0,
+          "foulsDrawn": 0,
+          "tackles": 198,
+          "interceptions": 198,
+          "blocks": 198,
+          "duelsWon": 0,
+          "saves": 198,
+          "penaltiesSaved": 0,
+          "yellowCards": 198,
+          "redCards": 198,
+          "foulsCommitted": 0,
+          "penaltiesMissed": 0,
+          "minutes": 198,
+          "cleanSheet": 189
+        }
+      }
+    }
+  },
+  "duelsWonByPosition": {
+    "GK": {
+      "observedRows": 0,
+      "meanContribution": null
+    },
+    "DEF": {
+      "observedRows": 0,
+      "meanContribution": null
+    },
+    "MID": {
+      "observedRows": 0,
+      "meanContribution": null
+    },
+    "FWD": {
+      "observedRows": 0,
+      "meanContribution": null
+    }
+  },
+  "archetypes": {
+    "eliteGoalscorer": {
+      "player": "M. Olise",
+      "fixture": "Bayern München vs Union Berlin",
+      "kickoff": "2026-09-18T18:30:00+00:00",
+      "competition": "GER",
+      "position": "MID",
+      "stats": {
+        "minutes": 90,
+        "goals": 3,
+        "assists": 1,
+        "shotsOnTarget": 5,
+        "keyPasses": 2,
+        "tackles": 3,
+        "interceptions": 1,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 0,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 50.75,
+      "v4Partial": 42.5,
+      "difference": -8.25,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 21
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 10
+        },
+        {
+          "category": "ASSISTS",
+          "points": 4
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "CLEAN SHEET",
+          "points": 3
+        }
+      ]
+    },
+    "creativeMidfielder": {
+      "player": "M. Olise",
+      "fixture": "Bayern München vs Bodo/Glimt",
+      "kickoff": "2026-09-10T19:00:00+00:00",
+      "competition": "UCL",
+      "position": "MID",
+      "stats": {
+        "minutes": 90,
+        "goals": 2,
+        "assists": 1,
+        "shotsOnTarget": 4,
+        "keyPasses": 7,
+        "tackles": 4,
+        "interceptions": 0,
+        "blocks": 2,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 0,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 43,
+      "v4Partial": 35.25,
+      "difference": -7.75,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 14
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 8
+        },
+        {
+          "category": "ASSISTS",
+          "points": 4
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "CLEAN SHEET",
+          "points": 3
+        }
+      ]
+    },
+    "defensiveMidfielder": {
+      "player": "D. Rice",
+      "fixture": "Sunderland vs Arsenal",
+      "kickoff": "2026-09-12T19:00:00+00:00",
+      "competition": "ENG",
+      "position": "MID",
+      "stats": {
+        "minutes": 81,
+        "goals": 0,
+        "assists": 1,
+        "shotsOnTarget": 0,
+        "keyPasses": 3,
+        "tackles": 2,
+        "interceptions": 0,
+        "blocks": 1,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 0,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 14.5,
+      "v4Partial": 10.5,
+      "difference": -4,
+      "contributors": [
+        {
+          "category": "ASSISTS",
+          "points": 4
+        },
+        {
+          "category": "CLEAN SHEET",
+          "points": 3
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 2
+        },
+        {
+          "category": "KEY PASSES",
+          "points": 0.75
+        },
+        {
+          "category": "TACKLES",
+          "points": 0.5
+        }
+      ]
+    },
+    "centerBack": {
+      "player": "A. Bastoni",
+      "fixture": "France vs Italy",
+      "kickoff": "2026-10-02T18:45:00+00:00",
+      "competition": "UEFA_NL",
+      "position": "DEF",
+      "stats": {
+        "minutes": 90,
+        "goals": 1,
+        "assists": 0,
+        "shotsOnTarget": 1,
+        "keyPasses": 0,
+        "tackles": 1,
+        "interceptions": 0,
+        "blocks": 3,
+        "saves": 0,
+        "yellowCards": 1,
+        "redCards": 0,
+        "concededByOwnTeam": 1,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 14.75,
+      "v4Partial": 13,
+      "difference": -1.75,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 7
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 2
+        },
+        {
+          "category": "BLOCKS",
+          "points": 1.5
+        },
+        {
+          "category": "TACKLES",
+          "points": 0.5
+        }
+      ]
+    },
+    "attackingFullback": {
+      "player": "A. Davies",
+      "fixture": "Bayern München vs Bodo/Glimt",
+      "kickoff": "2026-09-10T19:00:00+00:00",
+      "competition": "UCL",
+      "position": "DEF",
+      "stats": {
+        "minutes": 80,
+        "goals": 1,
+        "assists": 0,
+        "shotsOnTarget": 1,
+        "keyPasses": 1,
+        "tackles": 1,
+        "interceptions": 3,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 0,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 21.75,
+      "v4Partial": 19.25,
+      "difference": -2.5,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 7
+        },
+        {
+          "category": "CLEAN SHEET",
+          "points": 6
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 2
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 2
+        },
+        {
+          "category": "INTERCEPTIONS",
+          "points": 1.5
+        }
+      ]
+    },
+    "goalkeeper": {
+      "player": "B. Özer",
+      "fixture": "Toulouse vs Lille",
+      "kickoff": "2026-09-03T18:45:00+00:00",
+      "competition": "FRA",
+      "position": "GK",
+      "stats": {
+        "minutes": 90,
+        "goals": 0,
+        "assists": 0,
+        "shotsOnTarget": 0,
+        "keyPasses": 0,
+        "tackles": 0,
+        "interceptions": 0,
+        "blocks": 0,
+        "saves": 9,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 0,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 13.5,
+      "v4Partial": 19,
+      "difference": 5.5,
+      "contributors": [
+        {
+          "category": "SAVES",
+          "points": 9
+        },
+        {
+          "category": "CLEAN SHEET",
+          "points": 7
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        }
+      ]
+    },
+    "physicalStrikerCandidate": {
+      "player": "E. Haaland",
+      "fixture": "Norway vs Denmark",
+      "kickoff": "2026-09-24T18:45:00+00:00",
+      "competition": "UEFA_NL",
+      "position": "FWD",
+      "stats": {
+        "minutes": 90,
+        "goals": 2,
+        "assists": 0,
+        "shotsOnTarget": 4,
+        "keyPasses": 1,
+        "tackles": 0,
+        "interceptions": 0,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 2,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 24,
+      "v4Partial": 25.25,
+      "difference": 1.25,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 14
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 8
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "KEY PASSES",
+          "points": 0.25
+        }
+      ]
+    },
+    "lowEventStarter": {
+      "player": "K. Diks",
+      "fixture": "Borussia Mönchengladbach vs SV Elversberg",
+      "kickoff": "2026-09-05T13:30:00+00:00",
+      "competition": "GER",
+      "position": "DEF",
+      "stats": {
+        "minutes": 90,
+        "goals": 0,
+        "assists": 0,
+        "shotsOnTarget": 0,
+        "keyPasses": 0,
+        "tackles": 0,
+        "interceptions": 0,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 1,
+        "redCards": 0,
+        "concededByOwnTeam": 4,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 2,
+      "v4Partial": 2,
+      "difference": 0,
+      "contributors": [
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "YELLOW CARDS",
+          "points": -1
+        }
+      ]
+    },
+    "substitute": {
+      "player": "D. Doué",
+      "fixture": "France vs Belgium",
+      "kickoff": "2026-10-05T18:45:00+00:00",
+      "competition": "UEFA_NL",
+      "position": "FWD",
+      "stats": {
+        "minutes": 18,
+        "goals": 1,
+        "assists": 2,
+        "shotsOnTarget": 1,
+        "keyPasses": 2,
+        "tackles": 1,
+        "interceptions": 0,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 1,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 23.25,
+      "v4Partial": 18.6,
+      "difference": -4.65,
+      "contributors": [
+        {
+          "category": "ASSISTS",
+          "points": 8
+        },
+        {
+          "category": "GOALS",
+          "points": 7
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 2
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 1
+        },
+        {
+          "category": "KEY PASSES",
+          "points": 0.5
+        }
+      ]
+    }
+  },
+  "topPartial": [
+    {
+      "player": "M. Olise",
+      "fixture": "Bayern München vs Union Berlin",
+      "kickoff": "2026-09-18T18:30:00+00:00",
+      "competition": "GER",
+      "position": "MID",
+      "stats": {
+        "minutes": 90,
+        "goals": 3,
+        "assists": 1,
+        "shotsOnTarget": 5,
+        "keyPasses": 2,
+        "tackles": 3,
+        "interceptions": 1,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 0,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 50.75,
+      "v4Partial": 42.5,
+      "difference": -8.25,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 21
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 10
+        },
+        {
+          "category": "ASSISTS",
+          "points": 4
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "CLEAN SHEET",
+          "points": 3
+        }
+      ]
+    },
+    {
+      "player": "Kylian Mbappé",
+      "fixture": "Real Madrid vs Real Sociedad",
+      "kickoff": "2026-08-26T19:00:00+00:00",
+      "competition": "ESP",
+      "position": "FWD",
+      "stats": {
+        "minutes": 90,
+        "goals": 3,
+        "assists": 0,
+        "shotsOnTarget": 7,
+        "keyPasses": 3,
+        "tackles": 0,
+        "interceptions": 1,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 1,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 40.75,
+      "v4Partial": 38.85,
+      "difference": -1.9,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 21
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 14
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "KEY PASSES",
+          "points": 0.75
+        },
+        {
+          "category": "INTERCEPTIONS",
+          "points": 0.1
+        }
+      ]
+    },
+    {
+      "player": "Bruno Fernandes",
+      "fixture": "Manchester United vs Ipswich",
+      "kickoff": "2026-08-30T15:30:00+00:00",
+      "competition": "ENG",
+      "position": "MID",
+      "stats": {
+        "minutes": 90,
+        "goals": 3,
+        "assists": 1,
+        "shotsOnTarget": 3,
+        "keyPasses": 3,
+        "tackles": 1,
+        "interceptions": 1,
+        "blocks": 1,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 2,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 46.75,
+      "v4Partial": 35.5,
+      "difference": -11.25,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 21
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 6
+        },
+        {
+          "category": "ASSISTS",
+          "points": 4
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "KEY PASSES",
+          "points": 0.75
+        }
+      ]
+    },
+    {
+      "player": "M. Olise",
+      "fixture": "Bayern München vs Bodo/Glimt",
+      "kickoff": "2026-09-10T19:00:00+00:00",
+      "competition": "UCL",
+      "position": "MID",
+      "stats": {
+        "minutes": 90,
+        "goals": 2,
+        "assists": 1,
+        "shotsOnTarget": 4,
+        "keyPasses": 7,
+        "tackles": 4,
+        "interceptions": 0,
+        "blocks": 2,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 0,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 43,
+      "v4Partial": 35.25,
+      "difference": -7.75,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 14
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 8
+        },
+        {
+          "category": "ASSISTS",
+          "points": 4
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "CLEAN SHEET",
+          "points": 3
+        }
+      ]
+    },
+    {
+      "player": "Franco Mastantuono",
+      "fixture": "Venezia vs Fiorentina",
+      "kickoff": "2026-09-11T18:45:00+00:00",
+      "competition": "ITA",
+      "position": "MID",
+      "stats": {
+        "minutes": 89,
+        "goals": 3,
+        "assists": 0,
+        "shotsOnTarget": 5,
+        "keyPasses": 4,
+        "tackles": 1,
+        "interceptions": 1,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 2,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 42.75,
+      "v4Partial": 34.5,
+      "difference": -8.25,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 21
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 10
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 2
+        },
+        {
+          "category": "KEY PASSES",
+          "points": 1
+        },
+        {
+          "category": "TACKLES",
+          "points": 0.25
+        }
+      ]
+    },
+    {
+      "player": "B. Brobbey",
+      "fixture": "Manchester City vs Sunderland",
+      "kickoff": "2026-09-20T13:00:00+00:00",
+      "competition": "ENG",
+      "position": "FWD",
+      "stats": {
+        "minutes": 90,
+        "goals": 3,
+        "assists": 0,
+        "shotsOnTarget": 4,
+        "keyPasses": 1,
+        "tackles": 0,
+        "interceptions": 0,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 5,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 36,
+      "v4Partial": 32.25,
+      "difference": -3.75,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 21
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 8
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "KEY PASSES",
+          "points": 0.25
+        }
+      ]
+    },
+    {
+      "player": "O. Dembélé",
+      "fixture": "Paris Saint Germain vs Slovan Bratislava",
+      "kickoff": "2026-09-09T19:00:00+00:00",
+      "competition": "UCL",
+      "position": "FWD",
+      "stats": {
+        "minutes": 64,
+        "goals": 2,
+        "assists": 2,
+        "shotsOnTarget": 3,
+        "keyPasses": 6,
+        "tackles": 0,
+        "interceptions": 0,
+        "blocks": 3,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 1,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 40.75,
+      "v4Partial": 31.8,
+      "difference": -8.95,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 14
+        },
+        {
+          "category": "ASSISTS",
+          "points": 8
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 6
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 2
+        },
+        {
+          "category": "KEY PASSES",
+          "points": 1.5
+        }
+      ]
+    },
+    {
+      "player": "Raphinha",
+      "fixture": "Barcelona vs Racing Santander",
+      "kickoff": "2026-09-16T19:30:00+00:00",
+      "competition": "ESP",
+      "position": "FWD",
+      "stats": {
+        "minutes": 69,
+        "goals": 3,
+        "assists": 0,
+        "shotsOnTarget": 4,
+        "keyPasses": 1,
+        "tackles": 1,
+        "interceptions": 0,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 2,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 35.5,
+      "v4Partial": 31.35,
+      "difference": -4.15,
+      "contributors": [
+        {
+          "category": "GOALS",
+          "points": 21
+        },
+        {
+          "category": "SHOTS ON TARGET",
+          "points": 8
+        },
+        {
+          "category": "APPEARANCE",
+          "points": 2
+        },
+        {
+          "category": "KEY PASSES",
+          "points": 0.25
+        },
+        {
+          "category": "TACKLES",
+          "points": 0.1
+        }
+      ]
+    }
+  ],
+  "lowChecks": {
+    "poor90": {
+      "player": "Reinildo",
+      "fixture": "Sunderland vs Arsenal",
+      "kickoff": "2026-09-12T19:00:00+00:00",
+      "competition": "ENG",
+      "position": "DEF",
+      "stats": {
+        "minutes": 90,
+        "goals": 0,
+        "assists": 0,
+        "shotsOnTarget": 0,
+        "keyPasses": 0,
+        "tackles": 1,
+        "interceptions": 2,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 2,
+        "redCards": 1,
+        "concededByOwnTeam": 2,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": -1.5,
+      "v4Partial": -1.5,
+      "difference": 0,
+      "contributors": [
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "INTERCEPTIONS",
+          "points": 1
+        },
+        {
+          "category": "TACKLES",
+          "points": 0.5
+        },
+        {
+          "category": "YELLOW CARDS",
+          "points": -2
+        },
+        {
+          "category": "RED CARDS",
+          "points": -4
+        }
+      ]
+    },
+    "cards": {
+      "player": "O. Óskarsson",
+      "fixture": "Valencia vs Real Sociedad",
+      "kickoff": "2026-09-20T19:00:00+00:00",
+      "competition": "ESP",
+      "position": "FWD",
+      "stats": {
+        "minutes": 35,
+        "goals": 0,
+        "assists": 0,
+        "shotsOnTarget": 0,
+        "keyPasses": 0,
+        "tackles": 0,
+        "interceptions": 0,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 2,
+        "redCards": 1,
+        "concededByOwnTeam": 2,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": -5,
+      "v4Partial": -5,
+      "difference": 0,
+      "contributors": [
+        {
+          "category": "APPEARANCE",
+          "points": 1
+        },
+        {
+          "category": "YELLOW CARDS",
+          "points": -2
+        },
+        {
+          "category": "RED CARDS",
+          "points": -4
+        }
+      ]
+    },
+    "concedingKeeper": {
+      "player": "S. Pizzignacco",
+      "fixture": "Inter vs Monza",
+      "kickoff": "2026-08-22T16:30:00+00:00",
+      "competition": "ITA",
+      "position": "GK",
+      "stats": {
+        "minutes": 90,
+        "goals": 0,
+        "assists": 0,
+        "shotsOnTarget": 0,
+        "keyPasses": 0,
+        "tackles": 0,
+        "interceptions": 0,
+        "blocks": 0,
+        "saves": 1,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 4,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 3.5,
+      "v4Partial": 4,
+      "difference": 0.5,
+      "contributors": [
+        {
+          "category": "APPEARANCE",
+          "points": 3
+        },
+        {
+          "category": "SAVES",
+          "points": 1
+        }
+      ]
+    },
+    "quietSubstitute": {
+      "player": "Abdoul Karim Coulibaly",
+      "fixture": "Strasbourg vs Monaco",
+      "kickoff": "2026-09-12T15:15:00+00:00",
+      "competition": "FRA",
+      "position": "DEF",
+      "stats": {
+        "minutes": 1,
+        "goals": 0,
+        "assists": 0,
+        "shotsOnTarget": 0,
+        "keyPasses": 0,
+        "tackles": 0,
+        "interceptions": 0,
+        "blocks": 0,
+        "saves": 0,
+        "yellowCards": 0,
+        "redCards": 0,
+        "concededByOwnTeam": 1,
+        "duelsWon": null,
+        "shots": null
+      },
+      "v3": 1,
+      "v4Partial": 1,
+      "difference": 0,
+      "contributors": [
+        {
+          "category": "APPEARANCE",
+          "points": 1
+        }
+      ]
+    },
+    "wastefulShooter": null
+  },
+  "missingBackfill": {
+    "fixtures": 364,
+    "rows": 12967,
+    "from": "2026-08-15T17:30:00+00:00",
+    "to": "2026-10-05T18:45:00+00:00",
+    "byCompetition": {
+      "ENG": {
+        "fixtures": 50,
+        "rows": 2000
+      },
+      "ESP": {
+        "fixtures": 69,
+        "rows": 3147
+      },
+      "FRA": {
+        "fixtures": 45,
+        "rows": 1794
+      },
+      "GER": {
+        "fixtures": 36,
+        "rows": 1442
+      },
+      "ITA": {
+        "fixtures": 50,
+        "rows": 2399
+      },
+      "UCL": {
+        "fixtures": 17,
+        "rows": 467
+      },
+      "UEFA_NL": {
+        "fixtures": 84,
+        "rows": 1447
+      },
+      "UEL": {
+        "fixtures": 13,
+        "rows": 271
+      }
+    }
+  }
+}

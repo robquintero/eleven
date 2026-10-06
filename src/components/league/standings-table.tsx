@@ -1,3 +1,4 @@
+import { formatRoundPoints } from "@/lib/team-fixture";
 import type { StandingsRow } from "@/data-access/matchups";
 import { cn } from "@/lib/utils";
 
@@ -71,8 +72,8 @@ export function StandingsTable({
               <span className="label-system text-xs tabular-nums text-foreground-secondary">{row.wins}</span>
               <span className="label-system text-xs tabular-nums text-foreground-secondary">{row.draws}</span>
               <span className="label-system text-xs tabular-nums text-foreground-secondary">{row.losses}</span>
-              <span className="label-system text-xs tabular-nums text-foreground-tertiary">{row.pointsFor.toFixed(1)}</span>
-              <span className="label-system text-xs tabular-nums text-foreground-tertiary">{row.pointsAgainst.toFixed(1)}</span>
+              <span className="label-system text-xs tabular-nums text-foreground-tertiary">{formatRoundPoints(row.pointsFor)}</span>
+              <span className="label-system text-xs tabular-nums text-foreground-tertiary">{formatRoundPoints(row.pointsAgainst)}</span>
               <span
                 className={cn(
                   "label-system text-xs font-semibold tabular-nums",
@@ -80,7 +81,7 @@ export function StandingsTable({
                 )}
               >
                 {diff > 0 ? "+" : ""}
-                {diff.toFixed(1)}
+                {formatRoundPoints(diff)}
               </span>
               <span className="label-system text-xs font-semibold tabular-nums text-foreground">{row.leaguePoints}</span>
             </div>

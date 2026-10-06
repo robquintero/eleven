@@ -1,3 +1,4 @@
+import { SCORING_RULE_VERSION } from "../domain/fantasy/scoring.ts";
 /**
  * Pass 14.5 regression coverage for `getRoundPlayerState` (the shared
  * "real round-scoped points + real fixture/lock display state" lookup
@@ -145,7 +146,7 @@ test("querySquad: starter shows real round points + FINAL state, bench shows rea
       .single();
     await admin.from("player_match_stats").insert({ player_id: benchPlayerId, fixture_id: liveFixture!.id, minutes: 45 });
 
-    const backfillResult = await backfillScores(admin, { fixtureIds: [finalFixture!.id, liveFixture!.id] });
+    const backfillResult = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [finalFixture!.id, liveFixture!.id] });
     assert.equal(backfillResult.failed, 0, backfillResult.errors.join("; "));
 
     const { data: starterRosterEntry } = await admin.from("roster_entries").select("id").eq("fantasy_team_id", league.teamIds[0]).eq("player_id", starterPlayerId).single();

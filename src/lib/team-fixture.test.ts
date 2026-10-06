@@ -127,7 +127,7 @@ test("formatRoundPoints: 0 formats as '0.0', not a blank or placeholder", () => 
 test("formatRoundPoints: supports decimals and aggregates (multi-fixture sums) consistently", () => {
   assert.equal(formatRoundPoints(12.7), "12.7");
   assert.equal(formatRoundPoints(16.5), "16.5");
-  assert.equal(formatRoundPoints(29.25), "29.3", "rounds to one decimal place for display, same as every other tabular points readout");
+  assert.equal(formatRoundPoints(29.25), "29.25", "preserves hundredths for rich event weights");
 });
 
 // CASE H: round window is always rendered from the real stored

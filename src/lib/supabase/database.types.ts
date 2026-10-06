@@ -409,6 +409,7 @@ export type Database = {
           number: number
           season_id: string
           starts_at: string
+          scoring_rule_version: string
           status: string
           updated_at: string
         }
@@ -420,6 +421,7 @@ export type Database = {
           number: number
           season_id: string
           starts_at: string
+          scoring_rule_version?: string
           status?: string
           updated_at?: string
         }
@@ -431,6 +433,7 @@ export type Database = {
           number?: number
           season_id?: string
           starts_at?: string
+          scoring_rule_version?: string
           status?: string
           updated_at?: string
         }
@@ -805,6 +808,9 @@ export type Database = {
           red_cards: number
           saves: number
           shots_on_target: number
+          reported_stats: Json | null
+          participation_club_id: string | null
+          scoring_position: string | null
           started: boolean
           tackles: number
           updated_at: string
@@ -825,6 +831,9 @@ export type Database = {
           red_cards?: number
           saves?: number
           shots_on_target?: number
+          reported_stats?: Json | null
+          participation_club_id?: string | null
+          scoring_position?: string | null
           started?: boolean
           tackles?: number
           updated_at?: string
@@ -845,6 +854,9 @@ export type Database = {
           red_cards?: number
           saves?: number
           shots_on_target?: number
+          reported_stats?: Json | null
+          participation_club_id?: string | null
+          scoring_position?: string | null
           started?: boolean
           tackles?: number
           updated_at?: string
@@ -863,6 +875,13 @@ export type Database = {
             columns: ["player_id"]
             isOneToOne: false
             referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "player_match_stats_participation_club_id_fkey"
+            columns: ["participation_club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
         ]
@@ -1112,6 +1131,12 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      scoring_version_activations: {
+        Row: { effective_from: string; scoring_rule_version: string }
+        Insert: { effective_from: string; scoring_rule_version: string }
+        Update: { effective_from?: string; scoring_rule_version?: string }
+        Relationships: []
       }
       seasons: {
         Row: {
@@ -1403,6 +1428,7 @@ export type Database = {
         Args: { p_fantasy_team_id: string; p_round_id: string; p_changes: Json; p_now?: string }
         Returns: undefined
       }
+      get_catalog_scoring_version: { Args: Record<PropertyKey, never>; Returns: string };
       get_player_score_totals: {
         Args: { p_season: number; p_version: string; p_player_ids?: string[] }
         Returns: { player_id: string; total_points: number; appearances: number }[]

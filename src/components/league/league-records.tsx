@@ -1,3 +1,4 @@
+import { formatRoundPoints } from "@/lib/team-fixture";
 import type { LeagueRecords } from "@/data-access/matchups";
 
 /**
@@ -16,7 +17,7 @@ export function LeagueRecordsList({ records }: { records: LeagueRecords }) {
       node: (
         <>
           {records.highestScore.teamName}{" "}
-          <span className="text-foreground-tertiary">· {records.highestScore.value.toFixed(1)} (RD {records.highestScore.roundNumber})</span>
+          <span className="text-foreground-tertiary">· {formatRoundPoints(records.highestScore.value)} (RD {records.highestScore.roundNumber})</span>
         </>
       ),
     });
@@ -27,7 +28,7 @@ export function LeagueRecordsList({ records }: { records: LeagueRecords }) {
       node: (
         <>
           {records.lowestScore.teamName}{" "}
-          <span className="text-foreground-tertiary">· {records.lowestScore.value.toFixed(1)} (RD {records.lowestScore.roundNumber})</span>
+          <span className="text-foreground-tertiary">· {formatRoundPoints(records.lowestScore.value)} (RD {records.lowestScore.roundNumber})</span>
         </>
       ),
     });
@@ -38,7 +39,7 @@ export function LeagueRecordsList({ records }: { records: LeagueRecords }) {
       node: (
         <>
           {records.largestMargin.teamName} over {records.largestMargin.opponentName}{" "}
-          <span className="text-foreground-tertiary">· +{records.largestMargin.value.toFixed(1)}</span>
+          <span className="text-foreground-tertiary">· +{formatRoundPoints(records.largestMargin.value)}</span>
         </>
       ),
     });
@@ -49,7 +50,7 @@ export function LeagueRecordsList({ records }: { records: LeagueRecords }) {
       node: (
         <>
           {records.closestMatchup.teamName} vs {records.closestMatchup.opponentName}{" "}
-          <span className="text-foreground-tertiary">· {records.closestMatchup.value.toFixed(1)} margin</span>
+          <span className="text-foreground-tertiary">· {formatRoundPoints(records.closestMatchup.value)} margin</span>
         </>
       ),
     });
@@ -59,7 +60,7 @@ export function LeagueRecordsList({ records }: { records: LeagueRecords }) {
       label: "MOST POINTS FOR",
       node: (
         <>
-          {records.mostPointsFor.teamName} <span className="text-foreground-tertiary">· {records.mostPointsFor.value.toFixed(1)}</span>
+          {records.mostPointsFor.teamName} <span className="text-foreground-tertiary">· {formatRoundPoints(records.mostPointsFor.value)}</span>
         </>
       ),
     });
@@ -70,7 +71,7 @@ export function LeagueRecordsList({ records }: { records: LeagueRecords }) {
       node: (
         <>
           {records.mostPointsAgainst.teamName}{" "}
-          <span className="text-foreground-tertiary">· {records.mostPointsAgainst.value.toFixed(1)}</span>
+          <span className="text-foreground-tertiary">· {formatRoundPoints(records.mostPointsAgainst.value)}</span>
         </>
       ),
     });

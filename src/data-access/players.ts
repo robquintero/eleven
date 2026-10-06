@@ -13,7 +13,8 @@ import { isSupabaseConfigured } from "../lib/supabase/config.ts";
 import type { createClient } from "../lib/supabase/server.ts";
 import { bigFiveLeagueFromCompetitionCode } from "../lib/leagues.ts";
 import { normalizeForSearch } from "../lib/search-normalize.ts";
-import { SCORING_RULE_VERSION } from "../domain/fantasy/scoring.ts";
+import type { ScoringRuleVersion } from "../domain/fantasy/scoring.ts";
+import { getCatalogScoringVersion } from "../lib/scoring/catalog-version.ts";
 import { getNextFixtureByPlayer, getTeamIdsByPlayer } from "../lib/fantasy-engine/player-fixture-participation.ts";
 import type { Player, PlayerFixture, PlayerMatchState, PlayerPosition } from "../lib/types/fantasy.ts";
 
@@ -210,6 +211,7 @@ export async function queryPlayerDatabase(
     }
   }
 
+  const catalogVersion = await getCatalogScoringVersion(supabase);
   const searchTerm = query.query?.trim();
   // Accent/diacritic-insensitive (Pass 10.5B): matched against the
   // generated `*_unaccented` columns (see
@@ -287,7 +289,7 @@ export async function queryPlayerDatabase(
       applyCommonFilters(supabase.from("players").select("id, name, club_id").eq("active", true))
         .order("id", { ascending: true })
         .range(from, to)
-    ), query.sort === "points" ? getFantasyScoreAggregates(supabase) : Promise.resolve(undefined)]);
+    ), query.sort === "points" ? getFantasyScoreAggregates(supabase, undefined, catalogVersion) : Promise.resolve(undefined)]);
 
     count = idRows.length;
     if (count === 0) return { players: [], total: 0, page, pageSize };
@@ -357,7 +359,7 @@ export async function queryPlayerDatabase(
   const [usageByPlayerId, nextFixtureByPlayerId, scoresByPlayerId] = await Promise.all([
     getUsageAggregates(supabase, playerIds),
     getNextFixtureByPlayer(supabase, playerIds),
-    rankingScores ? Promise.resolve(rankingScores) : getFantasyScoreAggregates(supabase, playerIds),
+    rankingScores ? Promise.resolve(rankingScores) : getFantasyScoreAggregates(supabase, playerIds, catalogVersion),
   ]);
 
   const players: Player[] = data.map((row) => {
@@ -392,6 +394,7 @@ export async function queryPlayerDatabase(
       number: row.shirt_number ?? undefined,
       nationality: row.nationality,
       fantasyPoints: 0,
+      scoringRuleVersion: catalogVersion,
       totalPoints: scores?.totalPoints,
       averagePoints: scores?.averagePoints,
       availability: (row.availability_status as Player["availability"]) ?? "available",
@@ -451,7 +454,7 @@ async function getUsageAggregates(
 }
 
 /**
- * Cumulative current-season fantasy points per player (current `SCORING_RULE_VERSION`)
+ * Cumulative current-season fantasy points per player (active catalog model)
  * (Pass 9). `fantasy_player_scores` doesn't store a season column itself —
  * scoped to the current season via its `fixtures!inner(season)` join
  * rather than assuming every stored score is automatically current, so
@@ -467,16 +470,18 @@ async function getUsageAggregates(
  */
 /** Pass 14.7: exported for `src/data-access/intelligence.ts` (Home's Form/Market Intelligence module) -- the exact same real season-points aggregation, never a second, divergent computation of "total/average points this season." */
 // Memoized per server render by client and optional IDs. Season/version
-// are fixed constants; ownership is never part of this global data.
+// include the selected model; ownership is never part of this global data.
 export const getFantasyScoreAggregates = cache(async function getFantasyScoreAggregates(
   supabase: SupabaseClientType,
-  playerIds?: string[]
+  playerIds?: string[],
+  version?: ScoringRuleVersion
 ): Promise<Map<string, { totalPoints: number; averagePoints: number }>> {
   const result = new Map<string, { totalPoints: number; averagePoints: number }>();
   if (playerIds && playerIds.length === 0) return result;
+  const catalogVersion = version ?? await getCatalogScoringVersion(supabase);
   for (let from = 0; ; from += 1000) {
     const { data: rows, error } = await supabase.rpc("get_player_score_totals", {
-      p_season: CURRENT_SEASON, p_version: SCORING_RULE_VERSION,
+      p_season: CURRENT_SEASON, p_version: catalogVersion,
       ...(playerIds ? { p_player_ids: playerIds } : {}),
     }).range(from, from + 999);
     // Never publish a partially read ranking as complete.
@@ -510,18 +515,19 @@ async function getClubShortNames(supabase: SupabaseClientType, clubIds: string[]
   return new Map((data ?? []).map((c) => [c.id, c.short_name]));
 }
 
-/** One player's current-version (`SCORING_RULE_VERSION`) points for a specific set of fixtures, keyed by fixture id. Missing from the map means not yet scored — the caller renders that as `null`, never 0. */
+/** One player's selected-version points for a specific set of fixtures, keyed by fixture id. Missing from the map means not yet scored — the caller renders that as `null`, never 0. */
 async function getScoresByFixtureId(
   supabase: SupabaseClientType,
   playerId: string,
-  fixtureIds: string[]
+  fixtureIds: string[],
+  version: ScoringRuleVersion
 ): Promise<Map<string, number>> {
   if (fixtureIds.length === 0) return new Map();
   const { data } = await supabase
     .from("fantasy_player_scores")
     .select("fixture_id, points")
     .eq("player_id", playerId)
-    .eq("scoring_rule_version", SCORING_RULE_VERSION)
+    .eq("scoring_rule_version", version)
     .in("fixture_id", fixtureIds);
   return new Map((data ?? []).map((s) => [s.fixture_id, s.points]));
 }
@@ -575,7 +581,7 @@ export interface RecentMatchRow {
   started: boolean;
   goals: number;
   assists: number;
-  /** Current-version (SCORING_RULE_VERSION) points for this specific match, or `null` if not yet scored (e.g. scoring hasn't been backfilled for this fixture) — never fabricated as 0. */
+  /** Selected-version points for this specific match, or `null` if not yet scored (e.g. scoring hasn't been backfilled for this fixture) — never fabricated as 0. */
   fantasyPoints: number | null;
 }
 
@@ -587,9 +593,10 @@ export interface RecentMatchRow {
  * (last 10) in one fetch — the inspector still renders 3/5/10 sub-windows
  * from this same result rather than issuing three separate queries.
  */
-export async function getPlayerRecentMatches(playerId: string, limit = 10): Promise<RecentMatchRow[]> {
+export async function getPlayerRecentMatches(playerId: string, limit = 10, requestedVersion?: ScoringRuleVersion): Promise<RecentMatchRow[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await resolveClient();
+  const version = requestedVersion ?? await getCatalogScoringVersion(supabase);
 
   const teamIdsByPlayer = await getTeamIdsByPlayer(supabase, [playerId]);
   const teamIds = new Set(teamIdsByPlayer.get(playerId) ?? []);
@@ -608,7 +615,7 @@ export async function getPlayerRecentMatches(playerId: string, limit = 10): Prom
   const { data, error } = await supabase
     .from("player_match_stats")
     .select(
-      "minutes, started, goals, assists, fixtures(id, kickoff_at, home_club_id, away_club_id, status)"
+      "minutes, started, goals, assists, participation_club_id, fixtures(id, kickoff_at, home_club_id, away_club_id, status)"
     )
     .eq("player_id", playerId);
 
@@ -622,18 +629,18 @@ export async function getPlayerRecentMatches(playerId: string, limit = 10): Prom
   // "home_club_id/away_club_id is one of their team ids (club OR national
   // team)" -- was `=== player.club_id` alone, which is wrong for an
   // international fixture (neither side is the player's permanent club).
-  const opponentClubIds = rows.map((row) =>
-    teamIds.has(row.fixtures!.home_club_id) ? row.fixtures!.away_club_id : row.fixtures!.home_club_id
-  );
+  const wasHome = (row: (typeof rows)[number]) => version === "ELEVEN_STANDARD_V4" && row.participation_club_id
+    ? row.participation_club_id === row.fixtures!.home_club_id : teamIds.has(row.fixtures!.home_club_id);
+  const opponentClubIds = rows.map((row) => wasHome(row) ? row.fixtures!.away_club_id : row.fixtures!.home_club_id);
   const fixtureIds = rows.map((row) => row.fixtures!.id);
   const [clubShortNames, pointsByFixtureId] = await Promise.all([
     getClubShortNames(supabase, Array.from(new Set(opponentClubIds))),
-    getScoresByFixtureId(supabase, playerId, fixtureIds),
+    getScoresByFixtureId(supabase, playerId, fixtureIds, version),
   ]);
 
   return rows.map((row) => {
     const fixture = row.fixtures!;
-    const isHome = teamIds.has(fixture.home_club_id);
+    const isHome = wasHome(row);
     const opponentId = isHome ? fixture.away_club_id : fixture.home_club_id;
     return {
       fixtureId: fixture.id,
@@ -657,6 +664,8 @@ export interface PlayerScoreBreakdown {
   total: number;
   /** `FantasyScoreBreakdown.components` (src/domain/fantasy/scoring.ts), stored verbatim as jsonb at scoring time — read back exactly as computed, never recomputed in the UI layer. */
   components: Record<string, number>;
+  scoringRuleVersion?: string;
+  detail?: import("../domain/fantasy/scoring-v4.ts").FantasyScoreBreakdownV4;
 }
 
 /**
@@ -664,16 +673,17 @@ export interface PlayerScoreBreakdown {
  * powers the Player Inspector's modest new Scoring Breakdown panel
  * (brief: "do not make the UI reverse-engineer a score; backend scoring
  * remains authoritative"). `null` means this player has no CURRENT
- * (`SCORING_RULE_VERSION`) scored performance yet. Fetches every scored
+ * selected-model scored performance yet. Fetches every scored
  * row for this player rather than filtering fixtures server-side first —
  * a full season's appearances is well under 100 rows, and this avoids the
  * same "PostgREST can't order outer rows by an embedded relation's
  * column" gotcha `getPlayerRecentMatches` already documents, by sorting
  * in JS instead.
  */
-export async function getPlayerLatestScoreBreakdown(playerId: string): Promise<PlayerScoreBreakdown | null> {
+export async function getPlayerLatestScoreBreakdown(playerId: string, requestedVersion?: ScoringRuleVersion): Promise<PlayerScoreBreakdown | null> {
   if (!isSupabaseConfigured()) return null;
   const supabase = await resolveClient();
+  const version = requestedVersion ?? await getCatalogScoringVersion(supabase);
 
   const teamIdsByPlayer = await getTeamIdsByPlayer(supabase, [playerId]);
   const teamIds = new Set(teamIdsByPlayer.get(playerId) ?? []);
@@ -683,15 +693,18 @@ export async function getPlayerLatestScoreBreakdown(playerId: string): Promise<P
     .from("fantasy_player_scores")
     .select("fixture_id, points, breakdown, fixtures(kickoff_at, home_club_id, away_club_id)")
     .eq("player_id", playerId)
-    .eq("scoring_rule_version", SCORING_RULE_VERSION);
+    .eq("scoring_rule_version", version);
 
   const rows = (data ?? []).filter((row) => row.fixtures);
   if (rows.length === 0) return null;
 
   const latest = rows.sort((a, b) => new Date(b.fixtures!.kickoff_at).getTime() - new Date(a.fixtures!.kickoff_at).getTime())[0];
   const fixture = latest.fixtures!;
-  // Pass 14: see getPlayerRecentMatches's identical comment above.
-  const isHome = teamIds.has(fixture.home_club_id);
+  // V4 keeps the actual fixture participant even after a transfer.
+  const participation = version === "ELEVEN_STANDARD_V4" ? await supabase.from("player_match_stats")
+    .select("participation_club_id").eq("player_id", playerId).eq("fixture_id", latest.fixture_id).maybeSingle() : null;
+  const side = participation?.data?.participation_club_id;
+  const isHome = side ? side === fixture.home_club_id : teamIds.has(fixture.home_club_id);
   const opponentId = isHome ? fixture.away_club_id : fixture.home_club_id;
   const clubShortNames = await getClubShortNames(supabase, [opponentId]);
 
@@ -701,7 +714,9 @@ export async function getPlayerLatestScoreBreakdown(playerId: string): Promise<P
     isHome,
     kickoffAt: fixture.kickoff_at,
     total: latest.points,
-    components: (latest.breakdown as Record<string, number> | null) ?? {},
+    scoringRuleVersion: version,
+    components: version === "ELEVEN_STANDARD_V4" ? ((latest.breakdown as unknown as import("../domain/fantasy/scoring-v4.ts").FantasyScoreBreakdownV4).components ?? {}) : (latest.breakdown as Record<string, number> | null) ?? {},
+    detail: version === "ELEVEN_STANDARD_V4" ? latest.breakdown as unknown as import("../domain/fantasy/scoring-v4.ts").FantasyScoreBreakdownV4 : undefined,
   };
 }
 

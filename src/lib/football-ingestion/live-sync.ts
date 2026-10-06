@@ -9,6 +9,7 @@ import { recordSyncEvent } from "./record-sync-event.ts";
 import { shouldStopForQuota } from "./quota.ts";
 import { PROVIDER } from "./identity.ts";
 import { backfillScores } from "../scoring/backfill.ts";
+import { getAffectedScoringVersions } from "../scoring/affected-versions.ts";
 import { reconcileFantasyStateForFixtures } from "../fantasy-engine/reconciliation.ts";
 import type { Database } from "../supabase/database.types.ts";
 import type { ProviderQuota } from "../football-providers/types.ts";
@@ -239,9 +240,13 @@ export async function runLiveSyncTick(
   let scoresRecomputed = 0;
   let roundsReconciled = 0;
   if (touchedFixtureIds.length > 0) {
-    const backfillResult = await backfillScores(admin, { fixtureIds: touchedFixtureIds });
-    scoresRecomputed = backfillResult.scored;
-    errors.push(...backfillResult.errors);
+    const versions = await getAffectedScoringVersions(admin, touchedFixtureIds);
+    for (const version of versions) {
+      const backfillResult = await backfillScores(admin, { scoringRuleVersion: version, fixtureIds: touchedFixtureIds });
+      scoresRecomputed += backfillResult.scored;
+      errors.push(...backfillResult.errors);
+      if (backfillResult.failed) throw new Error("Score recomputation failed; fantasy reconciliation deferred");
+    }
 
     // Marks exactly the fixtures that just got a REAL, successful stats
     // refresh -- live/ht fixtures land here every tick (their interval

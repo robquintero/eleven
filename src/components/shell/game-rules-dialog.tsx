@@ -4,7 +4,9 @@ import { useState } from "react";
 import { Info } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { FORMATION_RULES, ROSTER_RULES } from "@/domain/fantasy/constants";
-import { SCORING_RULE_VERSION_V3, SCORING_V3_WEIGHTS } from "@/domain/fantasy/scoring";
+import { HistoricalScoringRules } from "@/components/players/historical-scoring-rules";
+import { ScoringRulesV4 } from "@/components/players/scoring-rules-v4";
+import { SCORING_RULE_VERSION_V3, SCORING_V3_WEIGHTS, type ScoringRuleVersion } from "@/domain/fantasy/scoring";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -33,7 +35,7 @@ function Row({ label, value }: { label: string; value: string | number }) {
  * silently drift from the actual formula; a weight change there is
  * automatically reflected here with no second edit.
  */
-export function GameRulesDialog() {
+export function GameRulesDialog({ version = SCORING_RULE_VERSION_V3 }: { version?: ScoringRuleVersion }) {
   const [open, setOpen] = useState(false);
   const w = SCORING_V3_WEIGHTS;
 
@@ -56,7 +58,7 @@ export function GameRulesDialog() {
           </DialogHeader>
 
           <div className="flex flex-col gap-3">
-            <Section title={`SCORING — ${SCORING_RULE_VERSION_V3.replace("ELEVEN_STANDARD_", "")}`}>
+            {version === "ELEVEN_STANDARD_V4" ? <ScoringRulesV4 /> : version !== "ELEVEN_STANDARD_V3" ? <HistoricalScoringRules version={version} /> : <Section title={`SCORING — ${SCORING_RULE_VERSION_V3.replace("ELEVEN_STANDARD_", "")}`}>
               <p className="mb-2">
                 Every eligible real performance is scored from the same stats for every player — position only
                 changes the weight of goals and clean sheets, never which categories apply.
@@ -96,10 +98,12 @@ export function GameRulesDialog() {
               <Row label="Yellow card" value={w.yellowCard} />
               <Row label="Red card" value={w.redCard} />
               <p className="mt-2 text-[11px]">
-                Only statistics Eleven actually receives are scored — there is no passing-accuracy, duel, foul, or
-                penalty-event data available, so those are never invented or estimated.
+                V3 scores only the categories listed here. Passing accuracy, duels, fouls and penalty events do not
+                contribute to this version; missing statistics are never invented or estimated.
               </p>
             </Section>
+
+            }
 
             <Section title="FORMATION">
               Eleven V1 uses {FORMATION_RULES.positionRange.DEF.max}-{FORMATION_RULES.positionRange.MID.max}-

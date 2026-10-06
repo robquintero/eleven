@@ -43,6 +43,8 @@ export function PlayerInspector({
   // ever calls setState from inside the resolved promise callback (never
   // synchronously in the effect body) — the loading state is *derived*
   // below by comparing this to the current player, not tracked separately.
+  const version = player?.scoringRuleVersion;
+  const selectionKey = player ? `${player.id}:${version ?? "catalog"}` : null;
   const [loadedMatches, setLoadedMatches] = useState<{ playerId: string; matches: RecentMatchRow[] } | null>(null);
   const [loadedBreakdown, setLoadedBreakdown] = useState<{ playerId: string; breakdown: PlayerScoreBreakdown | null } | null>(null);
 
@@ -50,25 +52,25 @@ export function PlayerInspector({
     if (!player) return;
     let cancelled = false;
     const playerId = player.id;
-    getPlayerRecentMatchesAction(playerId).then((matches) => {
-      if (!cancelled) setLoadedMatches({ playerId, matches });
+    getPlayerRecentMatchesAction(playerId, version).then((matches) => {
+      if (!cancelled) setLoadedMatches({ playerId: `${playerId}:${version ?? "catalog"}`, matches });
     });
-    getPlayerScoreBreakdownAction(playerId).then((breakdown) => {
-      if (!cancelled) setLoadedBreakdown({ playerId, breakdown });
+    getPlayerScoreBreakdownAction(playerId, version).then((breakdown) => {
+      if (!cancelled) setLoadedBreakdown({ playerId: `${playerId}:${version ?? "catalog"}`, breakdown });
     });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player?.id]);
+  }, [player?.id, version]);
 
   const recentMatches =
-    loadedMatches && player && loadedMatches.playerId === player.id ? loadedMatches.matches : null;
+    loadedMatches && player && loadedMatches.playerId === selectionKey ? loadedMatches.matches : null;
   // `undefined` = not yet fetched for this player (distinct from a
   // resolved-but-null "no scored match yet" result) — mirrors
   // `recentMatches`'s own loading-vs-empty distinction above.
   const scoreBreakdown =
-    loadedBreakdown && player && loadedBreakdown.playerId === player.id ? loadedBreakdown.breakdown : undefined;
+    loadedBreakdown && player && loadedBreakdown.playerId === selectionKey ? loadedBreakdown.breakdown : undefined;
 
   if (variant === "inline") {
     if (!player) return null;

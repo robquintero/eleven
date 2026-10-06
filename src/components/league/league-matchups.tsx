@@ -1,3 +1,4 @@
+import { formatRoundPoints } from "@/lib/team-fixture";
 import type { LeagueMatchupSummary } from "@/data-access/matchups";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { pad2 } from "@/lib/team-fixture";
@@ -29,13 +30,13 @@ function MatchupRow({ matchup, myTeamId }: { matchup: LeagueMatchupSummary; myTe
         <div className="flex items-center justify-between gap-2">
           <span className="truncate text-sm text-foreground">{matchup.homeTeamName}</span>
           <span className="label-system shrink-0 text-sm font-semibold tabular-nums text-foreground">
-            {matchup.homePoints.toFixed(1)}
+            {formatRoundPoints(matchup.homePoints)}
           </span>
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-2">
           <span className="truncate text-sm text-foreground">{matchup.awayTeamName}</span>
           <span className="label-system shrink-0 text-sm font-semibold tabular-nums text-foreground">
-            {matchup.awayPoints.toFixed(1)}
+            {formatRoundPoints(matchup.awayPoints)}
           </span>
         </div>
       </div>

@@ -5,7 +5,7 @@ import "server-only";
 import { isSupabaseConfigured } from "../lib/supabase/config.ts";
 import { bigFiveLeagueFromCompetitionCode } from "../lib/leagues.ts";
 import { getFantasyScoreAggregates, type SupabaseClientType } from "./players.ts";
-import { SCORING_RULE_VERSION } from "../domain/fantasy/scoring.ts";
+import { getCatalogScoringVersion } from "../lib/scoring/catalog-version.ts";
 import type { Player, PlayerPosition } from "../lib/types/fantasy.ts";
 
 async function resolveClient() {
@@ -89,7 +89,7 @@ function toPlayer(
 
 /**
  * Pass 14.7 Phase 3: "who should I be paying attention to right now" --
- * free agents (not owned in THIS league) with the best recent real V3 form,
+ * free agents (not owned in THIS league) with the best recent active-model form,
  * falling back to season-total leaders only when too few free agents have
  * enough recent data to make "recent form" a meaningful signal at all (see
  * `HotFreeAgent.basis`). Entirely derived from stored `fantasy_player_scores`
@@ -107,6 +107,7 @@ export async function queryHotFreeAgents(
   leagueId: string,
   limit: number = DEFAULT_LIMIT
 ): Promise<HotFreeAgent[]> {
+  const catalogVersion = await getCatalogScoringVersion(supabase);
   const { data: owned } = await supabase.from("league_player_ownership").select("player_id").eq("league_id", leagueId);
   const ownedIds = new Set((owned ?? []).map((o) => o.player_id));
 
@@ -126,7 +127,7 @@ export async function queryHotFreeAgents(
     const { data: scores } = await supabase
       .from("fantasy_player_scores")
       .select("player_id, fixture_id, points")
-      .eq("scoring_rule_version", SCORING_RULE_VERSION)
+      .eq("scoring_rule_version", catalogVersion)
       .in("fixture_id", fixtureIds);
     for (const row of scores ?? []) {
       if (ownedIds.has(row.player_id)) continue;
@@ -166,7 +167,7 @@ export async function queryHotFreeAgents(
   // honestly labeled "season-total" rather than pretending it's form.
   let fallbackCandidates: { playerId: string; totalPoints: number }[] = [];
   if (picked.length < limit) {
-    const seasonAll = await getFantasyScoreAggregates(supabase);
+    const seasonAll = await getFantasyScoreAggregates(supabase, undefined, catalogVersion);
     fallbackCandidates = Array.from(seasonAll.entries())
       .filter(([playerId]) => !ownedIds.has(playerId) && !pickedIds.has(playerId))
       .map(([playerId, agg]) => ({ playerId, totalPoints: agg.totalPoints }))
@@ -186,7 +187,7 @@ export async function queryHotFreeAgents(
     .eq("active", true);
   const playerById = new Map(((playerRows ?? []) as unknown as CandidatePlayerRow[]).map((p) => [p.id, p]));
 
-  const seasonAggregates = await getFantasyScoreAggregates(supabase, allIds);
+  const seasonAggregates = await getFantasyScoreAggregates(supabase, allIds, catalogVersion);
 
   const result: HotFreeAgent[] = [];
   for (const c of picked) {
@@ -196,7 +197,7 @@ export async function queryHotFreeAgents(
     result.push({
       recentAveragePoints: Math.round(c.average * 100) / 100,
       basis: "recent-form",
-      player: toPlayer(row, c.recentForm, season?.totalPoints, season?.averagePoints),
+      player: { ...toPlayer(row, c.recentForm, season?.totalPoints, season?.averagePoints), scoringRuleVersion: catalogVersion },
     });
   }
   for (const c of fallbackCandidates) {
@@ -206,7 +207,7 @@ export async function queryHotFreeAgents(
     result.push({
       recentAveragePoints: season?.averagePoints ?? 0,
       basis: "season-total",
-      player: toPlayer(row, undefined, season?.totalPoints, season?.averagePoints),
+      player: { ...toPlayer(row, undefined, season?.totalPoints, season?.averagePoints), scoringRuleVersion: catalogVersion },
     });
   }
 

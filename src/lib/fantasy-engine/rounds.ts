@@ -4,7 +4,7 @@ import { findNextEligibleWindow, getEligibleFixtureIds } from "./round-eligibili
 import { createRoundLineupSlots } from "./lineup.ts";
 import { generateRoundRobinCycle, pairingsForSeasonRound } from "../../domain/fantasy/schedule.ts";
 import { determineFixtureSyncCadence } from "../../domain/football/sync-cadence.ts";
-import { SCORING_RULE_VERSION } from "../../domain/fantasy/scoring.ts";
+import { scoringVersion } from "../scoring/versions.ts";
 import { computeTotalRounds, DEFAULT_SCHEDULE_CYCLES, type ScheduleCycles } from "../../domain/fantasy/season.ts";
 import type { RoundWindow } from "../../domain/fantasy/round-calendar.ts";
 import type { FixtureStatus } from "../../domain/football/types.ts";
@@ -445,8 +445,9 @@ interface StarterRow {
  * needing a second score row or any mutation of the real score.
  */
 export async function refreshMatchupScores(admin: SupabaseClient<Database>, roundId: string): Promise<void> {
-  const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at").eq("id", roundId).maybeSingle();
+  const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at, scoring_rule_version").eq("id", roundId).maybeSingle();
   if (!round) return;
+  const version = scoringVersion(round.scoring_rule_version);
 
   const window: RoundWindow = { startsAt: new Date(round.starts_at), endsAt: new Date(round.ends_at) };
   const fixtureIds = await getEligibleFixtureIds(admin, window);
@@ -482,7 +483,7 @@ export async function refreshMatchupScores(admin: SupabaseClient<Database>, roun
     const { data: scores } = await admin
       .from("fantasy_player_scores")
       .select("player_id, fixture_id, points")
-      .eq("scoring_rule_version", SCORING_RULE_VERSION)
+      .eq("scoring_rule_version", version)
       .in("player_id", playerIds)
       .in("fixture_id", fixtureIds);
     for (const row of scores ?? []) {
@@ -508,7 +509,7 @@ export async function refreshMatchupScores(admin: SupabaseClient<Database>, roun
       // Acquired at or before kickoff -> counts; acquired after -> the
       // fixture's real points still exist in fantasy_player_scores, they
       // just don't belong to THIS team's matchup total.
-      if (kickoffAt && new Date(kickoffAt).getTime() >= acquiredAtMs) playerPoints += row.points;
+      if (kickoffAt && new Date(kickoffAt).getTime() >= acquiredAtMs) playerPoints += Math.round(row.points * 100);
     }
     pointsByTeamId.set(starter.fantasyTeamId, (pointsByTeamId.get(starter.fantasyTeamId) ?? 0) + playerPoints);
   }
@@ -516,7 +517,7 @@ export async function refreshMatchupScores(admin: SupabaseClient<Database>, roun
   const rows = teamIds.map((teamId) => ({
     fantasy_team_id: teamId,
     matchup_id: matchups.find((m) => m.home_fantasy_team_id === teamId || m.away_fantasy_team_id === teamId)!.id,
-    live_points: Math.round((pointsByTeamId.get(teamId) ?? 0) * 100) / 100,
+    live_points: (pointsByTeamId.get(teamId) ?? 0) / 100,
   }));
 
   await admin.from("matchup_scores").upsert(rows, { onConflict: "matchup_id,fantasy_team_id" });

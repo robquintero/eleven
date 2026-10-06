@@ -13,7 +13,8 @@ import { buildStandingsTable, rankStandings } from "../domain/fantasy/standings.
 import { computeFixtureIntelligence } from "../domain/fantasy/fixture-intelligence.ts";
 import { deriveFormationLabel } from "../domain/fantasy/constants.ts";
 import { isLocked } from "../domain/fantasy/lineup-lock.ts";
-import { SCORING_RULE_VERSION } from "../domain/fantasy/scoring.ts";
+import { SCORING_RULE_VERSION, type ScoringRuleVersion } from "../domain/fantasy/scoring.ts";
+import { scoringVersion } from "../lib/scoring/versions.ts";
 import { layoutStartingXi } from "../lib/selectors/pitch-layout.ts";
 import type { MatchupOutcome } from "../domain/fantasy/standings.ts";
 import type { FixtureRow } from "../domain/fantasy/fixture-intelligence.ts";
@@ -29,6 +30,7 @@ async function resolveClient() {
 export interface CurrentMatchup {
   id: string;
   roundId: string;
+  scoringRuleVersion: ScoringRuleVersion;
   roundNumber: number;
   /** The fantasy round's own Tue→Mon window (docs/game-rules.md "Fantasy round boundary") — what "round-aware" fixture lookups (Pass 10.5B) must stay inside, never crossing into a future round just to find something to show. */
   roundStartsAt: string;
@@ -80,7 +82,7 @@ export const getCurrentMatchup = cache(async function getCurrentMatchup(
 
   const { data: activeRound } = await supabase
     .from("fantasy_rounds")
-    .select("id, number, status, starts_at, ends_at")
+    .select("id, number, status, starts_at, ends_at, scoring_rule_version")
     .eq("league_id", leagueId)
     .in("status", ["in_progress", "upcoming"])
     .order("starts_at", { ascending: true })
@@ -104,7 +106,7 @@ export const getCurrentMatchup = cache(async function getCurrentMatchup(
     if (season) {
       const { data: lastFinalRound } = await supabase
         .from("fantasy_rounds")
-        .select("id, number, status, starts_at, ends_at")
+        .select("id, number, status, starts_at, ends_at, scoring_rule_version")
         .eq("season_id", season.id)
         .eq("status", "completed")
         .order("number", { ascending: false })
@@ -147,6 +149,7 @@ export const getCurrentMatchup = cache(async function getCurrentMatchup(
     id: matchup.id,
     roundId: round.id,
     roundNumber: round.number,
+    scoringRuleVersion: scoringVersion(round.scoring_rule_version),
     roundStartsAt: round.starts_at,
     roundEndsAt: round.ends_at,
     roundStatus: round.status as CurrentMatchup["roundStatus"],
@@ -520,7 +523,8 @@ export async function getRoundPlayerState(
   playerIds: string[],
   window: RoundWindow,
   acquiredAtByPlayerId: Map<string, string>,
-  includeScores = true
+  includeScores = true,
+  version: ScoringRuleVersion = SCORING_RULE_VERSION
 ): Promise<RoundPlayerState> {
   const pointsByPlayerId = new Map<string, number>();
   const preAcquisitionPointsByPlayerId = new Map<string, number>();
@@ -540,7 +544,7 @@ export async function getRoundPlayerState(
       const { data: scores } = await supabase
         .from("fantasy_player_scores")
         .select("player_id, fixture_id, points")
-        .eq("scoring_rule_version", SCORING_RULE_VERSION)
+        .eq("scoring_rule_version", scoringVersion(version))
         .in("player_id", playerIds)
         .in("fixture_id", fixtureIds);
 
@@ -645,7 +649,7 @@ export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: 
     .filter((s) => s.starter && isLocked(s.locked_at ? new Date(s.locked_at) : null, now))
     .map((s) => s.roster_entries.player_id).filter((id) => !activeIds.has(id))));
   const [state, historicalTeamIds] = await Promise.all([
-    getRoundPlayerState(supabase, playerIds, window, acquiredAtByPlayerId),
+    getRoundPlayerState(supabase, playerIds, window, acquiredAtByPlayerId, true, matchup.scoringRuleVersion),
     getTeamIdsByPlayer(supabase, historicalStarterIds),
   ]);
   const { pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId } = state;
@@ -670,6 +674,7 @@ export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: 
     ),
   ];
 
+  for (const squad of [home, away]) for (const player of [...squad.starters.map(s => s.player), ...squad.bench]) player.scoringRuleVersion = matchup.scoringRuleVersion;
   return { home, away, teamIdsByPlayerId };
 }
 

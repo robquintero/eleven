@@ -1,3 +1,4 @@
+import { SCORING_RULE_VERSION } from "../../domain/fantasy/scoring.ts";
 /**
  * Pass 14.6 Phase 7/10: "no retroactive point inheritance" -- a fantasy
  * team only receives a player's fantasy points for performances that
@@ -90,7 +91,7 @@ async function setUpScenario(admin: ReturnType<typeof createAdminClient>, league
     { player_id: starterPlayerId, fixture_id: afterFixture!.id, minutes: 90, goals: 0, assists: 1 }, // post-acquisition
     { player_id: benchPlayerId, fixture_id: beforeFixture!.id, minutes: 90, goals: 1, assists: 0 }, // bench, pre-acquisition
   ]);
-  const backfillResult = await backfillScores(admin, { fixtureIds: [beforeFixture!.id, afterFixture!.id] });
+  const backfillResult = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [beforeFixture!.id, afterFixture!.id] });
   assert.equal(backfillResult.failed, 0, backfillResult.errors.join("; "));
 
   const { data: season } = await admin.from("seasons").insert({ league_id: league.leagueId, season_number: 1, status: "ACTIVE", schedule_cycles: 2 }).select("id").single();

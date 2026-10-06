@@ -1,4 +1,5 @@
 import type { PlayerScoreBreakdown } from "@/data-access/players";
+import { ScoringBreakdownV4 } from "./scoring-breakdown-v4";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,6 +23,7 @@ const COMPONENT_LABEL: Record<string, string> = {
   saves: "SAVES",
   cleanSheet: "CLEAN SHEET",
   cards: "CARDS",
+  shooting: "SHOTS ON TARGET", creation: "KEY PASSES", defending: "DEFENSIVE ACTIONS", goalkeeping: "SAVES", discipline: "CARDS",
 };
 
 const COMPONENT_ORDER = Object.keys(COMPONENT_LABEL);
@@ -30,6 +32,8 @@ export function ScoringBreakdown({ breakdown }: { breakdown: PlayerScoreBreakdow
   if (!breakdown) {
     return <p className="text-xs text-foreground-tertiary">NO SCORED MATCH YET</p>;
   }
+
+  if (breakdown.detail?.schema === 4) return <ScoringBreakdownV4 detail={breakdown.detail} opponent={breakdown.opponent} kickoffAt={breakdown.kickoffAt} />;
 
   const entries = COMPONENT_ORDER.map((key) => [key, breakdown.components[key] ?? 0] as const).filter(
     ([, value]) => value !== 0

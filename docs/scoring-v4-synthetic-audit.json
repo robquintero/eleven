@@ -1,0 +1,1263 @@
+{
+  "capturedAt": "2026-10-06T02:34:01.406Z",
+  "method": "GET/HEAD-only Supabase REST audit; no provider queries. Deletion was a separately guarded exact fixture DELETE. No migration, score recomputation or fantasy-history mutation.",
+  "tablesInspected": {
+    "competitions": 29,
+    "clubs": 410,
+    "players": 2767,
+    "fixtures": 4130,
+    "player_match_stats": 14195,
+    "fantasy_player_scores": 36184,
+    "provider_mappings": 7304,
+    "player_national_teams": 968,
+    "fantasy_leagues": 5,
+    "fantasy_teams": 10,
+    "league_memberships": 10,
+    "fantasy_rounds": 3,
+    "matchups": 4,
+    "matchup_scores": 8,
+    "roster_entries": 132,
+    "lineup_slots": 116,
+    "league_player_ownership": 128,
+    "seasons": 4,
+    "domain_events": 8321,
+    "transactions": 69,
+    "profiles": 27,
+    "drafts": 3,
+    "draft_orders": 4,
+    "draft_picks": 64,
+    "waiver_claims": 0,
+    "trades": 6,
+    "trade_assets": 12,
+    "scoring_rules": 0
+  },
+  "providerBackedFixtureCount": 4099,
+  "providerBackedAction": "PRESERVED; stored mapping is provenance, not independent provider re-verification",
+  "fixtures": [
+    {
+      "internalId": "063ac67c-3d1a-47b3-aa66-fdcfd8bdcfbb",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "da59e6d3-362d-4b42-b219-45836a84a525",
+        "name": "Barcelona"
+      },
+      "kickoff": "2015-03-06T12:00:00+00:00",
+      "status": "live",
+      "source": "Exact committed round-player-state.integration.test.ts literal 2015 window, fixture sides/status/season, player association and stat signature",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "deterministic",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "5a472852-3a0c-4f77-a4f3-f6a021db5205"
+      ],
+      "scoreIds": [
+        "8331d29c-0eb4-4870-b89f-f7c96c89acda"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (single parent DELETE with FK cascades)"
+    },
+    {
+      "internalId": "0f56077e-cead-4346-a2b3-956d74f74d9d",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "52d750ab-92b3-4428-bee2-0aad1ee5780d",
+        "name": "Manchester City"
+      },
+      "kickoff": "2016-03-06T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "29454611-6ee2-4804-885a-e581c03fed74"
+      ],
+      "scoreIds": [
+        "cc2fa0ac-d9bc-4418-864d-dd7d8b88203c"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "2032e6c5-902b-411f-a85c-8705abc176a4",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2015-03-05T12:00:00+00:00",
+      "status": "final",
+      "source": "Exact committed round-player-state.integration.test.ts literal 2015 window, fixture sides/status/season, player association and stat signature",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "deterministic",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "371bf01b-fb24-4651-92a4-80b1bd78d963"
+      ],
+      "scoreIds": [
+        "e6f2283b-cc4b-4fcd-8c18-6d355703d473"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (single parent DELETE with FK cascades)"
+    },
+    {
+      "internalId": "35320a01-02e3-4600-bda0-a1381ba459bd",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "da59e6d3-362d-4b42-b219-45836a84a525",
+        "name": "Barcelona"
+      },
+      "kickoff": "2015-03-06T12:00:00+00:00",
+      "status": "live",
+      "source": "Exact committed round-player-state.integration.test.ts literal 2015 window, fixture sides/status/season, player association and stat signature",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "deterministic",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "3d4df23d-9b2f-400b-8a1c-bbe24f390f09"
+      ],
+      "scoreIds": [
+        "29b16c3d-dd43-4651-8339-fc54febd162f"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (single parent DELETE with FK cascades)"
+    },
+    {
+      "internalId": "42ebe96f-9e40-4f23-a146-e934791edf9b",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "52d750ab-92b3-4428-bee2-0aad1ee5780d",
+        "name": "Manchester City"
+      },
+      "kickoff": "2016-03-06T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 0,
+      "scoreCount": 0,
+      "statsIds": [],
+      "scoreIds": [],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "455a143b-6d28-4057-9fc4-8331f0499477",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "52d750ab-92b3-4428-bee2-0aad1ee5780d",
+        "name": "Manchester City"
+      },
+      "kickoff": "2016-03-06T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 0,
+      "scoreCount": 0,
+      "statsIds": [],
+      "scoreIds": [],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "46fbc0df-9cbc-4af4-b6d9-ad3b6c68bb4e",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "da59e6d3-362d-4b42-b219-45836a84a525",
+        "name": "Barcelona"
+      },
+      "kickoff": "2015-03-06T12:00:00+00:00",
+      "status": "live",
+      "source": "Exact committed round-player-state.integration.test.ts literal 2015 window, fixture sides/status/season, player association and stat signature",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "deterministic",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "04dd76dd-f408-4982-9679-607a3f5a20fd"
+      ],
+      "scoreIds": [
+        "df4d102c-6088-4efd-af24-b818921cf7b7"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (single parent DELETE with FK cascades)"
+    },
+    {
+      "internalId": "49e5f0f4-bf30-46f8-ad4c-9410e4467c80",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "da59e6d3-362d-4b42-b219-45836a84a525",
+        "name": "Barcelona"
+      },
+      "kickoff": "2015-03-06T12:00:00+00:00",
+      "status": "live",
+      "source": "Exact committed round-player-state.integration.test.ts literal 2015 window, fixture sides/status/season, player association and stat signature",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "deterministic",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "1ff793c2-51d5-4391-b7fc-b8cd84c822d2"
+      ],
+      "scoreIds": [
+        "004bd371-80b3-47b3-a128-2912b36113a8"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (single parent DELETE with FK cascades)"
+    },
+    {
+      "internalId": "4b60271c-3c35-4556-8723-0e7fc11b0fa7",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2015-03-05T12:00:00+00:00",
+      "status": "final",
+      "source": "Exact committed round-player-state.integration.test.ts literal 2015 window, fixture sides/status/season, player association and stat signature",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "deterministic",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "8b14d414-4706-4662-9ae9-0f282a39eaca"
+      ],
+      "scoreIds": [
+        "d5380536-240d-4caa-bf79-76b68cd4a345"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (single parent DELETE with FK cascades)"
+    },
+    {
+      "internalId": "4e1e2c6c-933c-47a8-8c76-1f5bab7ee66c",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2016-03-02T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 0,
+      "scoreCount": 0,
+      "statsIds": [],
+      "scoreIds": [],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "52af821d-3ab0-4b46-9f6b-57b4b76eaf32",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "52d750ab-92b3-4428-bee2-0aad1ee5780d",
+        "name": "Manchester City"
+      },
+      "kickoff": "2016-03-06T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "b28264b6-e3e3-48aa-b7ed-1c0ca0a04a79"
+      ],
+      "scoreIds": [
+        "82d14b89-4256-4327-85b1-d563aa59e699"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "5ed049bf-2dcd-4b80-90e6-4a534ea548c1",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "da59e6d3-362d-4b42-b219-45836a84a525",
+        "name": "Barcelona"
+      },
+      "kickoff": "2015-03-06T12:00:00+00:00",
+      "status": "live",
+      "source": "Exact committed round-player-state.integration.test.ts literal 2015 window, fixture sides/status/season, player association and stat signature",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "deterministic",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "47643c19-9f34-4f91-ac90-d39080bb883a"
+      ],
+      "scoreIds": [
+        "3341d67a-9eb4-4af7-8bf8-9aa04a2623a3"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (single parent DELETE with FK cascades)"
+    },
+    {
+      "internalId": "6a7d2eba-dfcb-4d76-8eeb-3010a9d03638",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "da59e6d3-362d-4b42-b219-45836a84a525",
+        "name": "Barcelona"
+      },
+      "kickoff": "2091-03-06T12:00:00+00:00",
+      "status": "live",
+      "source": "Matches round-player-state scenario stat/side signature and documented 2090+ isolation convention; exact 2091 literal not preserved in Git",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "e0418e94-de25-4542-a378-f5d4e897d496"
+      ],
+      "scoreIds": [
+        "d16076c2-0b71-4cf2-9e1b-ddd8bc70e9de"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "7190336c-a0e7-4088-afa5-aae5427a8529",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "52d750ab-92b3-4428-bee2-0aad1ee5780d",
+        "name": "Manchester City"
+      },
+      "kickoff": "2016-03-06T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 0,
+      "scoreCount": 0,
+      "statsIds": [],
+      "scoreIds": [],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "783dc743-bb56-413a-bee8-f655520db8da",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2016-03-02T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 2,
+      "scoreCount": 2,
+      "statsIds": [
+        "1fabf121-f412-4783-9a40-e0d866f4da13",
+        "dfef9e35-7752-4c9a-993e-b69dba296807"
+      ],
+      "scoreIds": [
+        "37364233-2e5d-44de-b021-79b465150a87",
+        "6ecec6ac-7d82-4734-8163-2cfb878b6674"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "788476b3-57a3-4201-904a-ce63caa90cf8",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2091-03-05T12:00:00+00:00",
+      "status": "final",
+      "source": "Matches round-player-state scenario stat/side signature and documented 2090+ isolation convention; exact 2091 literal not preserved in Git",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "0daacf50-b099-4205-b81b-8df10e225182"
+      ],
+      "scoreIds": [
+        "1a7b6b88-b146-49e8-ba01-a1c2dd70c63c"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "78b1a352-9f22-4a6f-b244-bbc58bd634ef",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "52d750ab-92b3-4428-bee2-0aad1ee5780d",
+        "name": "Manchester City"
+      },
+      "kickoff": "2016-03-06T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "f4ad9cea-959b-49fc-8bca-22439ab937ec"
+      ],
+      "scoreIds": [
+        "50d89f51-d66b-48f4-a96e-98fe49375c3d"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "8b73c6a1-6363-43cd-8d26-8fcb018c9ad5",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "52d750ab-92b3-4428-bee2-0aad1ee5780d",
+        "name": "Manchester City"
+      },
+      "kickoff": "2016-03-06T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 0,
+      "scoreCount": 0,
+      "statsIds": [],
+      "scoreIds": [],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "92d0f1bc-1f3d-43ec-a0fd-c4ea07bf3d15",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "52d750ab-92b3-4428-bee2-0aad1ee5780d",
+        "name": "Manchester City"
+      },
+      "kickoff": "2016-03-06T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 0,
+      "scoreCount": 0,
+      "statsIds": [],
+      "scoreIds": [],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "96c7f80f-ae90-4d1c-886c-63cff0720257",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2015-03-05T12:00:00+00:00",
+      "status": "final",
+      "source": "Exact committed round-player-state.integration.test.ts literal 2015 window, fixture sides/status/season, player association and stat signature",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "deterministic",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "8450db44-ccd0-4a16-965c-50bcee0556cb"
+      ],
+      "scoreIds": [
+        "6f96932f-5742-4602-83f3-3dc86dfd68b6"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (single parent DELETE with FK cascades)"
+    },
+    {
+      "internalId": "9cebf3b6-278e-4663-b683-1f97b3bd17ed",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2016-03-02T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 0,
+      "scoreCount": 0,
+      "statsIds": [],
+      "scoreIds": [],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "9ee14ca0-13de-4277-9a92-077c798996b5",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2091-03-05T12:00:00+00:00",
+      "status": "final",
+      "source": "Matches round-player-state scenario stat/side signature and documented 2090+ isolation convention; exact 2091 literal not preserved in Git",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "2978b26b-f84f-40a2-a74a-d1484de28c5a"
+      ],
+      "scoreIds": [
+        "de5291c0-4607-4b17-a58c-5bd5f03b8491"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "ab9bd05c-ef98-42c8-9ec9-4e122636cdf3",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2015-03-05T12:00:00+00:00",
+      "status": "final",
+      "source": "Exact committed round-player-state.integration.test.ts literal 2015 window, fixture sides/status/season, player association and stat signature",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "deterministic",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "6ce3b188-c46e-41c8-b7f3-715ee5605a91"
+      ],
+      "scoreIds": [
+        "44a2c064-69f9-4e2a-9034-529d189f1757"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (single parent DELETE with FK cascades)"
+    },
+    {
+      "internalId": "cdd08415-b040-46b4-a33c-922102380d08",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2016-03-02T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 2,
+      "scoreCount": 2,
+      "statsIds": [
+        "208a3d02-2898-45ca-8f98-d5264f312f71",
+        "c5016fb7-61bc-4b7d-9417-323cb6207cfb"
+      ],
+      "scoreIds": [
+        "68a711e2-9c43-4416-a816-46117cbdd7c4",
+        "d14d5200-94e2-460f-8741-ed902ae1cf5c"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "d1f0f3f5-e7a8-4363-8194-cf0b824195ee",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2015-03-05T12:00:00+00:00",
+      "status": "final",
+      "source": "Exact committed round-player-state.integration.test.ts literal 2015 window, fixture sides/status/season, player association and stat signature",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "deterministic",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "11f2851f-aa68-4abd-b96d-545ce9b519e3"
+      ],
+      "scoreIds": [
+        "be561192-0f5e-44fe-971e-790793bcb001"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (single parent DELETE with FK cascades)"
+    },
+    {
+      "internalId": "d89e86bb-9a53-4772-a1df-cb42aab46988",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2016-03-02T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 0,
+      "scoreCount": 0,
+      "statsIds": [],
+      "scoreIds": [],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "e680478b-fc3f-4450-b827-81e3b5146d2d",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2016-03-02T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 2,
+      "scoreCount": 2,
+      "statsIds": [
+        "41c038ab-ec69-418f-b18f-0ecb0d6a5830",
+        "b7a3b265-9c04-45a0-9412-3ab956d4d747"
+      ],
+      "scoreIds": [
+        "a9bbdedb-c4a7-4f72-83e8-3595109b14a3",
+        "c884d76d-c2ee-4dac-b231-bd110b35fc8f"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "e916b1f2-d532-4d6d-b87d-6a31cba04249",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2016-03-02T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 2,
+      "scoreCount": 2,
+      "statsIds": [
+        "3e27d505-435f-4001-9761-5958e59e0bcc",
+        "de1af4e0-c25d-4e4b-b86c-847083be7f76"
+      ],
+      "scoreIds": [
+        "10cdc78c-a7b0-4b41-8bc9-48b100472019",
+        "c6becef4-8aa1-4e81-8d44-611a91e3da72"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "f4d052ef-fc5f-4daf-9753-3ab59d09375a",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "away": {
+        "id": "52d750ab-92b3-4428-bee2-0aad1ee5780d",
+        "name": "Manchester City"
+      },
+      "kickoff": "2016-03-06T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 1,
+      "scoreCount": 1,
+      "statsIds": [
+        "7eda2c07-a6ff-4375-93a1-3977c7b778d6"
+      ],
+      "scoreIds": [
+        "d3ea5eac-e9ee-485c-b97f-fe0e437ae8a4"
+      ],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "fa4101e5-3df9-47c2-890a-1062bb26e1ae",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2016-03-02T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 0,
+      "scoreCount": 0,
+      "statsIds": [],
+      "scoreIds": [],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    },
+    {
+      "internalId": "fb18fda7-8711-44d7-9d7f-9cb29e56c334",
+      "providerId": null,
+      "competition": {
+        "id": "d948d2e0-5c50-4b44-bab1-5f4e6c52fd1e",
+        "name": "Premier League"
+      },
+      "home": {
+        "id": "cfa0e678-11ac-4805-bd98-e9d0a4909be9",
+        "name": "Real Madrid"
+      },
+      "away": {
+        "id": "556db1c7-a9dc-4b6f-a01c-d45dcfbc68f1",
+        "name": "Arsenal"
+      },
+      "kickoff": "2016-03-02T12:00:00+00:00",
+      "status": "final",
+      "source": "Documented earlier March 2016 leak in acquisition-cutoff.integration.test.ts; surviving source now uses April, so exact earlier timestamp provenance not established",
+      "classification": "PROVEN SYNTHETIC",
+      "confidence": "Product owner explicitly confirmed synthetic in FINALIZE ELEVEN STANDARD V4",
+      "statsCount": 0,
+      "scoreCount": 0,
+      "statsIds": [],
+      "scoreIds": [],
+      "directRoundIds": [],
+      "roundWindowUsage": [],
+      "eventTransactionRefs": [],
+      "action": "DELETED (approved final release cleanup; guarded transaction and existing FK cascades)",
+      "priorClassification": "LIKELY SYNTHETIC \u2014 DO NOT DELETE"
+    }
+  ],
+  "otherFindings": [
+    {
+      "table": "fantasy_leagues",
+      "id": "517dd351-95fe-4ab9-9206-ea1be153f097",
+      "name": "Eleven Integration Test 1790957945563",
+      "classification": "PROVEN SYNTHETIC (explicit factory naming marker)",
+      "source": "integration-test-helpers.ts createTestLeague naming convention",
+      "dependencies": {
+        "roundId": "7d81b42a-18fd-4f74-a09a-458eb98588f4",
+        "teams": 2,
+        "matchups": 1
+      },
+      "action": "PRESERVED: fantasy records/identities outside this narrowly selected football cleanup; no candidate fixture lies in its round"
+    },
+    {
+      "table": "fantasy_leagues",
+      "id": "dd27957b-d7cf-46f8-98d5-54eda3681492",
+      "name": "Test League",
+      "classification": "UNKNOWN \u2014 DO NOT DELETE",
+      "source": "Generic name is not deterministic provenance",
+      "action": "PRESERVED"
+    }
+  ],
+  "protection": {
+    "009434f3-c004-4b10-9d43-5d84d5eb1250": {
+      "name": "Fantastic 4",
+      "managers": [
+        {
+          "team": "Los Duros FC",
+          "profile": "TuroElDuro"
+        },
+        {
+          "team": "NiceTryBuddy",
+          "profile": "Joaking"
+        },
+        {
+          "team": "75 Hard",
+          "profile": "75Hard"
+        },
+        {
+          "team": "Kaka FC",
+          "profile": "robthesavage"
+        }
+      ],
+      "rosterCount": 64,
+      "acquiredDates": [
+        "2026-09-29"
+      ],
+      "rounds": [
+        {
+          "id": "ea80c33d-8d80-41d6-9267-fb303bc3e576",
+          "seasonId": "4b243feb-835b-457e-87d3-1004722cfeae",
+          "number": 1,
+          "start": "2026-09-29T00:00:00+00:00",
+          "end": "2026-10-06T00:00:00+00:00",
+          "matchupCount": 2
+        }
+      ]
+    },
+    "80f9181f-2c11-4dec-bffc-60a22ee0345f": {
+      "name": "The Room",
+      "managers": [
+        {
+          "team": "Kaka FC",
+          "profile": "robtheape"
+        },
+        {
+          "team": "Turo",
+          "profile": "TuroElDuro"
+        }
+      ],
+      "rosterCount": 36,
+      "acquiredDates": [
+        "2026-10-01",
+        "2026-10-03",
+        "2026-10-04"
+      ],
+      "rounds": [
+        {
+          "id": "d4116438-42ef-4ed8-a62c-04d8471fa780",
+          "seasonId": "451ef9f0-b4bd-448b-bf54-7129aeb01644",
+          "number": 1,
+          "start": "2026-09-29T00:00:00+00:00",
+          "end": "2026-10-06T00:00:00+00:00",
+          "matchupCount": 1
+        }
+      ]
+    }
+  },
+  "cleanup": {
+    "at": "2026-10-06T02:43:14.383Z",
+    "deleted": {
+      "fixtures": 10,
+      "player_match_stats": 10,
+      "fantasy_player_scores": 10,
+      "total": 30
+    },
+    "fixtureIds": [
+      "063ac67c-3d1a-47b3-aa66-fdcfd8bdcfbb",
+      "2032e6c5-902b-411f-a85c-8705abc176a4",
+      "35320a01-02e3-4600-bda0-a1381ba459bd",
+      "46fbc0df-9cbc-4af4-b6d9-ad3b6c68bb4e",
+      "49e5f0f4-bf30-46f8-ad4c-9410e4467c80",
+      "4b60271c-3c35-4556-8723-0e7fc11b0fa7",
+      "5ed049bf-2dcd-4b80-90e6-4a534ea548c1",
+      "96c7f80f-ae90-4d1c-886c-63cff0720257",
+      "ab9bd05c-ef98-42c8-9ec9-4e122636cdf3",
+      "d1f0f3f5-e7a8-4363-8194-cf0b824195ee"
+    ],
+    "protectedTablesSubstantivelyUnchanged": [
+      "fantasy_leagues",
+      "fantasy_teams",
+      "fantasy_rounds",
+      "seasons",
+      "roster_entries",
+      "lineup_slots",
+      "matchups",
+      "matchup_scores",
+      "transactions",
+      "domain_events",
+      "provider_mappings",
+      "league_memberships",
+      "league_player_ownership"
+    ],
+    "concurrentTimestampUpdates": {
+      "matchups": {
+        "fields": [
+          "updated_at"
+        ],
+        "rows": [
+          "04b1be72-82f8-4902-a2b3-0e9a143c6208",
+          "082c123c-1f10-4f8f-9582-624d7e72aedd",
+          "8b1ed1dc-2008-4a42-acad-e3a5eba3efee",
+          "e95bed14-7848-4f15-9a80-3ab8e6254827"
+        ]
+      },
+      "matchup_scores": {
+        "fields": [
+          "updated_at"
+        ],
+        "rows": [
+          "399865fc-55bf-432a-b5c3-04e5818138bd",
+          "453f4e13-ee27-4e67-afe7-1f7349616c86",
+          "6a1e70c2-2b50-4439-beb2-f6c6a3bbc4fa",
+          "78fd11de-58cc-453e-a37b-c5f847f5d2d6",
+          "86214738-aaed-4c56-8553-16c3a6912dbd",
+          "90a792ef-ef4e-42f1-9d9e-c259d386c8c8",
+          "aefb9b16-4e04-48f1-b38e-f76f6692861a",
+          "d8574336-da35-4d26-9037-d1698143986a"
+        ]
+      },
+      "newBackgroundEvents": {
+        "count": 2,
+        "types": [
+          "FOOTBALL_SYNC_LIVE-SYNC-TICK"
+        ]
+      }
+    },
+    "orphans": 0,
+    "postCounts": {
+      "fixtures": 4120,
+      "player_match_stats": 14185,
+      "fantasy_player_scores": 36174
+    }
+  },
+  "futurePrevention": "Existing production test guard retained; added regression proving createTestLeague rejects production before the first test identity/DB writer. No override used.",
+  "finalReleaseCleanup": {
+    "ownerAuthorization": "FINALIZE ELEVEN STANDARD V4: exact 18 March-2016 and 3 March-2091 fixtures explicitly confirmed synthetic",
+    "fixtureIds": [
+      "0f56077e-cead-4346-a2b3-956d74f74d9d",
+      "42ebe96f-9e40-4f23-a146-e934791edf9b",
+      "455a143b-6d28-4057-9fc4-8331f0499477",
+      "4e1e2c6c-933c-47a8-8c76-1f5bab7ee66c",
+      "52af821d-3ab0-4b46-9f6b-57b4b76eaf32",
+      "6a7d2eba-dfcb-4d76-8eeb-3010a9d03638",
+      "7190336c-a0e7-4088-afa5-aae5427a8529",
+      "783dc743-bb56-413a-bee8-f655520db8da",
+      "788476b3-57a3-4201-904a-ce63caa90cf8",
+      "78b1a352-9f22-4a6f-b244-bbc58bd634ef",
+      "8b73c6a1-6363-43cd-8d26-8fcb018c9ad5",
+      "92d0f1bc-1f3d-43ec-a0fd-c4ea07bf3d15",
+      "9cebf3b6-278e-4663-b683-1f97b3bd17ed",
+      "9ee14ca0-13de-4277-9a92-077c798996b5",
+      "cdd08415-b040-46b4-a33c-922102380d08",
+      "d89e86bb-9a53-4772-a1df-cb42aab46988",
+      "e680478b-fc3f-4450-b827-81e3b5146d2d",
+      "e916b1f2-d532-4d6d-b87d-6a31cba04249",
+      "f4d052ef-fc5f-4daf-9753-3ab59d09375a",
+      "fa4101e5-3df9-47c2-890a-1062bb26e1ae",
+      "fb18fda7-8711-44d7-9d7f-9cb29e56c334"
+    ],
+    "deleted": {
+      "fixtures": 21,
+      "player_match_stats": 15,
+      "fantasy_player_scores": 15,
+      "total": 51
+    },
+    "dependencyVerification": {
+      "roundWindowUsage": 0,
+      "directRoundReferences": 0,
+      "eventReferences": 0,
+      "transactionReferences": 0,
+      "unexpectedDeleteTriggers": 0
+    },
+    "verification": "All selected fixtures and children absent; protected round/result/roster/ownership and other legacy score hashes unchanged",
+    "cumulativeDeletedIncludingSafetyPass": {
+      "fixtures": 31,
+      "player_match_stats": 25,
+      "fantasy_player_scores": 25,
+      "total": 81
+    },
+    "otherAmbiguousData": "PRESERVED"
+  }
+}

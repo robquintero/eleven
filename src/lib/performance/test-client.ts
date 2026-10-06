@@ -20,6 +20,7 @@ export function testClient(respond: (query: RecordedQuery) => TestResponse | Pro
     const chain = {
       select(selection: string) { q.selection = selection; return chain; },
       eq(column: string, value: unknown) { q.filters.push({ method: "eq", column, value }); return chain; },
+      neq(column: string, value: unknown) { q.filters.push({ method: "neq", column, value }); return chain; },
       in(column: string, value: unknown) { q.filters.push({ method: "in", column, value }); return chain; },
       is(column: string, value: unknown) { q.filters.push({ method: "is", column, value }); return chain; },
       not(column: string, operator: string, value: unknown) { q.filters.push({ method: operator, column, value }); return chain; },

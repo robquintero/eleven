@@ -1,3 +1,4 @@
+import { getCurrentCatalogScoringVersion } from "@/lib/scoring/catalog-version";
 import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
 import { CommandPalette } from "@/components/command/command-palette";
@@ -37,6 +38,7 @@ async function loadStatusBarData(activeLeagueId: string | null): Promise<StatusB
   const next = nextLock(starters);
 
   return {
+    scoringRuleVersion: matchup.scoringRuleVersion,
     roundNumber: matchup.roundNumber,
     roundStatus: matchup.roundStatus,
     liveCount: buckets.live,
@@ -57,6 +59,8 @@ async function loadStatusBarData(activeLeagueId: string | null): Promise<StatusB
 export async function AppShell({ children }: { children: ReactNode }) {
   const [profile, leagues] = await Promise.all([getCurrentProfile(), getUserLeagues()]);
   const activeLeagueId = await getActiveLeagueId(leagues);
+  const statusPromise = loadStatusBarData(activeLeagueId);
+  void statusPromise.catch(() => {});
 
   return (
     <NavigationTransitionProvider>
@@ -89,14 +93,14 @@ export async function AppShell({ children }: { children: ReactNode }) {
                   <Wordmark authenticated />
                 </div>
                 <LeagueSwitcher leagues={leagues} activeLeagueId={activeLeagueId} />
-                {leagues.length > 0 && <GameRulesDialog />}
+                {leagues.length > 0 && <Suspense fallback={null}><RoundRules statusPromise={statusPromise} /></Suspense>}
               </div>
               <div className="flex items-center gap-3">
                 <CommandPalette />
                 <ProfileControl profile={profile} />
               </div>
             </div>
-            <Suspense fallback={<div role="status" className="label-system border-t border-border px-4 py-2 text-[10px] text-foreground-tertiary">LOADING ROUND STATUS</div>}><RoundStatus activeLeagueId={activeLeagueId} /></Suspense>
+            <Suspense fallback={<div role="status" className="label-system border-t border-border px-4 py-2 text-[10px] text-foreground-tertiary">LOADING ROUND STATUS</div>}><RoundStatus statusPromise={statusPromise} /></Suspense>
           </header>
 
           <main id="main-content" className="flex-1 px-4 pt-6 pb-28 sm:px-6 lg:px-8 lg:pb-12">
@@ -112,6 +116,9 @@ export async function AppShell({ children }: { children: ReactNode }) {
   );
 }
 
-async function RoundStatus({ activeLeagueId }: { activeLeagueId: string | null }) {
-  return <StatusBar data={await loadStatusBarData(activeLeagueId)} />;
+async function RoundStatus({ statusPromise }: { statusPromise: ReturnType<typeof loadStatusBarData> }) {
+  return <StatusBar data={await statusPromise} />;
+}
+async function RoundRules({ statusPromise }: { statusPromise: ReturnType<typeof loadStatusBarData> }) {
+  return <GameRulesDialog version={(await statusPromise)?.scoringRuleVersion ?? await getCurrentCatalogScoringVersion()} />;
 }

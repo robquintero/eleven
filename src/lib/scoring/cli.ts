@@ -1,12 +1,12 @@
 /**
- * `npm run scoring:backfill [-- --season 2026]` — manually-invoked developer
+ * `npm run scoring:backfill -- --version ELEVEN_STANDARD_V3 --season 2026` — manually-invoked developer
  * command that (re)calculates every eligible stored performance's canonical
  * fantasy score (see backfill.ts for exactly what "eligible" means) and
  * upserts it into `fantasy_player_scores`. Makes ZERO provider requests —
- * this is a pure DB-to-DB recomputation, safe to run as often as useful,
- * and safe to run twice in a row (see backfill.ts's idempotency guarantee).
+ * this is an explicit DB-to-DB mutation, idempotent on unchanged inputs
+ * (see backfill.ts). Production recomputation requires scoped approval.
  *
- * `npm run scoring:replay -- --fixture <fixtureId>` — read-only: recomputes
+ * `npm run scoring:replay -- --version ELEVEN_STANDARD_V3 --fixture <fixtureId>` — read-only: recomputes
  * one stored fixture's scores from its current `player_match_stats` and
  * diffs against whatever's currently stored, proving deterministic replay
  * against real historical data (brief §Phase 5). Never writes.
@@ -18,6 +18,7 @@ import "server-only";
 import { createAdminClient, isSupabaseAdminConfigured } from "../supabase/admin.ts";
 import { backfillScores } from "./backfill.ts";
 import { replayFixture } from "./replay.ts";
+import { scoringVersion } from "./versions.ts";
 
 function parseFlags(argv: string[]): Record<string, string> {
   const flags: Record<string, string> = {};
@@ -41,11 +42,14 @@ async function main() {
   const admin = createAdminClient();
 
   const args = process.argv.slice(2);
-  // Backward compatible: `npm run scoring:backfill -- --season 2026` has no
+  // Operation selection is backward compatible: the backfill script has no
   // positional operation token at all, so an absent/flag-shaped first token
   // still means "backfill" (the original, only behavior this CLI had).
   const operation = args[0] && !args[0].startsWith("--") ? args[0] : "backfill";
   const flags = parseFlags(operation === args[0] ? args.slice(1) : args);
+
+  // Require an explicit model before any score write or replay.
+  const version = scoringVersion(flags.version);
 
   if (operation === "replay") {
     if (!flags.fixture) {
@@ -53,13 +57,13 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    const result = await replayFixture(admin, flags.fixture);
+    const result = await replayFixture(admin, flags.fixture, version);
     console.log(JSON.stringify(result, null, 2));
     return;
   }
 
   const season = flags.season ? Number(flags.season) : undefined;
-  const result = await backfillScores(admin, { season });
+  const result = await backfillScores(admin, { season, scoringRuleVersion: version });
   console.log(JSON.stringify(result, null, 2));
 
   if (result.failed > 0) process.exitCode = 1;

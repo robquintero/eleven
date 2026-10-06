@@ -68,34 +68,31 @@ export async function syncFixtureStats(
       });
 
     if (resolvedRows.length > 0) {
-      const { data: existingStats } = await admin
+      const { data: existingStats, error: existingError } = await admin
         .from("player_match_stats")
-        .select("player_id")
+        .select("player_id, scoring_position")
         .eq("fixture_id", fixtureId)
         .in(
           "player_id",
           resolvedRows.map((e) => e.playerId)
         );
+      if (existingError) return fail(`Cannot preserve scoring provenance: ${existingError.message}`, 1);
       const existingPlayerIds = new Set((existingStats ?? []).map((r) => r.player_id));
+      const pinnedPositions = new Map((existingStats ?? []).map(r => [r.player_id, r.scoring_position]));
+      const [{ data: players, error: playerError }, { data: teams, error: teamError }] = await Promise.all([
+        admin.from("players").select("id, position").in("id", resolvedRows.map(r => r.playerId)),
+        admin.from("provider_mappings").select("external_id, internal_entity_id").eq("provider", PROVIDER)
+          .eq("internal_entity_type", "club").in("external_id", data.response.map(team => String(team.team.id))),
+      ]);
+      if (playerError || teamError) return fail(`Cannot resolve scoring provenance: ${playerError?.message ?? teamError?.message}`, 1);
+      const positions = new Map((players ?? []).map(p => [p.id, p.position]));
+      const teamIds = new Map((teams ?? []).map(t => [t.external_id, t.internal_entity_id]));
+
 
       const { error: upsertError } = await admin.from("player_match_stats").upsert(
-        resolvedRows.map(({ row, playerId }) => ({
-          player_id: playerId,
-          fixture_id: fixtureId,
-          minutes: row.minutes,
-          started: row.started,
-          goals: row.goals,
-          assists: row.assists,
-          shots_on_target: row.shotsOnTarget,
-          chances_created: row.chancesCreated,
-          tackles: row.tackles,
-          interceptions: row.interceptions,
-          blocks: row.blocks,
-          saves: row.saves,
-          yellow_cards: row.yellowCards,
-          red_cards: row.redCards,
-          clean_sheet: row.cleanSheet ?? null,
-        })),
+        resolvedRows.map(({ row, playerId }) => fixtureStatPersistenceRow(row, playerId, fixtureId,
+          teamIds.get(row.participationTeamExternalId ?? "") ?? null,
+          pinnedPositions.get(playerId) ?? positions.get(playerId) ?? null)),
         { onConflict: "player_id,fixture_id" }
       );
 
@@ -122,4 +119,16 @@ export async function syncFixtureStats(
   } catch (err) {
     return fail(err instanceof Error ? err.message : String(err), 1);
   }
+}
+
+/** Shared by the production upsert and offline adapter→storage→score tests. */
+export function fixtureStatPersistenceRow(row: import("../football-providers/types.ts").NormalizedFixturePlayerStats, playerId: string, fixtureId: string, participationClubId: string | null, scoringPosition: string | null) {
+  return {
+    player_id: playerId, fixture_id: fixtureId,
+    minutes: row.minutes, started: row.started, goals: row.goals, assists: row.assists,
+    shots_on_target: row.shotsOnTarget, chances_created: row.chancesCreated,
+    tackles: row.tackles, interceptions: row.interceptions, blocks: row.blocks, saves: row.saves,
+    yellow_cards: row.yellowCards, red_cards: row.redCards, clean_sheet: row.cleanSheet ?? null,
+    reported_stats: row.reportedStats ?? null, participation_club_id: participationClubId, scoring_position: scoringPosition,
+  };
 }

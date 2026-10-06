@@ -14,7 +14,7 @@ import { queryHotFreeAgents } from "./intelligence.ts";
 const start = "2026-10-06T00:00:00Z", end = "2026-10-13T00:00:00Z";
 const window = { startsAt: new Date(start), endsAt: new Date(end) };
 const player = { id: "p", name: "Player", short_name: "P", position: "DEF", club_id: "club", clubs: { id: "club", name: "Club", short_name: "CLB", competition_id: "comp", competitions: { code: "ENG" } } };
-const matchup: CurrentMatchup = { id: "matchup", roundId: "round", roundNumber: 1, roundStartsAt: start, roundEndsAt: end, roundStatus: "in_progress", status: "live", homeFantasyTeamId: "mine", awayFantasyTeamId: "other", homeTeamName: "Mine", awayTeamName: "Other", homeLivePoints: 2, awayLivePoints: 0, homeFinalPoints: null, awayFinalPoints: null, scoresUpdatedAt: null, isUserHome: true };
+const matchup: CurrentMatchup = { scoringRuleVersion: "ELEVEN_STANDARD_V3", id: "matchup", roundId: "round", roundNumber: 1, roundStartsAt: start, roundEndsAt: end, roundStatus: "in_progress", status: "live", homeFantasyTeamId: "mine", awayFantasyTeamId: "other", homeTeamName: "Mine", awayTeamName: "Other", homeLivePoints: 2, awayLivePoints: 0, homeFinalPoints: null, awayFinalPoints: null, scoresUpdatedAt: null, isUserHome: true };
 const fixtures = [
   { id: "f1", kickoff_at: "2026-10-07T12:00:00Z", home_club_id: "national", away_club_id: "opponent", status: "final", competitions: { code: "UEFA_NL" } },
   { id: "f2", kickoff_at: "2026-10-08T12:00:00Z", home_club_id: "club", away_club_id: "opponent", status: "live", competitions: { code: "ENG" } },
@@ -47,7 +47,7 @@ test("squad slots start while score enrichment is still pending", async () => {
   const gate = new Promise<void>((resolve) => { release = resolve; });
   const { client, calls } = testClient(async (q) => {
     if (q.table === "roster_entries") return result([{ id: "entry", player_id: "p", acquired_at: start, players: player }]);
-    if (q.table === "fantasy_rounds") return result({ id: "round", starts_at: start, ends_at: end });
+    if (q.table === "fantasy_rounds") return result({ id: "round", starts_at: start, ends_at: end, scoring_rule_version: "ELEVEN_STANDARD_V3" });
     if (q.table === "lineup_slots") return result([{ roster_entry_id: "entry", starter: true, locked_at: null }]);
     if (q.table === "fantasy_player_scores") await gate;
     return roundResponder(q);
@@ -83,6 +83,7 @@ test("shell summary agrees with matchup starters and omits scores and opponent r
 test("aggregate pagination is complete, keeps JS negative-half rounding, and fails closed", async () => {
   const rows = Array.from({ length: 1001 }, (_, i) => ({ player_id: `p${i}`, total_points: -0.75, appearances: 2 }));
   const { client, calls } = testClient((q) => {
+    if (q.table === "get_catalog_scoring_version") return result("ELEVEN_STANDARD_V3");
     assert.equal(q.table, "get_player_score_totals");
     assert.deepEqual(q.payload, { p_season: 2026, p_version: "ELEVEN_STANDARD_V3" });
     return result(rows.slice(q.range![0], q.range![1] + 1));
@@ -90,13 +91,14 @@ test("aggregate pagination is complete, keeps JS negative-half rounding, and fai
   const scores = await getFantasyScoreAggregates(client);
   assert.equal(scores.size, 1001);
   assert.equal(scores.get("p1000")?.averagePoints, -0.37);
-  assert.equal(calls.length, 2);
+  assert.equal(calls.length, 3);
   const failed = testClient(() => ({ data: null, error: { message: "RPC unavailable" } }));
   await assert.rejects(getFantasyScoreAggregates(failed.client), /RPC unavailable/);
 });
 test("Home season-total ties use immutable identity regardless of raw-score or RPC traversal order", async () => {
   for (const ids of [["b", "a", "owned"], ["owned", "a", "b"]]) {
     const { client } = testClient((q) => {
+      if (q.table === "get_catalog_scoring_version") return result("ELEVEN_STANDARD_V3");
       if (q.table === "league_player_ownership") return result([{ player_id: "owned" }]);
       if (q.table === "fixtures") return result([]);
       if (q.table === "get_player_score_totals") return result(ids.map((player_id) => ({ player_id, total_points: 10, appearances: 2 })));
@@ -111,6 +113,7 @@ test("Home season-total ties use immutable identity regardless of raw-score or R
 test("points order spans the row cap, keeps tied-name ordering, pagination and league ownership", async () => {
   const candidates = Array.from({ length: 1001 }, (_, i) => ({ ...player, id: `p${i}`, name: i === 999 ? "Zulu" : i === 1000 ? "Alpha" : `Player ${i}` }));
   const { client, calls } = testClient((q) => {
+    if (q.table === "get_catalog_scoring_version") return result("ELEVEN_STANDARD_V3");
     if (q.table === "league_player_ownership") return result(filter(q, "league_id") === "a" ? [{ player_id: "p1000", fantasy_team_id: "mine" }] : [{ player_id: "p999", fantasy_team_id: "other" }]);
     if (q.table === "fantasy_teams") return result({ id: "mine" });
     if (q.table === "get_player_score_totals") return result([{ player_id: "p999", total_points: 20, appearances: 2 }, { player_id: "p1000", total_points: 20, appearances: 2 }, { player_id: "p2", total_points: -0.75, appearances: 2 }]);
@@ -197,8 +200,8 @@ test("actual React server rendering deduplicates aggregate reads only within a r
     renderToReadableStream: (model: unknown, manifest: object) => Promise<ReadableStream<Uint8Array>>;
   };
   let points = 1;
-  const first = testClient(() => result([{ player_id: "p", total_points: points, appearances: 1 }]));
-  const other = testClient(() => result([{ player_id: "p", total_points: 99, appearances: 1 }]));
+  const first = testClient(q => result(q.table === "get_catalog_scoring_version" ? "ELEVEN_STANDARD_V3" : [{ player_id: "p", total_points: points, appearances: 1 }]));
+  const other = testClient(q => result(q.table === "get_catalog_scoring_version" ? "ELEVEN_STANDARD_V3" : [{ player_id: "p", total_points: 99, appearances: 1 }]));
   async function Probe() {
     const [a, duplicate, b] = await Promise.all([getFantasyScoreAggregates(first.client), getFantasyScoreAggregates(first.client), getFantasyScoreAggregates(other.client)]);
     assert.equal(a, duplicate);
@@ -211,6 +214,6 @@ test("actual React server rendering deduplicates aggregate reads only within a r
     const stream = await renderToReadableStream(createElement(Probe), {});
     assert.match(await new Response(stream).text(), /verified/, "the server component's assertions must complete successfully");
   }
-  assert.equal(first.calls.length, 2);
-  assert.equal(other.calls.length, 2);
+  assert.equal(first.calls.length, 4);
+  assert.equal(other.calls.length, 4);
 });

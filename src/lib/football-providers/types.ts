@@ -79,6 +79,8 @@ export interface NormalizedFixture {
 export interface NormalizedFixturePlayerStats {
   fixtureExternalId: string;
   playerExternalId: string;
+  participationTeamExternalId?: string;
+  reportedStats?: Record<string, number | string | null>;
   minutes: number;
   started: boolean;
   goals: number;

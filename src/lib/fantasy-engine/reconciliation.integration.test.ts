@@ -1,3 +1,4 @@
+import { SCORING_RULE_VERSION } from "../../domain/fantasy/scoring.ts";
 /**
  * Pass 14.1 — fantasy round reconciliation regression suite (CASE A-J from
  * the brief). Every test builds its own isolated league/round/matchup
@@ -194,7 +195,7 @@ async function insertFixture(
 
 async function scorePlayer(admin: ReturnType<typeof createAdminClient>, playerId: string, fixtureId: string, goals: number): Promise<number> {
   await admin.from("player_match_stats").insert({ player_id: playerId, fixture_id: fixtureId, minutes: 90, goals });
-  const result = await backfillScores(admin, { fixtureIds: [fixtureId] });
+  const result = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [fixtureId] });
   if (result.failed > 0) throw new Error(`backfillScores failed: ${result.errors.join("; ")}`);
   const { data } = await admin.from("fantasy_player_scores").select("points").eq("player_id", playerId).eq("fixture_id", fixtureId).single();
   return data!.points;
@@ -542,7 +543,7 @@ test("CASE G: a pre-epoch international fixture never locks, scores, or contribu
     const fixtureId = await insertFixture(admin, ctx.eligibleCompetitionId, ctx.nationalTeamAId, ctx.nationalTeamBId, kickoff, "final");
     ctx.fixtureIds.push(fixtureId);
     await admin.from("player_match_stats").insert({ player_id: player.id, fixture_id: fixtureId, minutes: 90, goals: 5 });
-    await backfillScores(admin, { fixtureIds: [fixtureId] }); // must refuse to score (proven already in Gate 8's own epoch test) -- re-confirmed here via the engine-level effect
+    await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [fixtureId] }); // must refuse to score (proven already in Gate 8's own epoch test) -- re-confirmed here via the engine-level effect
 
     await reconcileFantasyStateForFixtures(admin, [fixtureId]);
 
@@ -593,7 +594,7 @@ test("CASE H: a provider correction after reconciliation updates the SAME score 
 
     // Provider correction: one more goal.
     await admin.from("player_match_stats").update({ goals: 2 }).eq("player_id", player.id).eq("fixture_id", fixtureId);
-    const correctionResult = await backfillScores(admin, { fixtureIds: [fixtureId] });
+    const correctionResult = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [fixtureId] });
     assert.equal(correctionResult.failed, 0);
     await reconcileFantasyStateForFixtures(admin, [fixtureId]);
 

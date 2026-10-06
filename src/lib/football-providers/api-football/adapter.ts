@@ -173,14 +173,16 @@ export function normalizeFixture(item: ApiFootballFixtureItem): NormalizedFixtur
 
 /**
  * Flattens `/fixtures/players`' per-team grouping into one normalized row
- * per player. `NormalizedFixturePlayerStats` intentionally only carries
+ * per player. Legacy columns remain zero-coalesced for V1-V3. V4 also
+ * preserves nullable reported counts and fixture-team provenance.
+ * The earlier implementation only carried
  * the fields `player_match_stats` has columns for — the raw endpoint
  * returns considerably more (rating, passes, duels, dribbles, fouls,
- * penalties); see docs/football-data-system.md "Stats deliberately not
- * modeled" for why those stop here rather than being persisted.
+ * penalties). V4 now preserves the useful nullable counts; ratings
+ * remain unscored. See docs/scoring-model-v4.md for the coverage limits.
  *
  * `chancesCreated` is mapped from the provider's "key passes" — the
- * closest available proxy for Eleven's chances-created stat; not a
+ * historical label for key passes; V4 calls it KEY PASSES, not a
  * provider field named identically.
  */
 export function normalizeFixturePlayerStats(
@@ -191,24 +193,32 @@ export function normalizeFixturePlayerStats(
 
   for (const team of teams) {
     for (const entry of team.players) {
-      const stats = entry.statistics[0];
+      const stats = entry.statistics?.[0];
       if (!stats) continue;
 
+      const numeric = (value: number | null | undefined): number | null =>
+        typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : null;
+      const reportedStats = {
+        minutes: numeric(stats.games?.minutes), goals: numeric(stats.goals?.total), assists: numeric(stats.goals?.assists),
+        shots: numeric(stats.shots?.total), shotsOnTarget: numeric(stats.shots?.on), keyPasses: numeric(stats.passes?.key),
+        tackles: numeric(stats.tackles?.total), interceptions: numeric(stats.tackles?.interceptions), blocks: numeric(stats.tackles?.blocks),
+        saves: numeric(stats.goals?.saves), yellowCards: numeric(stats.cards?.yellow), redCards: numeric(stats.cards?.red),
+        duelsTotal: numeric(stats.duels?.total), duelsWon: numeric(stats.duels?.won),
+        successfulDribbles: numeric(stats.dribbles?.success), foulsDrawn: numeric(stats.fouls?.drawn), foulsCommitted: numeric(stats.fouls?.committed),
+        penaltiesWon: numeric(stats.penalty?.won), penaltiesMissed: numeric(stats.penalty?.missed), penaltiesSaved: numeric(stats.penalty?.saved),
+        goalsConceded: numeric(stats.goals?.conceded), passesTotal: numeric(stats.passes?.total),
+        // Stored for evidence, never scored or converted to an accurate-pass count.
+        passAccuracyRaw: stats.passes?.accuracy ?? null,
+      };
       rows.push({
-        fixtureExternalId,
-        playerExternalId: String(entry.player.id),
-        minutes: stats.games.minutes ?? 0,
-        started: !stats.games.substitute,
-        goals: stats.goals.total ?? 0,
-        assists: stats.goals.assists ?? 0,
-        shotsOnTarget: stats.shots.on ?? 0,
-        chancesCreated: stats.passes.key ?? 0,
-        tackles: stats.tackles.total ?? 0,
-        interceptions: stats.tackles.interceptions ?? 0,
-        blocks: stats.tackles.blocks ?? 0,
-        saves: stats.goals.saves ?? 0,
-        yellowCards: stats.cards.yellow,
-        redCards: stats.cards.red,
+        fixtureExternalId, playerExternalId: String(entry.player.id), participationTeamExternalId: String(team.team.id), reportedStats,
+        // Historical V1-V3 inputs retain their shipped zero-coalescing behavior.
+        minutes: reportedStats.minutes ?? 0, started: !stats.games?.substitute,
+        goals: reportedStats.goals ?? 0, assists: reportedStats.assists ?? 0,
+        shotsOnTarget: reportedStats.shotsOnTarget ?? 0, chancesCreated: reportedStats.keyPasses ?? 0,
+        tackles: reportedStats.tackles ?? 0, interceptions: reportedStats.interceptions ?? 0,
+        blocks: reportedStats.blocks ?? 0, saves: reportedStats.saves ?? 0,
+        yellowCards: reportedStats.yellowCards ?? 0, redCards: reportedStats.redCards ?? 0,
       });
     }
   }

@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { calculateFantasyScore, SCORING_RULE_VERSION } from "../../domain/fantasy/scoring.ts";
+import type { ScoringRuleVersion } from "../../domain/fantasy/scoring.ts";
+import { scoringVersion, scoreStoredPerformance } from "./versions.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
 import type { Database } from "../supabase/database.types.ts";
 
@@ -35,8 +36,10 @@ export interface ReplayFixtureResult {
  */
 export async function replayFixture(
   admin: SupabaseClient<Database>,
-  fixtureId: string
+  fixtureId: string,
+  version: ScoringRuleVersion
 ): Promise<ReplayFixtureResult> {
+  scoringVersion(version);
   const { data: fixture, error: fixtureError } = await admin
     .from("fixtures")
     .select("id, home_club_id, away_club_id, home_score, away_score")
@@ -50,7 +53,7 @@ export async function replayFixture(
   const { data: statsRows, error: statsError } = await admin
     .from("player_match_stats")
     .select(
-      "player_id, minutes, goals, assists, shots_on_target, chances_created, tackles, interceptions, blocks, saves, yellow_cards, red_cards"
+      "player_id, minutes, goals, assists, shots_on_target, chances_created, tackles, interceptions, blocks, saves, yellow_cards, red_cards, reported_stats, participation_club_id, scoring_position"
     )
     .eq("fixture_id", fixtureId);
 
@@ -59,12 +62,15 @@ export async function replayFixture(
   const playerIds = (statsRows ?? []).map((r) => r.player_id);
   const { data: players } = await admin.from("players").select("id, position, club_id").in("id", playerIds);
   const playerById = new Map((players ?? []).map((p) => [p.id, p]));
+  const { data: nationalTeams } = await admin.from("player_national_teams").select("player_id, national_team_club_id").in("player_id", playerIds);
+  const sidesByPlayer = new Map<string, string[]>();
+  for (const team of nationalTeams ?? []) sidesByPlayer.set(team.player_id, [...(sidesByPlayer.get(team.player_id) ?? []), team.national_team_club_id]);
 
   const { data: existingScores } = await admin
     .from("fantasy_player_scores")
     .select("player_id, points")
     .eq("fixture_id", fixtureId)
-    .eq("scoring_rule_version", SCORING_RULE_VERSION);
+    .eq("scoring_rule_version", version);
   const existingByPlayer = new Map((existingScores ?? []).map((s) => [s.player_id, s.points]));
 
   const results: ReplayPlayerResult[] = [];
@@ -74,25 +80,15 @@ export async function replayFixture(
 
     let concededByOwnClub: number | null = null;
     if (fixture.home_score !== null && fixture.away_score !== null) {
-      if (player.club_id === fixture.home_club_id) concededByOwnClub = fixture.away_score;
-      else if (player.club_id === fixture.away_club_id) concededByOwnClub = fixture.home_score;
+      if ([player.club_id, ...(sidesByPlayer.get(row.player_id) ?? [])].includes(fixture.home_club_id)) concededByOwnClub = fixture.away_score;
+      else if ([player.club_id, ...(sidesByPlayer.get(row.player_id) ?? [])].includes(fixture.away_club_id)) concededByOwnClub = fixture.home_score;
     }
 
-    const breakdown = calculateFantasyScore({
-      position: player.position as PlayerPosition,
-      minutes: row.minutes,
-      goals: row.goals,
-      assists: row.assists,
-      shotsOnTarget: row.shots_on_target,
-      chancesCreated: row.chances_created,
-      tackles: row.tackles,
-      interceptions: row.interceptions,
-      blocks: row.blocks,
-      saves: row.saves,
-      yellowCards: row.yellow_cards,
-      redCards: row.red_cards,
-      concededByOwnClub,
-    });
+    if (version === "ELEVEN_STANDARD_V4") {
+      const side = row.participation_club_id;
+      concededByOwnClub = side === fixture.home_club_id ? fixture.away_score : side === fixture.away_club_id ? fixture.home_score : null;
+    }
+    const breakdown = scoreStoredPerformance(version, row, player.position as PlayerPosition, concededByOwnClub);
 
     const storedPoints = existingByPlayer.get(row.player_id) ?? null;
     results.push({
@@ -105,7 +101,7 @@ export async function replayFixture(
 
   return {
     fixtureId,
-    scoringRuleVersion: SCORING_RULE_VERSION,
+    scoringRuleVersion: version,
     performances: results.length,
     players: results,
     anyChanged: results.some((r) => r.changed),

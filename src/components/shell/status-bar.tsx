@@ -1,6 +1,7 @@
 import { formatKickoff, pad2 } from "@/lib/team-fixture";
 
 export interface StatusBarData {
+  scoringRuleVersion?: import("@/domain/fantasy/scoring").ScoringRuleVersion;
   roundNumber: number;
   roundStatus: "upcoming" | "in_progress" | "completed";
   liveCount: number;

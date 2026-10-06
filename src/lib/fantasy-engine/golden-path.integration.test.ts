@@ -1,3 +1,4 @@
+import { SCORING_RULE_VERSION } from "../../domain/fantasy/scoring.ts";
 /**
  * Pass 14.7 Phase 12 — ONE deterministic golden-path lifecycle test, never
  * a giant simulation suite. Exercises, against the real engine/RPCs with
@@ -325,7 +326,7 @@ test("golden path: draft -> XI/bench -> substitution (+ locked rejection) -> fre
       });
       assert.equal(statsError, null, `player_match_stats insert failed: ${statsError?.message}`);
     }
-    const subjectBackfill = await backfillScores(admin, { fixtureIds: [fixtureA, fixtureB] });
+    const subjectBackfill = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [fixtureA, fixtureB] });
     assert.equal(subjectBackfill.failed, 0, `scoring must succeed cleanly: ${JSON.stringify(subjectBackfill.errors)}`);
     assert.equal(subjectBackfill.scored, 2);
 
@@ -389,7 +390,7 @@ test("golden path: draft -> XI/bench -> substitution (+ locked rejection) -> fre
       started: true,
     });
     assert.equal(team1StatsError, null);
-    const team1Backfill = await backfillScores(admin, { fixtureIds: [team1Fixture!.id] });
+    const team1Backfill = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [team1Fixture!.id] });
     assert.equal(team1Backfill.failed, 0, `scoring must succeed cleanly: ${JSON.stringify(team1Backfill.errors)}`);
 
     await refreshMatchupScores(admin, roundId);

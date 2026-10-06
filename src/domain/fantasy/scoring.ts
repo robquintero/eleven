@@ -20,11 +20,10 @@
  *
  * NEVER uses a provider "rating" field, and never trusts a provider's own
  * fantasy-points field — see docs/domain-model.md invariant #10. Both
- * versions share the exact same `ScoringInput` shape: Pass 14.5's own
- * audit (docs/scoring-model-v3.md) found no additional API-Football stat
- * reliably ingested-but-unused, so V3's "more statistical texture" comes
- * from recalibrating weights on the stats Eleven already has, never from
- * inventing a field Eleven doesn't reliably receive.
+ * legacy versions share the same `ScoringInput` shape. V4's later audit
+ * found additional nullable endpoint counts discarded by the old
+ * adapter; its separate scorer/configuration preserves those counts.
+ * See docs/scoring-model-v4.md. The active/catalog default remains V3.
  */
 
 import type { PlayerPosition } from "@/domain/football/types";
@@ -120,6 +119,14 @@ const V2_SAVES_PER_POINT = 3;
 
 const V2_YELLOW_CARD_POINTS = -1;
 const V2_RED_CARD_POINTS = -3;
+
+export const SCORING_V2_WEIGHTS = {
+  minutes: { appearance: V2_MINUTES_APPEARANCE_POINTS, significant: V2_MINUTES_FULL_SHIFT_POINTS, significantThreshold: V2_MINUTES_FULL_SHIFT_THRESHOLD },
+  goalsByPosition: V2_GOALS_BY_POSITION, assist: V2_ASSIST_POINTS, shotOnTarget: V2_SHOT_ON_TARGET_POINTS,
+  keyPass: V2_CHANCE_CREATED_POINTS, defensiveAction: V2_DEFENSIVE_ACTION_POINTS, savesPerPoint: V2_SAVES_PER_POINT,
+  cleanSheetByPosition: V2_CLEAN_SHEET_BY_POSITION, cleanSheetMinutesThreshold: V2_CLEAN_SHEET_MINUTES_THRESHOLD,
+  yellowCard: V2_YELLOW_CARD_POINTS, redCard: V2_RED_CARD_POINTS,
+} as const;
 
 /** ELEVEN_STANDARD_V2, preserved exactly as it shipped — see docs/scoring-model-v2.md. */
 export function calculateFantasyScoreV2(input: ScoringInput): FantasyScoreBreakdown {
@@ -308,5 +315,10 @@ export function calculateFantasyScoreV3(input: ScoringInput): FantasyScoreBreakd
 // =====================================================================
 
 export const SCORING_RULE_VERSION = SCORING_RULE_VERSION_V3;
-export type ScoringRuleVersion = typeof SCORING_RULE_VERSION;
+export type ScoringRuleVersion = "ELEVEN_STANDARD_V1" | typeof SCORING_RULE_VERSION_V2 | typeof SCORING_RULE_VERSION_V3 | "ELEVEN_STANDARD_V4";
 export const calculateFantasyScore = calculateFantasyScoreV3;
+
+// Adding V4 never switches the active/catalog formula. Activation is a
+// separately approved database policy for newly created future rounds.
+export { calculateFantasyScoreV1, SCORING_RULE_VERSION_V1 } from "./scoring-v1.ts";
+export { calculateFantasyScoreV4, SCORING_RULE_VERSION_V4, SCORING_V4_WEIGHTS } from "./scoring-v4.ts";

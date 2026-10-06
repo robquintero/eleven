@@ -87,3 +87,15 @@ test("assertMutationTestsAllowedAgainstThisProject: SUPABASE_SERVICE_ROLE_KEY (l
     }
   );
 });
+
+test("leaked-fixture scenario entry point refuses production before creating any test identity or rows", async () => {
+  const { createTestLeague } = await import("../fantasy-engine/integration-test-helpers.ts");
+  let reachedWriter = false;
+  const admin = { auth: { admin: { createUser: async () => { reachedWriter = true; throw new Error("Writer must not run"); } } } } as unknown as Parameters<typeof createTestLeague>[0];
+  let attempt!: ReturnType<typeof createTestLeague>;
+  withEnv({ NEXT_PUBLIC_SUPABASE_URL: `https://${PRODUCTION_SUPABASE_PROJECT_REF}.supabase.co`, SUPABASE_SECRET_KEY: "offline-test-key" }, () => {
+    attempt = createTestLeague(admin, 2, 4);
+  });
+  await assert.rejects(attempt, /PRODUCTION Supabase project/);
+  assert.equal(reachedWriter, false);
+});

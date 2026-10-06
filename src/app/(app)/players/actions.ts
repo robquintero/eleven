@@ -1,5 +1,7 @@
 "use server";
 
+import { type ScoringRuleVersion } from "@/domain/fantasy/scoring";
+import { scoringVersion } from "@/lib/scoring/versions";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getPlayerIdentityMatches, getPlayerRecentMatches, getPlayerLatestScoreBreakdown, type RecentMatchRow, type PlayerScoreBreakdown } from "@/data-access/players";
@@ -31,13 +33,13 @@ export async function searchPlayersAction(query: string): Promise<PlayerSearchRe
 }
 
 /** Thin server-action wrapper so the client-side Player Inspector can fetch one player's real recent matches on demand, without ever calling Supabase directly. */
-export async function getPlayerRecentMatchesAction(playerId: string): Promise<RecentMatchRow[]> {
-  return getPlayerRecentMatches(playerId);
+export async function getPlayerRecentMatchesAction(playerId: string, version?: ScoringRuleVersion): Promise<RecentMatchRow[]> {
+  return getPlayerRecentMatches(playerId, 10, version === undefined ? undefined : scoringVersion(version));
 }
 
 /** Pass 12C: thin server-action wrapper for the Player Inspector's Scoring Breakdown panel. `null` means this player has no current-version scored performance yet. */
-export async function getPlayerScoreBreakdownAction(playerId: string): Promise<PlayerScoreBreakdown | null> {
-  return getPlayerLatestScoreBreakdown(playerId);
+export async function getPlayerScoreBreakdownAction(playerId: string, version?: ScoringRuleVersion): Promise<PlayerScoreBreakdown | null> {
+  return getPlayerLatestScoreBreakdown(playerId, version === undefined ? undefined : scoringVersion(version));
 }
 
 /**

@@ -5,10 +5,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // resolve TypeScript path aliases for VALUE imports (only tsc/webpack/Next.js
 // do) — see docs/football-data-system.md and the same pattern throughout
 // src/lib/football-ingestion/.
-import { calculateFantasyScore, SCORING_RULE_VERSION } from "../../domain/fantasy/scoring.ts";
+import { type ScoringRuleVersion } from "../../domain/fantasy/scoring.ts";
+import { scoringVersion, scoreStoredPerformance } from "./versions.ts";
 import { isEligibleFixtureKickoff, isScoringEligibleCompetitionCode } from "../football-ingestion/competition-eligibility.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
-import type { Database } from "../supabase/database.types.ts";
+import type { Database, Json } from "../supabase/database.types.ts";
 
 export interface BackfillResult {
   scoringRuleVersion: string;
@@ -61,8 +62,9 @@ export interface BackfillResult {
  */
 export async function backfillScores(
   admin: SupabaseClient<Database>,
-  options: { season?: number; fixtureIds?: string[] } = {}
+  options: { scoringRuleVersion: ScoringRuleVersion; season?: number; fixtureIds?: string[] }
 ): Promise<BackfillResult> {
+  const version = scoringVersion(options?.scoringRuleVersion);
   const season = options.season ?? 2026;
   const errors: string[] = [];
   const byPosition: Record<string, number> = {};
@@ -80,7 +82,7 @@ export async function backfillScores(
 
   if (fixturesError) {
     return {
-      scoringRuleVersion: SCORING_RULE_VERSION,
+      scoringRuleVersion: version,
       eligiblePerformances: 0,
       scored: 0,
       skipped: 0,
@@ -129,7 +131,7 @@ export async function backfillScores(
 
   const fixtureIds = Array.from(fixtureById.keys());
   if (fixtureIds.length === 0) {
-    return { scoringRuleVersion: SCORING_RULE_VERSION, eligiblePerformances: 0, scored: 0, skipped: 0, failed: 0, byPosition, byCompetition, errors };
+    return { scoringRuleVersion: version, eligiblePerformances: 0, scored: 0, skipped: 0, failed: 0, byPosition, byCompetition, errors };
   }
 
   // player_match_stats can exceed PostgREST's default 1000-row page —
@@ -148,6 +150,9 @@ export async function backfillScores(
     saves: number;
     yellow_cards: number;
     red_cards: number;
+    reported_stats: Json | null;
+    participation_club_id: string | null;
+    scoring_position: string | null;
   }> = [];
   {
     let from = 0;
@@ -155,7 +160,7 @@ export async function backfillScores(
       const { data, error } = await admin
         .from("player_match_stats")
         .select(
-          "player_id, fixture_id, minutes, goals, assists, shots_on_target, chances_created, tackles, interceptions, blocks, saves, yellow_cards, red_cards"
+          "player_id, fixture_id, minutes, goals, assists, shots_on_target, chances_created, tackles, interceptions, blocks, saves, yellow_cards, red_cards, reported_stats, participation_club_id, scoring_position"
         )
         .in("fixture_id", fixtureIds)
         .range(from, from + 999);
@@ -226,7 +231,7 @@ export async function backfillScores(
     fixture_id: string;
     fantasy_round_id: null;
     points: number;
-    breakdown: Record<string, number>;
+    breakdown: Json;
     scoring_rule_version: string;
   }> = [];
 
@@ -260,32 +265,25 @@ export async function backfillScores(
       // docs/scoring-model.md "Known limitations."
     }
 
-    const breakdown = calculateFantasyScore({
-      position: player.position,
-      minutes: row.minutes,
-      goals: row.goals,
-      assists: row.assists,
-      shotsOnTarget: row.shots_on_target,
-      chancesCreated: row.chances_created,
-      tackles: row.tackles,
-      interceptions: row.interceptions,
-      blocks: row.blocks,
-      saves: row.saves,
-      yellowCards: row.yellow_cards,
-      redCards: row.red_cards,
-      concededByOwnClub,
-    });
+    // V4 knows the actual participating side even after a club transfer.
+    // Legacy formulas deliberately retain their existing side lookup.
+    if (version === "ELEVEN_STANDARD_V4") {
+      concededByOwnClub = row.participation_club_id === fixture.home_club_id ? fixture.away_score
+        : row.participation_club_id === fixture.away_club_id ? fixture.home_score : null;
+    }
+    const breakdown = scoreStoredPerformance(version, row, player.position, concededByOwnClub);
 
     upsertRows.push({
       player_id: row.player_id,
       fixture_id: row.fixture_id,
       fantasy_round_id: null,
       points: breakdown.total,
-      breakdown: breakdown.components,
+      breakdown: (version === "ELEVEN_STANDARD_V4" ? breakdown : breakdown.components) as unknown as Json,
       scoring_rule_version: breakdown.scoringRuleVersion,
     });
 
-    byPosition[player.position] = (byPosition[player.position] ?? 0) + 1;
+    const scoredPosition = "position" in breakdown ? breakdown.position : player.position;
+    byPosition[scoredPosition] = (byPosition[scoredPosition] ?? 0) + 1;
     const compCode = compCodeById.get(fixture.competition_id) ?? "UNKNOWN";
     byCompetition[compCode] = (byCompetition[compCode] ?? 0) + 1;
   }
@@ -304,7 +302,7 @@ export async function backfillScores(
   }
 
   return {
-    scoringRuleVersion: SCORING_RULE_VERSION,
+    scoringRuleVersion: version,
     eligiblePerformances: statsRows.length,
     scored,
     skipped,

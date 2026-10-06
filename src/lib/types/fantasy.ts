@@ -78,6 +78,7 @@ export interface Player {
   nationality?: string | null;
   /** Points for the active fantasy round that count toward the owning fantasy team's matchup — i.e. AFTER the Pass 14.6 "no retroactive point inheritance" cutoff is applied. */
   fantasyPoints: number;
+  scoringRuleVersion?: import("../../domain/fantasy/scoring.ts").ScoringRuleVersion;
   /**
    * Pass 14.6: the portion of this round's REAL, objective performance
    * (same `fantasy_player_scores` the engine already computed) that does

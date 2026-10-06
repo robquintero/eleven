@@ -49,11 +49,12 @@ export function formatRoundWindow(startsAt: string, endsAt: string): string {
 }
 
 /**
- * Round points, always rendered with one decimal place — "0" must read as
+ * Round points retain hundredths when present; otherwise one decimal place — "0" must read as
  * a real, known zero ("0.0"), never as missing data (brief §Phase 1).
  */
 export function formatRoundPoints(points: number): string {
-  return points.toFixed(1);
+  const units = Math.round(points * 100);
+  return (units / 100).toFixed(units % 10 === 0 ? 1 : 2);
 }
 
 /**

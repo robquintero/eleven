@@ -397,7 +397,7 @@ test("scoring: a clean sheet earned in an international fixture is credited, exa
       saves: 3,
     });
 
-    const result = await backfillScores(admin, { fixtureIds: [fixtureId] });
+    const result = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [fixtureId] });
     assert.equal(result.failed, 0, result.errors.join("; "));
     assert.equal(result.scored, 1);
 
@@ -545,7 +545,7 @@ test("GATE 6: a club performance and an international performance in the same ro
     assert.ok(opened.ok, `round must open: ${!opened.ok ? opened.error : ""}`);
     if (!opened.ok) return;
 
-    const matchup: CurrentMatchup = {
+    const matchup: CurrentMatchup = { scoringRuleVersion: "ELEVEN_STANDARD_V3",
       id: "test-matchup",
       roundId: opened.roundId,
       roundNumber: 1,
@@ -589,7 +589,7 @@ test("GATE 6: a club performance and an international performance in the same ro
       { player_id: playerId, fixture_id: intlFixtureId, minutes: 90, goals: 0, assists: 1 },
     ]);
 
-    const backfillResult = await backfillScores(admin, { fixtureIds: [clubFixture!.id, intlFixtureId] });
+    const backfillResult = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [clubFixture!.id, intlFixtureId] });
     assert.equal(backfillResult.failed, 0, backfillResult.errors.join("; "));
     assert.equal(backfillResult.scored, 2);
 
@@ -655,7 +655,7 @@ test("GATE 8/epoch: an international fixture BEFORE the scoring epoch never scor
       { player_id: gkId, fixture_id: postEpochFixtureId, minutes: 90, saves: 3 },
     ]);
 
-    const result = await backfillScores(admin, { fixtureIds: [preEpochFixtureId, postEpochFixtureId] });
+    const result = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [preEpochFixtureId, postEpochFixtureId] });
     assert.equal(result.failed, 0, result.errors.join("; "));
     assert.equal(result.scored, 1, "exactly one of the two identical fixtures (the post-epoch one) must score");
     assert.ok(
@@ -721,7 +721,7 @@ test("GATE 7: a later stat correction to an international fixture reconciles the
     await admin.from("fixtures").update({ home_score: 1, away_score: 0 }).eq("id", fixtureId);
     await admin.from("player_match_stats").insert({ player_id: gkId, fixture_id: fixtureId, minutes: 90, saves: 2 });
 
-    const firstResult = await backfillScores(admin, { fixtureIds: [fixtureId] });
+    const firstResult = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [fixtureId] });
     assert.equal(firstResult.failed, 0, firstResult.errors.join("; "));
     const { data: firstScore } = await admin
       .from("fantasy_player_scores")
@@ -743,7 +743,7 @@ test("GATE 7: a later stat correction to an international fixture reconciles the
       .eq("fixture_id", fixtureId);
     assert.equal(correctionError, null);
 
-    const secondResult = await backfillScores(admin, { fixtureIds: [fixtureId] });
+    const secondResult = await backfillScores(admin, { scoringRuleVersion: SCORING_RULE_VERSION, fixtureIds: [fixtureId] });
     assert.equal(secondResult.failed, 0, secondResult.errors.join("; "));
 
     const { data: allScoreRows } = await admin

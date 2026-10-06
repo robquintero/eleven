@@ -10,6 +10,7 @@ import { isSupabaseConfigured } from "../lib/supabase/config.ts";
 import { bigFiveLeagueFromCompetitionCode } from "../lib/leagues.ts";
 import { deriveFormationLabel } from "../domain/fantasy/constants.ts";
 import { isLocked } from "../domain/fantasy/lineup-lock.ts";
+import { scoringVersion } from "../lib/scoring/versions.ts";
 import { getRoundPlayerState } from "./matchups.ts";
 import { layoutStartingXi } from "../lib/selectors/pitch-layout.ts";
 import type { RoundWindow } from "../domain/fantasy/round-calendar.ts";
@@ -132,7 +133,7 @@ export async function querySquad(
     .eq("status", "active"),
     supabase
     .from("fantasy_rounds")
-    .select("id, starts_at, ends_at")
+    .select("id, starts_at, ends_at, scoring_rule_version")
     .eq("league_id", leagueId)
     .order("number", { ascending: false })
     .limit(1)
@@ -156,7 +157,7 @@ export async function querySquad(
         supabase,
         playerIds,
         { startsAt: new Date(currentRound.starts_at), endsAt: new Date(currentRound.ends_at) } satisfies RoundWindow,
-        acquiredAtByPlayerId
+        acquiredAtByPlayerId, true, scoringVersion(currentRound.scoring_rule_version)
       )
     : {
         pointsByPlayerId: new Map<string, number>(),
@@ -173,7 +174,10 @@ export async function querySquad(
   const playerByRosterEntryId = new Map<string, Player>();
   for (const entry of rosterRows) {
     const player = toPlayer(entry, pointsByPlayerId, fixtureByPlayerId, preAcquisitionPointsByPlayerId);
-    if (player) playerByRosterEntryId.set(entry.id, player);
+    if (player) {
+      if (currentRound) player.scoringRuleVersion = scoringVersion(currentRound.scoring_rule_version);
+      playerByRosterEntryId.set(entry.id, player);
+    }
   }
 
   if (!currentRound) {

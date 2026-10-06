@@ -5,7 +5,7 @@ import { openNextRound, refreshMatchupScores, finalizeRoundIfReady } from "./rou
 import { updateLineup } from "./lineup.ts";
 import { chooseAutomaticStartingXi } from "../../domain/fantasy/auto-lineup.ts";
 import { isStarterCompositionValid } from "../../domain/fantasy/constants.ts";
-import { SCORING_RULE_VERSION } from "../../domain/fantasy/scoring.ts";
+import { scoringVersion } from "../scoring/versions.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
 import type { Database } from "../supabase/database.types.ts";
 
@@ -506,7 +506,7 @@ async function checkInvariants(
   // Scoring: independently recompute one finalized round's totals from
   // raw fantasy_player_scores and compare against the stored matchup_scores.
   if (firstFinalized) {
-    const { data: roundRow } = await admin.from("fantasy_rounds").select("id, starts_at, ends_at").eq("league_id", leagueId).eq("number", firstFinalized.roundNumber).maybeSingle();
+    const { data: roundRow } = await admin.from("fantasy_rounds").select("id, starts_at, ends_at, scoring_rule_version").eq("league_id", leagueId).eq("number", firstFinalized.roundNumber).maybeSingle();
     if (roundRow) {
       const { data: fixtures } = await admin.from("fixtures").select("id").gte("kickoff_at", roundRow.starts_at).lt("kickoff_at", roundRow.ends_at);
       const fixtureIds = (fixtures ?? []).map((f) => f.id);
@@ -525,7 +525,7 @@ async function checkInvariants(
             const { data: scores } = await admin
               .from("fantasy_player_scores")
               .select("points")
-              .eq("scoring_rule_version", SCORING_RULE_VERSION)
+              .eq("scoring_rule_version", scoringVersion(roundRow.scoring_rule_version))
               .in("player_id", playerIds)
               .in("fixture_id", fixtureIds);
             recomputed = Math.round((scores ?? []).reduce((s, r) => s + r.points, 0) * 100) / 100;

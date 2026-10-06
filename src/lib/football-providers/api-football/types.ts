@@ -155,12 +155,17 @@ export interface ApiFootballFixtureItem {
 export interface ApiFootballFixturePlayerStats {
   player: { id: number };
   statistics: Array<{
-    games: { minutes: number | null; substitute: boolean };
-    shots: { on: number | null };
-    goals: { total: number | null; assists: number | null; saves: number | null };
-    passes: { key: number | null };
-    tackles: { total: number | null; blocks: number | null; interceptions: number | null };
-    cards: { yellow: number; red: number };
+    games?: { minutes?: number | null; substitute?: boolean };
+    shots?: { total?: number | null; on?: number | null };
+    goals?: { total?: number | null; conceded?: number | null; assists?: number | null; saves?: number | null };
+    // Preserve ambiguity: fixture/season accuracy fields are not interchangeable.
+    passes?: { total?: number | null; key?: number | null; accuracy?: number | string | null };
+    tackles?: { total?: number | null; blocks?: number | null; interceptions?: number | null };
+    duels?: { total?: number | null; won?: number | null };
+    dribbles?: { attempts?: number | null; success?: number | null; past?: number | null };
+    fouls?: { drawn?: number | null; committed?: number | null };
+    cards?: { yellow?: number | null; red?: number | null };
+    penalty?: { won?: number | null; commited?: number | null; scored?: number | null; missed?: number | null; saved?: number | null };
   }>;
 }
 
