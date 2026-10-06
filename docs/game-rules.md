@@ -326,15 +326,32 @@ naturally produces a deterministic bye for whichever team draws the
   yet) → `live` (at least one starter's fixture is currently
   `live`/`ht`) → `final` (the round has been finalized — see below).
   Never inferred from wall-clock date alone.
-- **Finalization**: conservative — a round finalizes only when every
-  fixture in its window has reached a terminal status
-  (`final`/`postponed`) **and** the post-FT reconciliation window
-  (Pass 9) has closed for the last of them. A single delayed/postponed
-  fixture holds the whole round open rather than finalizing early and
-  risking a stat correction after the fact. Once finalized,
-  `matchups.status = 'final'`, `matchup_scores.final_points` is set, and
-  W/L/D is derived (never stored) the same way `getStandings()` already
-  does — see `docs/data-flow.md` "Fantasy score → matchup score."
+- **Round closed / result pending / result final**: at Tuesday 06:00 UTC,
+  the old scoring window closes and the next week opens independently.
+  Closed, unfinished results stay visible in League as **PENDING**, with
+  their real stored scores and date range. They do not affect official
+  W/L/D, PF/PA, records or standings until final.
+- **Finalization**: one fixed **60-minute grace after the persisted round
+  end**. A normal completed week is eligible at Tuesday 07:00 UTC; the
+  existing every-minute central cron publishes it on a subsequent tick.
+  Settlement no longer waits for ingestion's 24-hour correction cadence.
+  Only scoring-eligible fixtures relevant to starters (including known
+  appearances after transfers) can block it; acquisition cutoffs apply.
+  Relevant fixtures must be final or postponed. V4 requires a complete
+  final player envelope from both fixture participants, reported stats and
+  a captured scoring position for known appearances, plus the round's
+  pinned-version scores matching the unchanged scorer. A full final
+  envelope can establish non-participation; missing/partial/error responses
+  cannot. Optional provider nulls remain valid and are never fabricated.
+  Both matchup score sides must exist. Missing required evidence or a
+  still-live fixture keeps the result PENDING until normal reconciliation
+  resolves it. User page loads never settle competition.
+- **Atomic publication**: trusted `settle_fantasy_round` checks the same
+  stored evidence again and commits both score sides, final matchup/round
+  statuses and finalization events in one transaction. Standings remain
+  derived from FINAL rows. Retries do not count results twice. Existing
+  immutability triggers remain unchanged; later player analytics cannot
+  rewrite an official result.
 
 ## Standings
 

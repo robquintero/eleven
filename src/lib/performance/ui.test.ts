@@ -23,7 +23,7 @@ function load(file: string, mocks: Record<string, unknown> = {}): Record<string,
   const localRequire = (id: string): unknown => {
     if (id in mocks) return mocks[id];
     if (id.startsWith("@/data-access/")) throw new Error(`Unmocked data access: ${id}`);
-    if (id.startsWith("@/components/") && !id.includes("workspace-loading") && !id.includes("matchup-command") && !id.includes("transition-link")) {
+    if (id.startsWith("@/components/") && !id.includes("workspace-loading") && !id.includes("matchup-command") && !id.includes("transition-link") && !id.includes("league-matchups") && !id.includes("matchup-status") && !id.includes("team-name")) {
       return new Proxy({}, { get: (_target, name) => name === "__esModule" ? true : ({ children, title }: { children?: ReactNode; title?: string }) => createElement("div", {}, title ?? String(name), children) });
     }
     if (id.startsWith("@/") || id.startsWith(".")) {
@@ -163,4 +163,20 @@ test("League standings and identity stream before competition/history/transactio
     transactions: { getRecentActivity: async (gate: Promise<void>) => { await gate; return []; } },
     trades: { getTeamTrades: async (gate: Promise<void>) => { await gate; return { incoming: [], outgoing: [] }; } },
   }, /STANDINGS/, /LeagueMatchups/);
+});
+
+test("League pending results render real scores/date range and restrained status, with no official winner or wrong current-matchup link",async()=>{
+  const { LeagueMatchups }=load("src/components/league/league-matchups.tsx",{"next/link":nextLink});
+  const matchup={id:"old",roundNumber:1,roundStartsAt:"2026-09-29T06:00:00Z",roundEndsAt:"2026-10-06T06:00:00Z",resultState:"pending",status:"scheduled",homeTeamId:"mine",homeTeamName:"Kaka FC",homePoints:150.85,awayTeamId:"other",awayTeamName:"Los Duros FC",awayPoints:137.8};
+  const render=(m: typeof matchup)=>flight(createElement(LeagueMatchups as (props:Record<string,unknown>)=>ReactNode,{matchups:[m],myTeamId:"mine",emptyLabel:"NO RESULTS"}));
+  const output=await render(matchup);
+  for(const value of ["Kaka FC","Los Duros FC","150.85","137.8","PENDING","Finalizing result","SEP 29","OCT 6","UTC"])assert.ok(output.includes(value),value);
+  assert.doesNotMatch(output,/WINNER|WON|UPCOMING|"href":"\/matchup"/);
+  assert.match(await render({...matchup,awayPoints:null as unknown as number}),/—/);
+});
+
+test("Home/Matchup command shares closed-week PENDING semantics and shows scores, not a live or scheduled winner",async()=>{
+  const { MatchupCommand }=load("src/components/dashboard/matchup-command.tsx");
+  const result=await flight(createElement(MatchupCommand as (props:Record<string,unknown>)=>ReactNode,{matchup:{...matchup,roundStatus:"in_progress",roundStartsAt:"2026-09-29T06:00:00Z",roundEndsAt:"2026-10-06T06:00:00Z",homeLivePoints:150.85,awayLivePoints:137.8},hasLeague:true,now:new Date("2026-10-06T06:30Z")}));
+  assert.match(result,/PENDING/);assert.match(result,/150.85/);assert.match(result,/137.8/);assert.doesNotMatch(result,/IN PROGRESS|"children":"FINAL"/);
 });

@@ -1,3 +1,4 @@
+import { matchupResultState } from "@/domain/fantasy/matchup-result-state";
 import { getCurrentCatalogScoringVersion } from "@/lib/scoring/catalog-version";
 import { Suspense, type ReactNode } from "react";
 import Link from "next/link";
@@ -41,6 +42,7 @@ async function loadStatusBarData(activeLeagueId: string | null): Promise<StatusB
     scoringRuleVersion: matchup.scoringRuleVersion,
     roundNumber: matchup.roundNumber,
     roundStatus: matchup.roundStatus,
+    resultState: matchupResultState({ status: matchup.status, roundStatus: matchup.roundStatus, startsAt: matchup.roundStartsAt, endsAt: matchup.roundEndsAt }, new Date()),
     liveCount: buckets.live,
     lockedCount: buckets.locked + buckets.final,
     remainingCount: buckets.upcoming,

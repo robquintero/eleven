@@ -1,13 +1,13 @@
+import { normalizeFixturePlayerStats } from "../football-providers/api-football/adapter.ts";
+import type { ApiFootballFixturePlayersItem } from "../football-providers/api-football/types.ts";
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { findNextEligibleWindow, getEligibleFixtureIds } from "./round-eligibility.ts";
 import { createRoundLineupSlots } from "./lineup.ts";
 import { generateRoundRobinCycle, pairingsForSeasonRound } from "../../domain/fantasy/schedule.ts";
-import { determineFixtureSyncCadence } from "../../domain/football/sync-cadence.ts";
-import { scoringVersion } from "../scoring/versions.ts";
+import { scoreStoredPerformance, scoringVersion, type StoredScoringStats } from "../scoring/versions.ts";
 import { computeTotalRounds, DEFAULT_SCHEDULE_CYCLES, type ScheduleCycles } from "../../domain/fantasy/season.ts";
 import type { RoundWindow } from "../../domain/fantasy/round-calendar.ts";
-import type { FixtureStatus } from "../../domain/football/types.ts";
 import type { Database } from "../supabase/database.types.ts";
 
 export type OpenRoundResult =
@@ -544,74 +544,57 @@ export async function refreshMatchupScores(admin: SupabaseClient<Database>, roun
 
 export type FinalizeRoundResult = { finalized: false } | { finalized: true; roundId: string };
 
-/**
- * Conservative round finalization: only when EVERY fixture in the
- * round's window has reached a terminal state (`final` and past Pass 9's
- * post-FT reconciliation window, or `postponed`) — a single
- * delayed/reconciling fixture holds the whole round open. Reuses Pass
- * 9's `determineFixtureSyncCadence` "settled" reason as the exact
- * definition of "reconciliation has closed for this fixture," so both
- * systems agree on when a fixture's stats are truly final.
- */
+/** The server clock avoids calls for open weeks. The trusted RPC owns the
+ * canonical 60-minute grace, required evidence and atomic publication.
+ * Provider ingestion's longer correction cadence is deliberately independent. */
 export async function finalizeRoundIfReady(
   admin: SupabaseClient<Database>,
   roundId: string,
   now: Date
 ): Promise<FinalizeRoundResult> {
-  const { data: round } = await admin
-    .from("fantasy_rounds")
-    .select("starts_at, ends_at, status, league_id, number")
-    .eq("id", roundId)
-    .maybeSingle();
+  const { data: round, error: roundError } = await admin.from("fantasy_rounds")
+    .select("ends_at, status").eq("id", roundId).maybeSingle();
+  if (roundError) throw new Error(`Cannot inspect round settlement: ${roundError.message}`);
   if (!round || round.status === "completed" || now < new Date(round.ends_at)) return { finalized: false };
-
-  const window: RoundWindow = { startsAt: new Date(round.starts_at), endsAt: new Date(round.ends_at) };
-  const { data: fixtures } = await admin
-    .from("fixtures")
-    .select("status, kickoff_at")
-    .gte("kickoff_at", window.startsAt.toISOString())
-    .lt("kickoff_at", window.endsAt.toISOString());
-
-  const allSettled = (fixtures ?? []).every((f) => {
-    if (f.status === "postponed") return true;
-    if (f.status !== "final") return false;
-    return determineFixtureSyncCadence({ status: f.status as FixtureStatus, kickoffAt: f.kickoff_at }, now).reason === "settled";
+  const { data: evidence, error: evidenceError } = await admin.rpc("get_round_settlement_readiness", { p_round_id: roundId });
+  if (evidenceError) throw new Error(`Cannot inspect settlement evidence: ${evidenceError.message}`);
+  if (!settlementScoresMatch(evidence)) return { finalized: false };
+  const { data, error } = await admin.rpc("settle_fantasy_round", {
+    p_round_id: roundId, p_evidence_digest: (evidence as { evidence_digest: string }).evidence_digest,
   });
-
-  if (!allSettled) return { finalized: false };
-
-  await refreshMatchupScores(admin, roundId);
-
-  const { data: matchups } = await admin.from("matchups").select("id, status").eq("fantasy_round_id", roundId);
-  for (const matchup of matchups ?? []) {
-    if (matchup.status === "final") continue;
-    const { data: scores } = await admin.from("matchup_scores").select("id, live_points, final_points").eq("matchup_id", matchup.id);
-    for (const score of scores ?? []) {
-      if (score.final_points !== null && score.final_points !== undefined) continue;
-      const { error } = await admin.from("matchup_scores").update({ final_points: score.live_points }).eq("id", score.id).is("final_points", null);
-      if (error) throw new Error(`Cannot settle matchup score: ${error.message}`);
-    }
-    await admin.from("domain_events").insert({
-      event_type: "MATCHUP_FINALIZED",
-      league_id: round.league_id,
-      entity_type: "matchup",
-      entity_id: matchup.id,
-      payload: {},
-    });
+  if (error) throw new Error(`Cannot settle fantasy round: ${error.message}`);
+  if (data && typeof data === "object" && !Array.isArray(data) && data.finalized === true) {
+    return { finalized: true, roundId };
   }
+  return { finalized: false };
+}
 
-  const { error: matchupError } = await admin.from("matchups").update({ status: "final" }).eq("fantasy_round_id", roundId);
-  if (matchupError) throw new Error(`Cannot settle matchups: ${matchupError.message}`);
-  const { error: roundError } = await admin.from("fantasy_rounds").update({ status: "completed" }).eq("id", roundId);
-  if (roundError) throw new Error(`Cannot complete round: ${roundError.message}`);
-
-  await admin.from("domain_events").insert({
-    event_type: "ROUND_FINALIZED",
-    league_id: round.league_id,
-    entity_type: "fantasy_round",
-    entity_id: roundId,
-    payload: { roundNumber: round.number },
-  });
-
-  return { finalized: true, roundId };
+/** Reuse the unchanged scorer to detect ingestion's stats→score gap. The RPC
+ * checks the exact same evidence digest again inside its transaction. No
+ * timestamp inference: calculated_at is not refreshed by score upserts. */
+export function settlementScoresMatch(evidence: unknown): boolean {
+  if (!evidence || typeof evidence !== "object") return false;
+  const e = evidence as { ready?: boolean; version?: string; evidence_digest?: string; performances?: Array<{
+    stats: StoredScoringStats; provider_team?: ApiFootballFixturePlayersItem; position: "GK" | "DEF" | "MID" | "FWD"; conceded: number | null; points: number | null;
+  }> };
+  if (!e.ready || !e.evidence_digest || !Array.isArray(e.performances)) return false;
+  try {
+    const version = scoringVersion(e.version);
+    return e.performances.every(p => {
+      if (p.points === null || !Number.isFinite(p.points)) return false;
+      const units = Math.round(p.points * 100);
+      if (Math.round(scoreStoredPerformance(version, p.stats, p.position, p.conceded).total * 100) !== units) return false;
+      if (version === "ELEVEN_STANDARD_V4") {
+        // Archives are persisted before normalization. Verify the latest
+        // received counts too, without clocks or another provider request.
+        if (!p.provider_team) return false;
+        const raw = normalizeFixturePlayerStats([p.provider_team], "settlement")[0];
+        if (!raw) return false;
+        return Math.round(scoreStoredPerformance(version, { ...p.stats, reported_stats: raw.reportedStats }, p.position, p.conceded).total * 100) === units;
+      }
+      return true;
+    });
+  } catch {
+    return false; // Missing required V4 provenance stays pending, never zeroed.
+  }
 }

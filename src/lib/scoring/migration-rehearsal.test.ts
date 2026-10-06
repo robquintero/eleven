@@ -1,3 +1,6 @@
+import { settlementScoresMatch } from "../fantasy-engine/rounds.ts";
+import { scoreStoredPerformance } from "./versions.ts";
+import { buildStandingsTable } from "../../domain/fantasy/standings.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
@@ -189,12 +192,12 @@ test("canonical upgrade: immediate V4, frozen 102–98 result/winner/standings, 
   } finally { await db.close(); }
 });
 
-test("complete 36-migration clean installation includes raw storage and immutable settlement without activating V4", async () => {
+test("complete 37-migration clean installation includes raw storage and immutable settlement without activating V4", async () => {
   const db = await bootstrap();
   try {
     const files=(await readdir(folder)).filter(f=>f.endsWith('.sql')).sort();
     for(const file of files){const sql=await readFile(new URL(file,folder),'utf8');await db.transaction(tx=>tx.exec(sql));}
-    assert.equal(files.length,36);
+    assert.equal(files.length,37);
     assert.equal((await db.query<{v:string}>('select get_catalog_scoring_version() v')).rows[0].v,'ELEVEN_STANDARD_V3');
     assert.equal((await db.query<{n:number}>('select count(*)::int n from football_provider_snapshots')).rows[0].n,0);
   } finally { await db.close(); }
@@ -261,4 +264,83 @@ test("exact one-off calendar transaction fails closed, adjusts only approved win
     await assert.rejects(db.exec(`update fantasy_rounds set ends_at='2026-10-07' where id='${roundIds[0]}'`),/WINDOW_IMMUTABLE/);
     await assert.rejects(db.exec("update matchup_scores set final_points=999"),/IMMUTABLE/);
   } finally { await db.close(); }
+});
+
+test("fast settlement: actual schema/evidence gates, UTC grace, atomic publication/rollback, final-only standings and protected history", async (t) => {
+  const db = await bootstrap();
+  try {
+    await migrations(db,true); await seed(db);
+    await db.exec(await readFile(new URL("20261009000000_scoring_v4_canonical_and_raw_evidence.sql",folder),"utf8"));
+    await db.exec("select activate_scoring_v4_now()");
+    const migration = await readFile(new URL("20261011000000_fast_round_settlement.sql",folder),"utf8");
+    const before = await snapshot(db);
+    const guards = async () => (await db.query("select pg_get_functiondef('guard_settled_matchup_scores()'::regprocedure) s,pg_get_functiondef('guard_settled_matchups()'::regprocedure) m,pg_get_functiondef('pin_round_scoring_version()'::regprocedure) r")).rows;
+    const originalGuards = await guards();
+    await db.exec(migration); await db.exec(migration);
+    assert.deepEqual(await snapshot(db),before,"creation/redeployment changes no data");
+    assert.deepEqual(await guards(),originalGuards,"no existing guard weakened");
+    const clock = async (at: string) => db.exec(migration.replaceAll("pg_catalog.statement_timestamp()",`timestamptz '${at}'`));
+    const historical = async () => (await db.query(`select to_jsonb(m) m,to_jsonb(s) s from matchups m join matchup_scores s on s.matchup_id=m.id where m.id='${id(14)}' order by s.id`)).rows;
+    const originalHistory = await historical();
+    const stats = { minutes:90, goals:1, assists:null, shotsOnTarget:null, keyPasses:null, tackles:null, interceptions:null, saves:null, yellowCards:null, redCards:null };
+    const stored = { minutes:90,goals:1,assists:0,shots_on_target:0,chances_created:0,tackles:0,interceptions:0,blocks:0,saves:0,yellow_cards:0,red_cards:0,reported_stats:stats,scoring_position:"GK" };
+    const points = scoreStoredPerformance("ELEVEN_STANDARD_V4",stored,"GK",1).total;
+    await db.exec(`insert into fantasy_rounds(id,league_id,season_id,number,starts_at,ends_at,status) values('${id(90)}','${id(3)}','${id(6)}',10,'2026-09-29 06:00+00','2026-10-06 06:00+00','in_progress');
+      insert into fixtures(id,competition_id,home_club_id,away_club_id,kickoff_at,status,season,home_score,away_score) values('${id(91)}','${id(10)}','${id(11)}','${id(12)}','2026-10-06 05:45+00','final',2026,2,1);
+      insert into matchups(id,league_id,fantasy_round_id,home_fantasy_team_id,away_fantasy_team_id,status) values('${id(92)}','${id(3)}','${id(90)}','${id(4)}','${id(5)}','scheduled');
+      insert into lineup_slots(roster_entry_id,fantasy_round_id,slot,starter) values('${id(40)}','${id(90)}','GK',true);
+      insert into player_match_stats(player_id,fixture_id,minutes,goals,reported_stats,scoring_position,participation_club_id) values('${id(20)}','${id(91)}',90,1,'${JSON.stringify(stats)}','GK','${id(11)}');
+      insert into fantasy_player_scores(player_id,fixture_id,points,scoring_rule_version) values('${id(20)}','${id(91)}',${points},'ELEVEN_STANDARD_V4');
+      insert into matchup_scores(matchup_id,fantasy_team_id,live_points) values('${id(92)}','${id(4)}',${points}),('${id(92)}','${id(5)}',0);
+      insert into provider_mappings(provider,internal_entity_type,external_id,internal_entity_id) values('api-football','club','11','${id(11)}'),('api-football','club','12','${id(12)}'),('api-football','player','20','${id(20)}');`);
+    // The populated 102–98 fixture is outside this independent current week.
+    await db.exec(`update fixtures set kickoff_at='2026-09-28 12:00+00' where id='${id(13)}'`);
+    const payload = {errors:[],response:[{team:{id:11},players:[{player:{id:20},statistics:[{games:{minutes:90},goals:{total:1}}]}]},{team:{id:12},players:[{player:{id:999},statistics:[{games:{minutes:90}}]}]}]};
+    await db.query(`insert into football_provider_snapshots(provider,endpoint,external_id,fixture_id,payload,fetched_at,observed_fixture_status) values('api-football','/fixtures/players','91',$1,$2,'2026-10-06 06:15+00','final')`,[id(91),JSON.stringify(payload)]);
+    type Evidence = {ready:boolean; evidence_digest:string; blockers:Array<{code:string}>; totals:Array<{team_id:string;points:number}>};
+    const evidence = async () => (await db.query<{e:Evidence}>(`select get_round_settlement_readiness('${id(90)}') e`)).rows[0].e;
+    const settle = async (digest?:string) => (await db.query<{e:{finalized:boolean;blockers?:Array<{code:string}>}}>(`select settle_fantasy_round('${id(90)}',$1) e`,[digest??(await evidence()).evidence_digest])).rows[0].e;
+    const official = async () => (await db.query<{homePoints:string;awayPoints:string}>(`select h.final_points as "homePoints",a.final_points as "awayPoints" from matchups m join matchup_scores h on h.matchup_id=m.id and h.fantasy_team_id=m.home_fantasy_team_id join matchup_scores a on a.matchup_id=m.id and a.fantasy_team_id=m.away_fantasy_team_id where m.id='${id(92)}' and m.status='final'`)).rows;
+    await t.test("06:00/06:30 pending and no official standings; 07:00 permits a recently-final fixture with optional nulls",async()=>{
+      for(const at of ["2026-10-06 06:00+00","2026-10-06 06:30+00","2026-10-06 06:59:59+00"]){await clock(at);assert.equal((await evidence()).ready,false);assert.equal((await settle()).finalized,false);assert.deepEqual(await official(),[]);}
+      await clock("2026-10-06 07:00+00");const e=await evidence();assert.equal(e.ready,true,JSON.stringify(e.blockers));assert.equal(settlementScoresMatch(e),true);assert.equal(e.totals.find(s=>s.team_id===id(4))?.points,points);
+    });
+    const rollback = async (work:()=>Promise<void>) => { await db.exec("begin");try{await work();}finally{await db.exec("rollback");} };
+    await t.test("live fixture, missing envelope, partial/error response, known missing V4 score/stats/provenance all stay pending",async()=>{
+      const cases:[string,string][]=[
+        [`update fixtures set status='live' where id='${id(91)}'`,"fixture_unresolved"],
+        ["delete from football_provider_snapshots","player_envelope_missing"],
+        ["update football_provider_snapshots set payload='{}'","player_envelope_missing"],
+        ["update football_provider_snapshots set payload=jsonb_set(payload,'{errors}','[\"unavailable\"]')","player_envelope_missing"],
+        ["update football_provider_snapshots set observed_fixture_status='live'","player_envelope_missing"],
+        [`delete from fantasy_player_scores where fixture_id='${id(91)}'`,"starter_score_missing"],
+        [`delete from player_match_stats where fixture_id='${id(91)}'`,"starter_stats_missing"],
+        [`update player_match_stats set reported_stats=null where fixture_id='${id(91)}'`,"starter_v4_provenance_missing"],
+        [`delete from matchup_scores where matchup_id='${id(92)}' and fantasy_team_id='${id(5)}'`,"score_sides_missing"],
+      ];
+      for(const [sql,code] of cases) await rollback(async()=>{await db.exec(sql);const e=await evidence();assert.ok(e.blockers.some(b=>b.code===code),JSON.stringify(e));assert.equal((await settle()).finalized,false);assert.deepEqual(await official(),[]);});
+    });
+    await t.test("stats→score ingestion gap fails scorer check; concurrent evidence changes fail digest check",async()=>{
+      await rollback(async()=>{const old=await evidence();await db.exec(`update fantasy_player_scores set points=99 where fixture_id='${id(91)}'`);assert.equal(settlementScoresMatch(await evidence()),false);assert.equal((await settle(old.evidence_digest)).finalized,false);});
+      await rollback(async()=>{const old=await evidence();await db.exec("update football_provider_snapshots set payload=jsonb_set(payload,'{response,0,players,0,statistics,0,goals,total}','2')");assert.equal(settlementScoresMatch(await evidence()),false);assert.equal((await settle(old.evidence_digest)).finalized,false);});
+    });
+    await t.test("complete final envelope establishes absence/DNP; missing optional fields are allowed",async()=>{
+      await rollback(async()=>{await db.exec(`delete from fantasy_player_scores where fixture_id='${id(91)}';delete from player_match_stats where fixture_id='${id(91)}';update football_provider_snapshots set payload=jsonb_set(payload,'{response,0,players,0,player,id}','9999');`);assert.equal((await evidence()).ready,true);assert.equal((await evidence()).totals.find(s=>s.team_id===id(4))?.points,0);});
+    });
+    await t.test("service-only security; failure on second score side rolls back first side and every result/event",async()=>{
+      for(const role of ["anon","authenticated"]){await db.exec(`set role ${role}`);await assert.rejects(evidence(),/permission denied/);await assert.rejects(settle("x"),/permission denied/);await db.exec("reset role");}
+      await db.exec(`create function fail_test_second_side() returns trigger language plpgsql as $$begin if new.fantasy_team_id='${id(5)}' and new.final_points is not null then raise exception 'TEST_SECOND_SIDE_FAILURE';end if;return new;end$$;create trigger zz_test_second_side before update on matchup_scores for each row execute function fail_test_second_side();`);
+      const unchanged=await snapshot(db);await assert.rejects(settle(),/TEST_SECOND_SIDE_FAILURE/);assert.deepEqual(await snapshot(db),unchanged);await db.exec("drop trigger zz_test_second_side on matchup_scores;drop function fail_test_second_side()");
+    });
+    await t.test("late evidence settles automatically/idempotently; winner/W-L/PF-PA appear once and cannot follow later analytics",async()=>{
+      await db.exec("set role service_role");assert.equal((await settle()).finalized,true);assert.equal((await settle()).finalized,false);await db.exec("reset role");
+      const rows=await official();assert.deepEqual(rows,[{homePoints:points.toFixed(2),awayPoints:"0.00"}]);
+      const table=buildStandingsTable(rows.map(r=>({homeTeamId:id(4),awayTeamId:id(5),homePoints:Number(r.homePoints),awayPoints:Number(r.awayPoints)})));
+      assert.deepEqual(table.map(r=>[r.played,r.wins,r.losses,r.pointsFor,r.pointsAgainst]),[[1,1,0,points,0],[1,0,1,0,points]]);
+      assert.equal((await db.query<{n:number}>(`select count(*)::int n from domain_events where event_type='MATCHUP_FINALIZED' and entity_id='${id(92)}'`)).rows[0].n,1);
+      await db.exec(`update fantasy_player_scores set points=999 where fixture_id='${id(91)}'`);assert.deepEqual(await official(),rows);assert.deepEqual(await historical(),originalHistory,"102–98 stays populated and immutable");
+      await assert.rejects(db.exec(`update matchup_scores set final_points=999 where matchup_id='${id(92)}'`),/IMMUTABLE/);
+      assert.equal((await db.query<{status:string}>(`select status from fantasy_rounds where id='${id(8)}'`)).rows[0].status,"in_progress","next week stays active");
+    });
+  } finally {await db.close();}
 });

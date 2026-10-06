@@ -1,3 +1,5 @@
+import { matchupResultState } from "@/domain/fantasy/matchup-result-state";
+import { MatchupStatus } from "@/components/football/matchup-status";
 import type { ReactNode } from "react";
 import { TeamName } from "@/components/ui/team-name";
 import type { CurrentMatchup, MatchupFixtureIntelligence } from "@/data-access/matchups";
@@ -54,7 +56,9 @@ export function MatchupCommand({
     );
   }
 
-  const isLive = matchup.status === "live";
+  const resultState = matchupResultState({ status: matchup.status, roundStatus: matchup.roundStatus,
+    startsAt: matchup.roundStartsAt, endsAt: matchup.roundEndsAt }, now);
+  const isLive = resultState === "live";
   // Pass 14.5: whether the ROUND has started, not whether a fixture is
   // CURRENTLY live right now -- `matchup.status` reverts to "scheduled"
   // the instant nothing is live (see data-access/matchups.ts's
@@ -63,7 +67,7 @@ export function MatchupCommand({
   // scored performances existed (e.g. The Room's Round 1, where several
   // starters had already played while nothing happened to be live at
   // read time).
-  const isScheduled = matchup.roundStatus === "upcoming";
+  const isScheduled = resultState === "upcoming";
   const homeScore = matchup.homeFinalPoints ?? matchup.homeLivePoints;
   const awayScore = matchup.awayFinalPoints ?? matchup.awayLivePoints;
   const total = homeScore + awayScore || 1;
@@ -98,21 +102,7 @@ export function MatchupCommand({
           MATCHUP_COMMAND
         </span>
         <span className="label-system flex items-center gap-1.5 text-[10px] text-foreground-tertiary">
-          {isLive ? (
-            <>
-              <span className="relative flex size-1.5">
-                <span className="absolute inline-flex size-full animate-ping rounded-full bg-live opacity-75" />
-                <span className="relative inline-flex size-1.5 rounded-full bg-live" />
-              </span>
-              <span className="font-semibold text-live">LIVE</span>
-            </>
-          ) : matchup.roundStatus === "completed" ? (
-            "FINAL"
-          ) : matchup.roundStatus === "in_progress" ? (
-            "IN PROGRESS"
-          ) : (
-            "SCHEDULED"
-          )}
+          <MatchupStatus state={resultState} />
           · MATCHDAY {pad2(matchup.roundNumber)}
         </span>
       </div>

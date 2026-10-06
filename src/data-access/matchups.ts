@@ -1,4 +1,5 @@
 import "server-only";
+import { matchupResultState, type MatchupResultState } from "../domain/fantasy/matchup-result-state.ts";
 import { cache } from "react";
 // Relative imports (not the usual `@/...` aliases) -- same reasoning as
 // src/data-access/players.ts's own import-block comment: keeps
@@ -803,13 +804,16 @@ export async function getStandings(leagueId: string): Promise<StandingsRow[]> {
 export interface LeagueMatchupSummary {
   id: string;
   roundNumber: number;
+  roundStartsAt: string;
+  roundEndsAt: string;
+  resultState: MatchupResultState;
   status: "scheduled" | "live" | "final";
   homeTeamId: string;
   homeTeamName: string;
-  homePoints: number;
+  homePoints: number | null;
   awayTeamId: string;
   awayTeamName: string;
-  awayPoints: number;
+  awayPoints: number | null;
 }
 
 export interface LeagueRecordEntry {
@@ -831,7 +835,7 @@ export interface LeagueRecords {
 export interface LeagueCompetitionSummary {
   /** This league's current (in-progress, else soonest upcoming) round's matchups -- every pairing, not scoped to one manager. `[]` once every round is final (season concluded) or before the draft/first round exists. */
   currentRoundMatchups: LeagueMatchupSummary[];
-  /** Completed matchups, most recent round first. */
+  /** Closed pending and final matchups, most recent round first. Official records stay final-only. */
   recentResults: LeagueMatchupSummary[];
   records: LeagueRecords;
 }
@@ -839,7 +843,7 @@ export interface LeagueCompetitionSummary {
 /**
  * League-wide competition data for the League page's "competition
  * center" surfaces: the current round's matchups (every pairing, not
- * just the caller's own), recent completed results, and records derived
+ * just the caller's own), visible pending/completed results, and records derived
  * ONLY from completed (`status = 'final'`) matchups -- never from a live
  * or scheduled one, so nothing here can misrepresent an in-progress
  * result as final. One shared query over `matchups`+`matchup_scores`
@@ -884,7 +888,8 @@ function emptyCompetitionSummary(): LeagueCompetitionSummary {
  */
 export async function queryLeagueCompetitionSummary(
   supabase: SupabaseClientType,
-  leagueId: string
+  leagueId: string,
+  now: Date = new Date()
 ): Promise<LeagueCompetitionSummary> {
   const empty = emptyCompetitionSummary();
 
@@ -905,7 +910,7 @@ export async function queryLeagueCompetitionSummary(
   const { data: allMatchups } = await supabase
     .from("matchups")
     .select(
-      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(number, season_id), matchup_scores(fantasy_team_id, live_points, final_points)"
+      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(number, season_id, starts_at, ends_at, status), matchup_scores(fantasy_team_id, live_points, final_points)"
     )
     .eq("fantasy_rounds.season_id", season.id);
 
@@ -924,25 +929,32 @@ export async function queryLeagueCompetitionSummary(
     return {
       id: m.id,
       roundNumber: (m.fantasy_rounds as unknown as { number: number }).number,
+      roundStartsAt: (m.fantasy_rounds as unknown as { starts_at: string }).starts_at,
+      roundEndsAt: (m.fantasy_rounds as unknown as { ends_at: string }).ends_at,
+      resultState: matchupResultState({ status: m.status as LeagueMatchupSummary["status"],
+        startsAt: (m.fantasy_rounds as unknown as { starts_at: string }).starts_at,
+        endsAt: (m.fantasy_rounds as unknown as { ends_at: string }).ends_at }, now),
       status: m.status as LeagueMatchupSummary["status"],
       homeTeamId: m.home_fantasy_team_id,
       homeTeamName: nameById.get(m.home_fantasy_team_id) ?? "—",
-      homePoints: home?.final_points ?? home?.live_points ?? 0,
+      homePoints: m.status === "final" ? home?.final_points ?? null : home?.final_points ?? home?.live_points ?? null,
       awayTeamId: m.away_fantasy_team_id,
       awayTeamName: nameById.get(m.away_fantasy_team_id) ?? "—",
-      awayPoints: away?.final_points ?? away?.live_points ?? 0,
+      awayPoints: m.status === "final" ? away?.final_points ?? null : away?.final_points ?? away?.live_points ?? null,
     };
   }
 
   const summaries = allMatchups.map(toSummary).sort((a, b) => b.roundNumber - a.roundNumber);
-  const finalSummaries = summaries.filter((s) => s.status === "final");
+  const finalSummaries = summaries.filter((s): s is LeagueMatchupSummary & { homePoints: number; awayPoints: number } =>
+    s.status === "final" && s.homePoints !== null && s.awayPoints !== null);
 
   // Latest opened week, including while older weeks await settlement.
-  const nonFinal = summaries.filter((s) => s.status !== "final");
+  const nonFinal = summaries.filter((s) => s.resultState !== "final" && s.resultState !== "pending");
   const currentRoundNumber = nonFinal.length > 0 ? Math.max(...nonFinal.map((s) => s.roundNumber)) : null;
   const currentRoundMatchups = currentRoundNumber !== null ? nonFinal.filter((s) => s.roundNumber === currentRoundNumber) : [];
 
-  const recentResults = finalSummaries.slice(0, 5);
+  // Preserve closed pending scores in history while the next week is active.
+  const recentResults = [...summaries.filter(s => s.resultState === "pending"), ...summaries.filter(s => s.resultState === "final").slice(0, 5)];
 
   const records: LeagueRecords = { ...empty.records };
   if (finalSummaries.length > 0) {
@@ -1008,7 +1020,7 @@ export async function getSeasonMatchupResults(supabase: SupabaseClientType, seas
   const { data: rows } = await supabase
     .from("matchups")
     .select(
-      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(number, season_id), matchup_scores(fantasy_team_id, live_points, final_points)"
+      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(number, season_id, starts_at, ends_at, status), matchup_scores(fantasy_team_id, live_points, final_points)"
     )
     .eq("fantasy_rounds.season_id", seasonId)
     .eq("status", "final");
@@ -1027,13 +1039,16 @@ export async function getSeasonMatchupResults(supabase: SupabaseClientType, seas
       return {
         id: m.id,
         roundNumber: (m.fantasy_rounds as unknown as { number: number }).number,
+        roundStartsAt: (m.fantasy_rounds as unknown as { starts_at: string }).starts_at,
+        roundEndsAt: (m.fantasy_rounds as unknown as { ends_at: string }).ends_at,
+        resultState: "final",
         status: m.status as LeagueMatchupSummary["status"],
         homeTeamId: m.home_fantasy_team_id,
         homeTeamName: nameById.get(m.home_fantasy_team_id) ?? "—",
-        homePoints: home?.final_points ?? home?.live_points ?? 0,
+        homePoints: m.status === "final" ? home?.final_points ?? null : home?.final_points ?? home?.live_points ?? null,
         awayTeamId: m.away_fantasy_team_id,
         awayTeamName: nameById.get(m.away_fantasy_team_id) ?? "—",
-        awayPoints: away?.final_points ?? away?.live_points ?? 0,
+        awayPoints: m.status === "final" ? away?.final_points ?? null : away?.final_points ?? away?.live_points ?? null,
       };
     })
     .sort((a, b) => a.roundNumber - b.roundNumber);

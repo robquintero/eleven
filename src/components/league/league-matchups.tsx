@@ -3,13 +3,8 @@ import { formatRoundPoints } from "@/lib/team-fixture";
 import type { LeagueMatchupSummary } from "@/data-access/matchups";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { pad2 } from "@/lib/team-fixture";
-import { cn } from "@/lib/utils";
-
-const statusLabel: Record<LeagueMatchupSummary["status"], string> = {
-  scheduled: "UPCOMING",
-  live: "LIVE",
-  final: "FINAL",
-};
+import { MatchupStatus } from "@/components/football/matchup-status";
+import { formatRoundWindow } from "@/lib/team-fixture";
 
 /**
  * One matchup row -- "TEAM A score / vs / TEAM B score" per the brief's
@@ -21,8 +16,7 @@ const statusLabel: Record<LeagueMatchupSummary["status"], string> = {
  * actually render that specific contest.
  */
 function MatchupRow({ matchup, myTeamId }: { matchup: LeagueMatchupSummary; myTeamId: string | null }) {
-  const isMine = myTeamId !== null && (matchup.homeTeamId === myTeamId || matchup.awayTeamId === myTeamId);
-  const isLive = matchup.status === "live";
+  const isMine = matchup.resultState !== "pending" && matchup.resultState !== "final" && myTeamId !== null && (matchup.homeTeamId === myTeamId || matchup.awayTeamId === myTeamId);
 
   const content = (
     <div className="flex items-center gap-2.5 px-3 sm:px-4 py-2.5">
@@ -31,30 +25,17 @@ function MatchupRow({ matchup, myTeamId }: { matchup: LeagueMatchupSummary; myTe
         <div className="flex items-center justify-between gap-2">
           <TeamName name={matchup.homeTeamName} className="text-sm text-foreground" />
           <span className="label-system shrink-0 text-sm font-semibold tabular-nums text-foreground">
-            {formatRoundPoints(matchup.homePoints)}
+            {matchup.homePoints === null ? "—" : formatRoundPoints(matchup.homePoints)}
           </span>
         </div>
         <div className="mt-0.5 flex items-center justify-between gap-2">
           <TeamName name={matchup.awayTeamName} className="text-sm text-foreground" />
           <span className="label-system shrink-0 text-sm font-semibold tabular-nums text-foreground">
-            {formatRoundPoints(matchup.awayPoints)}
+            {matchup.awayPoints === null ? "—" : formatRoundPoints(matchup.awayPoints)}
           </span>
         </div>
       </div>
-      <span
-        className={cn(
-          "label-system flex shrink-0 items-center gap-1.5 text-[10px]",
-          isLive ? "text-live" : "text-foreground-tertiary"
-        )}
-      >
-        {isLive && (
-          <span className="relative flex size-1.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-live opacity-75" />
-            <span className="relative inline-flex size-1.5 rounded-full bg-live" />
-          </span>
-        )}
-        {statusLabel[matchup.status]}
-      </span>
+      <MatchupStatus state={matchup.resultState} />
     </div>
   );
 
@@ -65,7 +46,12 @@ function MatchupRow({ matchup, myTeamId }: { matchup: LeagueMatchupSummary; myTe
       </TransitionLink>
     );
   }
-  return content;
+  return <div>{content}
+    {(matchup.resultState === "pending" || matchup.resultState === "final") && <p className="label-system px-3 pb-2.5 text-[9px] leading-relaxed text-foreground-tertiary sm:px-4">
+      {formatRoundWindow(matchup.roundStartsAt, matchup.roundEndsAt)}
+      {matchup.resultState === "pending" && <span className="ml-2 normal-case tracking-normal">Finalizing result</span>}
+    </p>}
+  </div>;
 }
 
 export function LeagueMatchups({

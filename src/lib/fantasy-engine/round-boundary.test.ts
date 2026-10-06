@@ -55,14 +55,14 @@ test("late reconciliation targets the old persisted window only, even with a new
   });
   assert.deepEqual((await reconcileFantasyStateForFixtures(client, ["old"])).roundIds, ["old-round"]);
   assert.ok(calls.filter(q => q.table === "lineup_slots").every(q => filter(q, "fantasy_round_id") === "old-round"));
-  assert.ok(calls.every(q => q.operation === "select"));
+  assert.ok(calls.every(q => q.operation === "select" || q.table === "get_round_settlement_readiness"));
 });
 
-test("calendar boundary does not finalize live, recently-final or completed rounds", async () => {
-  for (const [status, completed] of [["live", false], ["final", false], ["final", true]] as const) {
-    const { client, calls } = testClient(q => q.table === "fantasy_rounds" ? result({ ...round, status: completed ? "completed" : round.status }) : q.table === "fixtures" ? result([{ ...fixtures[0], status }]) : (() => { throw new Error(q.table); })());
+test("calendar boundary does not finalize evidence-blocked or completed rounds", async () => {
+  for (const completed of [false, true]) {
+    const { client, calls } = testClient(q => q.table === "fantasy_rounds" ? result({ ...round, status: completed ? "completed" : round.status }) : q.table === "get_round_settlement_readiness" ? result({ ready: false }) : (() => { throw new Error(q.table); })());
     assert.deepEqual(await finalizeRoundIfReady(client, "old-round", new Date("2026-10-06T07:00:00Z")), { finalized: false });
-    assert.ok(calls.every(q => q.operation === "select"));
+    assert.ok(calls.every(q => q.operation === "select" || q.table === "get_round_settlement_readiness"));
     if (completed) assert.equal(calls.length, 1);
   }
 });
@@ -76,6 +76,7 @@ test("an active calendar window cannot finalize early even if all currently know
 function opener(previous = round) {
   return testClient(q => {
     if (q.table === "fantasy_teams") return result([{ id: "t1", draft_orders: [{ position: 1 }] }, { id: "t2", draft_orders: [{ position: 2 }] }]);
+    if (q.table === "get_round_settlement_readiness") return result({ ready: false });
     if (q.table === "seasons") return result({ id: "s", season_number: 1, schedule_cycles: 2, total_rounds: 2 });
     if (q.table === "fantasy_rounds") return result(q.operation === "insert" ? { id: "new-round" } : previous);
     if (q.table === "fixtures") return { ...result([]), count: 1 };
@@ -105,11 +106,12 @@ test("closed but unsettled old week opens the canonical next week with existing 
 test("opening again within the new week cannot duplicate or advance the round", async () => {
   const { client, calls } = opener({ ...round, id: "new-round", number: 2, starts_at: newWindow.startsAt.toISOString(), ends_at: newWindow.endsAt.toISOString() });
   assert.deepEqual(await openNextRound(client, "league", boundary), { ok: false, error: "PREVIOUS_ROUND_STILL_OPEN" });
-  assert.ok(calls.every(q => q.operation === "select"));
+  assert.ok(calls.every(q => q.operation === "select" || q.table === "get_round_settlement_readiness"));
 });
 
 test("one lifecycle tick opens the fresh week while preserving the prior week for late settlement", async () => {
   const { client, calls } = testClient(q => {
+    if (q.table === "get_round_settlement_readiness") return result({ ready: false });
     if (q.table === "seasons") return result({ id: "s", total_rounds: 2, season_number: 1, schedule_cycles: 2 });
     if (q.table === "fantasy_rounds" && !q.limit && q.operation === "select" && filter(q, "season_id")) return result([{ id: round.id, number: 1, ends_at: round.ends_at }]);
     if (q.table === "fantasy_rounds" && filter(q, "id")) return result(round);
@@ -139,6 +141,7 @@ test("blank-week search advances using Tuesday 06:00 only", async () => {
 
 test("season progression keeps processing the old week and cannot crown a winner while it is unsettled", async () => {
   const { client, calls } = testClient(q => {
+    if (q.table === "get_round_settlement_readiness") return result({ ready: false });
     if (q.table === "seasons") return result({ id: "s", total_rounds: 2 });
     if (q.table === "fantasy_rounds") {
       if (filter(q, "id") === "old-round") return result(round);
@@ -152,5 +155,5 @@ test("season progression keeps processing the old week and cannot crown a winner
   });
   assert.deepEqual(await progressSeason(client, "league", boundary), { action: "waiting_on_fixtures", roundId: "new-round" });
   assert.ok(calls.some(q => q.table === "fantasy_rounds" && filter(q, "id") === "old-round"));
-  assert.ok(calls.every(q => q.operation === "select"));
+  assert.ok(calls.every(q => q.operation === "select" || q.table === "get_round_settlement_readiness"));
 });

@@ -115,7 +115,8 @@ test("scoreboard keeps user's full identity and exact score on the left in home 
       const mine = names[i], opponent = names[(i + 1) % names.length];
       const matchup = { isUserHome, homeTeamName: isUserHome ? mine : opponent, awayTeamName: isUserHome ? opponent : mine,
         homeLivePoints: isUserHome ? 152.1 : 141.15, awayLivePoints: isUserHome ? 141.15 : 152.1,
-        homeFinalPoints: null, awayFinalPoints: null, status: "scheduled", roundStatus: "in_progress", roundNumber: 1, scoresUpdatedAt: null };
+        homeFinalPoints: null, awayFinalPoints: null, status: "scheduled", roundStatus: "in_progress", roundNumber: 1, scoresUpdatedAt: null,
+        roundStartsAt: "2026-09-29T06:00:00Z", roundEndsAt: "2090-01-03T06:00:00Z" };
       const tree = MatchupCommand({ matchup, hasLeague: true, now: new Date("2026-10-06T00:00:00Z") });
       const result = text(tree);
       assert.ok(result.indexOf(mine) < result.indexOf(opponent));

@@ -1,8 +1,10 @@
+import { MATCHUP_RESULT_LABEL, type MatchupResultState } from "@/domain/fantasy/matchup-result-state";
 import { formatKickoff, pad2 } from "@/lib/team-fixture";
 
 export interface StatusBarData {
   scoringRuleVersion?: import("@/domain/fantasy/scoring").ScoringRuleVersion;
   roundNumber: number;
+  resultState: MatchupResultState;
   roundStatus: "upcoming" | "in_progress" | "completed";
   liveCount: number;
   lockedCount: number;
@@ -32,10 +34,7 @@ export function StatusBar({ data }: { data: StatusBarData | null }) {
     );
   }
 
-  const roundLabel =
-    data.roundStatus === "completed"
-      ? `MATCHDAY ${pad2(data.roundNumber)} · COMPLETED`
-      : `MATCHDAY ${pad2(data.roundNumber)} · ${data.roundStatus === "in_progress" ? "IN PROGRESS" : "UPCOMING"}`;
+  const roundLabel = `MATCHDAY ${pad2(data.roundNumber)} · ${MATCHUP_RESULT_LABEL[data.resultState]}`;
 
   return (
     <div className="hidden items-center gap-5 border-t border-border px-4 py-1.5 lg:flex lg:px-8">

@@ -1435,6 +1435,8 @@ export type Database = {
         Args: { p_fantasy_team_id: string; p_round_id: string; p_changes: Json; p_now?: string }
         Returns: undefined
       }
+      get_round_settlement_readiness: { Args: { p_round_id: string }; Returns: Json };
+      settle_fantasy_round: { Args: { p_round_id: string; p_evidence_digest: string }; Returns: Json };
       activate_scoring_v4_now: { Args: Record<PropertyKey, never>; Returns: string };
       get_catalog_scoring_version: { Args: Record<PropertyKey, never>; Returns: string };
       get_player_score_totals: {

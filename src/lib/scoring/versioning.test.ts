@@ -50,6 +50,8 @@ test("clients have no activation table or trigger-function authorization", async
 function aggregation(version: string, completed = false) {
   let correction = false;
   const { client, calls } = testClient(q => {
+    if (q.table === "get_round_settlement_readiness") return result({ ready: true, version, evidence_digest: "pinned-score-evidence", performances: [] });
+    if (q.table === "settle_fantasy_round") return result({ finalized: true });
     if (q.table === "fantasy_rounds") return result({ id: "r", starts_at: "2026-10-06T00:00:00Z", ends_at: "2026-10-13T00:00:00Z", scoring_rule_version: version, status: completed ? "completed" : "in_progress" });
     if (q.table === "lineup_slots") return result(q.selection?.includes("acquired_at") ? [{ roster_entries: { fantasy_team_id: "t1", player_id: "p", acquired_at: "2026-10-07T10:00:00Z" } }] : []);
     if (q.table === "matchups") return result(q.operation === "select" ? [{ id: "m", home_fantasy_team_id: "t1", away_fantasy_team_id: "t2" }] : null);
@@ -92,10 +94,12 @@ test("live correction discovers unfinished pinned models and retains catalog V3 
   assert.deepEqual(await getAffectedScoringVersions(client, ["fixture"]), ["ELEVEN_STANDARD_V3", "ELEVEN_STANDARD_V4"]);
 });
 
-test("actual V4 round completion snapshots the exact live total and never switches the pinned version", async () => {
+test("V4 completion delegates verified pinned evidence to atomic publication, without client-supplied totals or version changes", async () => {
   const { client, calls } = aggregation("ELEVEN_STANDARD_V4");
+  await refreshMatchupScores(client, "r");
+  const live = calls.find(q => q.table === "matchup_scores" && q.operation === "upsert")!.payload as Array<{ live_points: number }>;
+  assert.deepEqual(live.map(s => s.live_points), [10.45, 0]);
   assert.deepEqual(await finalizeRoundIfReady(client, "r", new Date("2026-10-16T00:00:00Z")), { finalized: true, roundId: "r" });
-  assert.ok(calls.some(q => q.table === "matchup_scores" && q.operation === "update" && (q.payload as { final_points: number }).final_points === 10.45));
-  const final = calls.find(q => q.table === "fantasy_rounds" && q.operation === "update")!;
-  assert.deepEqual(final.payload, { status: "completed" });
+  assert.deepEqual(calls.find(q => q.table === "settle_fantasy_round")?.payload, { p_round_id: "r", p_evidence_digest: "pinned-score-evidence" });
+  assert.ok(!calls.some(q => (q.table === "fantasy_rounds" || q.table === "matchup_scores") && q.operation === "update"));
 });
