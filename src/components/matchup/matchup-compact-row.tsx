@@ -1,16 +1,14 @@
 import { Lock } from "lucide-react";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { formatRoundPoints, isPlayerLocked, playerStatusLabel } from "@/lib/team-fixture";
-import type { Player, PlayerPosition } from "@/lib/types/fantasy";
+import { PositionBadge } from "@/components/players/position-badge";
+import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
-
-const POSITION_LETTER: Record<PlayerPosition, string> = { GK: "G", DEF: "D", MID: "M", FWD: "F" };
-
 const toneClass = {
   destructive: "text-destructive",
   warning: "text-warning",
   live: "text-live",
-  neutral: "text-foreground-tertiary",
+  neutral: "text-foreground-secondary",
 };
 
 /**
@@ -46,16 +44,14 @@ export function MatchupCompactRow({ player, onSelect }: { player: Player; onSele
       onClick={onSelect}
       aria-label={`${player.name}, ${player.position}, ${status.text}, ${compactPoints} points`}
       className={cn(
-        "flex w-full cursor-pointer items-center gap-1 rounded-md px-1 py-1.5 text-left outline-none transition-colors hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset active:bg-muted/60",
+        "flex min-h-11 w-full cursor-pointer items-center gap-1 rounded-md px-1 py-1.5 text-left outline-none transition-colors hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset active:bg-muted/60",
         isLocked && "bg-foreground/2"
       )}
     >
-      <span className="label-system w-2.5 shrink-0 text-center text-[8px] font-semibold text-foreground-tertiary">
-        {POSITION_LETTER[player.position]}
-      </span>
-      <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
-      <span className="flex min-w-0 flex-1 items-center gap-1 truncate text-[11px] font-medium text-foreground">
-        {player.name}
+      <PositionBadge position={player.position} compact />
+      <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" className="size-4.5" />
+      <span className="flex min-w-0 flex-1 items-center gap-1 text-[11px] font-medium text-foreground">
+        <span className="min-w-0 truncate" title={player.name}>{player.name}</span>
         {isFlagged && <span className="size-1 shrink-0 rounded-full bg-destructive" />}
         {isDoubtful && <span className="size-1 shrink-0 rounded-full bg-warning" />}
       </span>

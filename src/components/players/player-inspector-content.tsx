@@ -1,5 +1,7 @@
 "use client";
 
+import { PositionBadge } from "@/components/players/position-badge";
+
 import { useState, type ReactNode } from "react";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { Info, Lock, X } from "lucide-react";
@@ -127,7 +129,7 @@ export function PlayerInspectorContent({
                 size="icon-sm"
                 onClick={onClose}
                 aria-label="Close player record"
-                className="-m-1"
+                className="-m-1 size-10"
               >
                 <X className="size-4" strokeWidth={2} />
               </Button>
@@ -141,10 +143,10 @@ export function PlayerInspectorContent({
           <PlayerAvatar name={player.name} nationality={player.nationality} size="lg" />
           <div className="min-w-0">
             <p className="label-system text-xs text-foreground-tertiary">
-              {player.club.shortName} / {player.position}
+              {player.club.shortName} / <PositionBadge position={player.position} />
               {player.number !== undefined ? ` / #${String(player.number).padStart(2, "0")}` : ""}
             </p>
-            <h2 className="mt-1.5 text-xl font-semibold tracking-tight text-foreground">
+            <h2 className="mt-1.5 text-xl [overflow-wrap:anywhere] font-semibold tracking-tight text-foreground">
               {player.name}
             </h2>
           </div>

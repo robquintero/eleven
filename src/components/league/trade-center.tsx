@@ -1,5 +1,7 @@
 "use client";
 
+import { PositionBadge } from "@/components/players/position-badge";
+
 import { useEffect, useState } from "react";
 import { Check } from "lucide-react";
 import {
@@ -417,9 +419,7 @@ function TradePlayerRow({
         selected ? "border-accent bg-accent/10" : "border-border hover:bg-muted"
       }`}
     >
-      <span className="label-system w-8 shrink-0 rounded-md bg-muted py-0.5 text-center text-[10px] font-semibold text-foreground-secondary">
-        {player.position}
-      </span>
+      <PositionBadge position={player.position} />
       <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{player.name}</span>
       <Check
         className={`size-3.5 shrink-0 text-accent transition-opacity ${selected ? "opacity-100" : "opacity-0"}`}

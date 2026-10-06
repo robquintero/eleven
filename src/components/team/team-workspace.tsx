@@ -324,8 +324,8 @@ export function TeamWorkspace({
   return (
     <div>
       {fantasyTeamId && (
-        <div className="mt-4 flex items-center justify-between">
-          <p role="status" aria-live="polite" className="text-xs text-foreground-tertiary">
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <p role="status" aria-live="polite" className="text-xs leading-relaxed text-foreground-secondary">
             {pendingAssignments.size > 0
               ? `Building lineup — ${totalAssigned} / ${FORMATION_RULES.startersTotal} selected. Click Done to save.`
               : substitutionBusy ? "Saving lineup…"
@@ -345,8 +345,8 @@ export function TeamWorkspace({
       )}
       {error && <ActionFeedback kind={error.kind} message={error.message} />}
 
-      <div aria-busy={substitutionBusy} className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_0.5fr] lg:items-start">
-        <section>
+      <div aria-busy={substitutionBusy} className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.5fr)] lg:items-start">
+        <section className="min-w-0">
           <ModuleHeader title="STARTING_XI" meta={squad.formation} />
           {/* Pass 14.6: the pitch concept is removed entirely -- a dense,
               row-based squad workspace, consistent with every other list
@@ -408,10 +408,10 @@ export function TeamWorkspace({
             unchanged for every other screen that reuses it (e.g. Draft).
             Bench rows (real content, not padding) still take the space
             they need. */}
-        <div className="flex flex-col divide-y divide-border border border-border">
+        <div className="min-w-0 flex flex-col divide-y divide-border border border-border">
           <RailModule header="BENCH" meta={`/ ${pad2(visibleBench.length)}`} className="lg:py-2.5">
             {visibleBench.length === 0 ? (
-              <p className="text-xs text-foreground-tertiary">NO BENCH PLAYERS</p>
+              <p className="text-xs leading-relaxed text-foreground-secondary">NO BENCH PLAYERS</p>
             ) : (
               <div className="divide-y divide-border">
                 {visibleBench.map((player, index) => {
@@ -436,7 +436,7 @@ export function TeamWorkspace({
 
           <RailModule header="SQUAD_STATUS" className="lg:py-2.5">
             {allPlayers.length === 0 ? (
-              <p className="text-xs text-foreground-tertiary">NO SQUAD</p>
+              <p className="text-xs leading-relaxed text-foreground-secondary">NO SQUAD</p>
             ) : (
               <SquadAvailability counts={availabilityCounts} />
             )}
@@ -459,7 +459,7 @@ export function TeamWorkspace({
             meta={matchdayNumber !== null ? `MATCHDAY ${pad2(matchdayNumber)}` : "—"}
             className="lg:py-2.5"
           >
-            <p className="text-xs text-foreground-tertiary">NO FIXTURE DATA</p>
+            <p className="text-xs leading-relaxed text-foreground-secondary">NO FIXTURE DATA</p>
           </RailModule>
         </div>
       </div>

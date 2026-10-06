@@ -1,5 +1,6 @@
 "use client";
 
+import { TeamName } from "@/components/ui/team-name";
 import { useState } from "react";
 import { BenchRow } from "@/components/team/bench-row";
 import { MatchupCompactRow } from "@/components/matchup/matchup-compact-row";
@@ -29,12 +30,12 @@ function TeamLineupColumn({
   onSelect: (player: Player) => void;
 }) {
   return (
-    <div className="border border-border">
+    <div className="min-w-0 border border-border">
       <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
         <div className="min-w-0">
           <p className="label-system text-[11px] text-foreground-secondary">{label}</p>
-          <p className="truncate text-sm font-semibold text-foreground">
-            {teamName}
+          <p className="text-sm font-semibold text-foreground">
+            <TeamName name={teamName} />
             {isUserTeam && <span className="label-system ml-2 text-[10px] text-accent">YOUR TEAM</span>}
           </p>
         </div>
@@ -92,11 +93,11 @@ function MatchupCompactColumn({
   onSelect: (player: Player) => void;
 }) {
   return (
-    <div className="border border-border">
+    <div className="min-w-0 border border-border">
       <div className="border-b border-border px-1.5 py-1.5">
-        <p className="label-system truncate text-[9px] text-foreground-secondary">{label}</p>
-        <p className="truncate text-[11px] font-semibold text-foreground">
-          {teamName}
+        <p className="label-system truncate text-[10px] text-foreground-secondary">{label}</p>
+        <p className="min-h-8 text-xs font-semibold leading-snug text-foreground">
+          <TeamName name={teamName} />
           {isUserTeam && <span className="ml-1 text-accent">●</span>}
         </p>
       </div>
@@ -112,7 +113,7 @@ function MatchupCompactColumn({
       )}
 
       <div className="border-t border-border bg-surface px-1.5 py-1">
-        <span className="label-system text-[8px] text-foreground-tertiary">BENCH / {pad2(squad.bench.length)}</span>
+        <span className="label-system text-[10px] text-foreground-tertiary">BENCH / {pad2(squad.bench.length)}</span>
       </div>
       {squad.bench.length > 0 && (
         <div className="divide-y divide-border">

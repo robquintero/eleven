@@ -156,7 +156,7 @@ export function CommandPalette() {
         type="button"
         onClick={() => handleOpenChange(true)}
         aria-label="Search"
-        className="label-system flex items-center gap-2 rounded-control border border-border bg-surface px-2.5 py-1.5 text-xs text-foreground-secondary transition-colors hover:bg-surface-elevated"
+        className="label-system flex size-10 items-center justify-center gap-2 rounded-control outline-none focus-visible:ring-2 focus-visible:ring-accent sm:h-auto sm:w-auto border border-border bg-surface px-2.5 py-1.5 text-xs text-foreground-secondary transition-colors hover:bg-surface-elevated"
       >
         <Search className="size-3.5" strokeWidth={2} aria-hidden="true" />
         <span className="hidden sm:inline" aria-hidden="true">Search</span>

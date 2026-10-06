@@ -1,5 +1,8 @@
 "use client";
 
+import { TeamName } from "@/components/ui/team-name";
+import { PositionBadge } from "@/components/players/position-badge";
+
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Ban } from "lucide-react";
@@ -174,8 +177,8 @@ export function DraftWorkspace({
   );
 
   return (
-    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.6fr_0.9fr]">
-      <section>
+    <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)]">
+      <section className="min-w-0">
         {/* Pass 11.5: compact mobile-only decision strip -- on mobile the
             full DRAFT_STATUS/SQUAD rail below sits AFTER the entire
             player pool, which forced managers to scroll past every
@@ -185,14 +188,14 @@ export function DraftWorkspace({
             lines (never a half-screen sticky header) -- the two
             RailModules it replaces are hidden below `lg:` (see below) so
             nothing is shown twice. */}
-        <div className="mb-3 border border-border px-3 py-2.5 lg:hidden">
+        <div className={`mb-3 border border-border px-3 py-2.5 ${draft.status === "completed" ? "hidden" : "lg:hidden"}`}>
           {draft.status === "completed" ? (
             <p className="text-xs text-foreground-secondary">Draft complete — {draft.picks.length} picks made.</p>
           ) : (
             <>
-              <div className="flex items-center justify-between">
-                <span className="label-system text-[10px] text-foreground-tertiary">ON THE CLOCK</span>
-                <span className="truncate text-xs font-semibold text-foreground">{draft.currentTeamName ?? "—"}</span>
+              <div className="flex items-center justify-between gap-3">
+                <span className="label-system shrink-0 text-[10px] text-foreground-tertiary">ON THE CLOCK</span>
+                <TeamName name={draft.currentTeamName ?? "—"} className="text-right text-sm font-semibold text-foreground" />
               </div>
               <div className="mt-1 flex items-center justify-between">
                 <span className="label-system text-[10px] text-foreground-tertiary">PICK</span>
@@ -247,13 +250,14 @@ export function DraftWorkspace({
               title="AVAILABLE_PLAYERS"
               meta={`${availablePlayers.total} PLAYERS`}
             />
-            <div className="mt-2 flex items-center gap-2 border border-border px-2.5 py-1.5">
+            <div className="mt-2 flex min-h-11 items-center gap-2 border border-border px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-accent/60 sm:min-h-9">
               <input
                 ref={searchRef}
                 type="text"
+                aria-label="Search available players"
                 placeholder="Search player… ( / )"
                 onChange={(e) => onSearch(e.target.value)}
-                className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
+                className="w-full bg-transparent text-base text-foreground outline-none placeholder:text-foreground-tertiary sm:text-sm"
               />
             </div>
 
@@ -266,7 +270,7 @@ export function DraftWorkspace({
                     key={option}
                     type="button"
                     onClick={() => onPositionFilterChange(value)}
-                    className={`label-system rounded-control border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    className={`label-system min-h-10 rounded-control border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
                       isActive
                         ? "border-accent bg-accent text-accent-foreground"
                         : "border-border text-foreground-secondary hover:bg-muted"
@@ -299,9 +303,7 @@ export function DraftWorkspace({
                       key={player.id}
                       className={`flex items-center gap-3 px-3 py-2 ${isDrafted ? "opacity-50" : ""}`}
                     >
-                      <span className="label-system w-9 shrink-0 rounded-md bg-muted py-1 text-center text-[11px] font-semibold text-foreground-secondary">
-                        {player.position}
-                      </span>
+                      <PositionBadge position={player.position} />
                       <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
                       <button
                         type="button"
@@ -334,7 +336,7 @@ export function DraftWorkspace({
                           type="button"
                           disabled={!draft.isMyTurn || pending !== null || !legalPositions.has(player.position)}
                           onClick={() => handleDraft(player.id)}
-                          className="label-system flex shrink-0 items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                          className="label-system flex min-h-10 shrink-0 items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {pending === player.id && (
                             <span
@@ -355,7 +357,7 @@ export function DraftWorkspace({
         )}
       </section>
 
-      <div className="flex flex-col divide-y divide-border border border-border">
+      <div className="min-w-0 flex flex-col self-start divide-y divide-border border border-border">
         {/* Pass 11.5: redundant with the compact mobile strip above the
             player pool now -- desktop-only here, where the rail sits
             beside (not below) the pool and the original scroll problem
@@ -369,9 +371,9 @@ export function DraftWorkspace({
             <p className="text-sm text-foreground-secondary">Draft complete — {draft.picks.length} picks made.</p>
           ) : (
             <div className="space-y-1.5">
-              <div className="flex items-baseline justify-between">
-                <span className="label-system text-[11px] text-foreground-tertiary">ON THE CLOCK</span>
-                <span className="text-sm font-semibold text-foreground">{draft.currentTeamName ?? "—"}</span>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="label-system shrink-0 text-[11px] text-foreground-tertiary">ON THE CLOCK</span>
+                <TeamName name={draft.currentTeamName ?? "—"} className="text-right text-sm font-semibold text-foreground" />
               </div>
               <div className="flex items-baseline justify-between">
                 <span className="label-system text-[11px] text-foreground-tertiary">PICK</span>
@@ -401,7 +403,7 @@ export function DraftWorkspace({
               const atMax = count >= max;
               return (
                 <div key={position} className="flex items-center justify-between">
-                  <span className="label-system text-[11px] text-foreground-tertiary">{position}</span>
+                  <PositionBadge position={position} />
                   <span
                     className={`label-system text-[11px] tabular-nums ${
                       belowMin
@@ -508,9 +510,7 @@ function DraftCompleteRecap({
           <div className="divide-y divide-border">
             {sortedMyPicks.map((pick) => (
               <div key={pick.pickNumber} className="flex items-center gap-3 px-4 py-2">
-                <span className="label-system w-9 shrink-0 rounded-md bg-muted py-1 text-center text-[11px] font-semibold text-foreground-secondary">
-                  {pick.position}
-                </span>
+                <PositionBadge position={pick.position} />
                 <p className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{pick.playerName}</p>
                 <span className="label-system shrink-0 text-[11px] text-foreground-tertiary">{pick.clubShortName}</span>
                 <span className="label-system shrink-0 text-[10px] text-foreground-tertiary">
@@ -540,7 +540,7 @@ function DraftCompleteRecap({
         <div className="divide-y divide-border">
           {picksByTeam.map((team) => (
             <div key={team.teamName} className="px-4 py-3">
-              <p className="text-sm font-semibold text-foreground">{team.teamName}</p>
+              <p className="text-sm font-semibold text-foreground"><TeamName name={team.teamName} /></p>
               <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
                 {team.picks.map((pick) => (
                   <span key={pick.pickNumber} className="label-system text-[11px] text-foreground-tertiary">

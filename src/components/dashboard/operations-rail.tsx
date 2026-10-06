@@ -36,10 +36,11 @@ export function OperationsRail({
       <RailModule header="ROUND_INTELLIGENCE">
         {hasActiveRound ? (
           <>
-            <OperationalRow
-              label="PLAYERS"
-              value={`${buckets.live} live / ${buckets.locked + buckets.final} locked / ${buckets.upcoming} remaining`}
-            />
+            <div className="grid grid-cols-3 gap-3">
+              <div><p className="label-system text-[10px] text-foreground-tertiary">LIVE</p><p className="label-system mt-1 text-base font-semibold text-live">{buckets.live}</p></div>
+              <div><p className="label-system text-[10px] text-foreground-tertiary">LOCKED</p><p className="label-system mt-1 text-base font-semibold text-foreground-secondary">{buckets.locked + buckets.final}</p></div>
+              <div><p className="label-system text-[10px] text-foreground-tertiary">REMAINING</p><p className="label-system mt-1 text-base font-semibold text-foreground">{buckets.upcoming}</p></div>
+            </div>
           </>
         ) : (
           <p className="text-xs text-foreground-tertiary">NO ACTIVE ROUND</p>

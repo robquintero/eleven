@@ -1,5 +1,7 @@
 "use client";
 
+import { PositionBadge } from "@/components/players/position-badge";
+
 import { ArrowDown } from "lucide-react";
 import { AvailabilityStatus } from "@/components/players/availability-status";
 import { MarketAction } from "@/components/players/market-action";
@@ -10,7 +12,7 @@ import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
 const rowGrid =
-  "grid grid-cols-[2rem_1fr_2.75rem_3rem_5rem_3.5rem_3.5rem_6.5rem] items-center gap-3 lg:grid-cols-[2rem_1fr_2.75rem_3rem_2.5rem_5rem_3.5rem_3.5rem_3.5rem_6.5rem]";
+  "grid grid-cols-[2rem_minmax(0,1fr)_2.75rem_3rem_5rem_3.5rem_3.5rem_6.5rem] items-center gap-3 @min-[60rem]:grid-cols-[2rem_minmax(0,1fr)_2.75rem_3rem_2.5rem_5rem_3.5rem_3.5rem_3.5rem_6.5rem]";
 
 function HeaderCell({
   label,
@@ -73,7 +75,7 @@ export function PlayerTable({
   pendingPlayerId?: string | null;
 }) {
   return (
-    <div className="w-full border border-border">
+    <div className="@container w-full border border-border">
       <div
         className={cn(
           rowGrid,
@@ -88,17 +90,17 @@ export function PlayerTable({
           label="LGE"
           activeSort={sort}
           onSort={onSort}
-          className="hidden lg:flex"
+          className="hidden @min-[60rem]:flex"
         />
         <HeaderCell label="NEXT" activeSort={sort} onSort={onSort} />
-        <HeaderCell label="MIN" activeSort={sort} onSort={onSort} />
+        <HeaderCell label="MIN" activeSort={sort} onSort={onSort} className="justify-self-end" />
         <HeaderCell
           label="STARTS"
           activeSort={sort}
           onSort={onSort}
-          className="hidden lg:flex"
+          className="hidden justify-self-end @min-[60rem]:flex"
         />
-        <HeaderCell label="PTS" activeSort={sort} onSort={onSort} />
+        <HeaderCell label="PTS" activeSort={sort} onSort={onSort} className="justify-self-end" />
         <HeaderCell label="STATUS" activeSort={sort} onSort={onSort} className="justify-self-end" />
       </div>
 
@@ -153,15 +155,13 @@ export function PlayerTable({
                 )}
               </span>
 
-              <span className="label-system text-[11px] text-foreground-tertiary">
-                {player.position}
-              </span>
+              <PositionBadge position={player.position} />
 
               <span className="label-system truncate text-[11px] text-foreground-secondary">
                 {player.club.shortName}
               </span>
 
-              <span className="label-system hidden text-[11px] text-foreground-tertiary lg:block">
+              <span className="label-system hidden text-[11px] text-foreground-tertiary @min-[60rem]:block">
                 {leagueCode[player.club.league]}
               </span>
 
@@ -169,15 +169,15 @@ export function PlayerTable({
                 {playerFixtureCode(player)}
               </span>
 
-              <span className="label-system text-sm font-semibold text-foreground">
+              <span className="label-system justify-self-end text-xs tabular-nums text-foreground-secondary">
                 {player.seasonStats ? player.seasonStats.minutes : "—"}
               </span>
 
-              <span className="label-system hidden text-[11px] text-foreground-tertiary lg:block">
+              <span className="label-system hidden justify-self-end text-xs tabular-nums text-foreground-tertiary @min-[60rem]:block">
                 {player.seasonStats ? player.seasonStats.starts : "—"}
               </span>
 
-              <span className="label-system text-sm font-semibold text-foreground">
+              <span className="label-system justify-self-end text-sm font-semibold tabular-nums text-foreground">
                 {player.totalPoints ?? "—"}
               </span>
 

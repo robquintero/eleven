@@ -85,25 +85,25 @@ export async function AppShell({ children }: { children: ReactNode }) {
           </div>
         </aside>
 
-        <div className="flex min-h-dvh flex-col">
+        <div className="flex min-h-dvh min-w-0 flex-col">
           <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur-xl">
-            <div className="flex items-center justify-between px-4 py-3.5 sm:px-6 lg:px-8">
-              <div className="flex items-center gap-3">
-                <div className="lg:hidden">
+            <div className="flex items-center justify-between gap-2 px-3 py-2.5 sm:py-3.5 sm:px-6 lg:px-8">
+              <div className="flex min-w-0 items-center gap-1 sm:gap-3">
+                <div className="shrink-0 lg:hidden">
                   <Wordmark authenticated />
                 </div>
                 <LeagueSwitcher leagues={leagues} activeLeagueId={activeLeagueId} />
                 {leagues.length > 0 && <Suspense fallback={null}><RoundRules /></Suspense>}
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex shrink-0 items-center gap-1 sm:gap-3">
                 <CommandPalette />
                 <ProfileControl profile={profile} />
               </div>
             </div>
-            <Suspense fallback={<div role="status" className="label-system border-t border-border px-4 py-2 text-[10px] text-foreground-tertiary">LOADING ROUND STATUS</div>}><RoundStatus statusPromise={statusPromise} /></Suspense>
+            <Suspense fallback={<div role="status" className="label-system hidden border-t border-border px-4 lg:block py-2 text-[10px] text-foreground-tertiary">LOADING ROUND STATUS</div>}><RoundStatus statusPromise={statusPromise} /></Suspense>
           </header>
 
-          <main id="main-content" className="flex-1 px-4 pt-6 pb-28 sm:px-6 lg:px-8 lg:pb-12">
+          <main id="main-content" className="min-w-0 flex-1 px-3 pt-6 pb-28 sm:px-6 lg:px-8 lg:pb-12">
             {children}
           </main>
         </div>

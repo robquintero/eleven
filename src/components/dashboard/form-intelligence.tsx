@@ -1,5 +1,7 @@
 "use client";
 
+import { PositionBadge } from "@/components/players/position-badge";
+
 import { useState } from "react";
 import { signPlayerAction } from "@/app/(app)/players/actions";
 import { FormSparkline } from "@/components/football/form-sparkline";
@@ -8,7 +10,7 @@ import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { ActionFeedback, type ActionFeedbackKind } from "@/components/ui/action-feedback";
 import type { HotFreeAgent } from "@/data-access/intelligence";
-import { formatRoundPoints, POSITION_BADGE_CLASS } from "@/lib/team-fixture";
+import { formatRoundPoints } from "@/lib/team-fixture";
 import type { Player } from "@/lib/types/fantasy";
 import { cn, INTERACTIVE_ROW_CLASS } from "@/lib/utils";
 
@@ -73,14 +75,7 @@ export function FormIntelligence({
             >
               <PlayerAvatar name={agent.player.name} nationality={agent.player.nationality} size="sm" />
 
-              <span
-                className={cn(
-                  "label-system flex w-7 shrink-0 items-center justify-center rounded-md py-1 text-[10px] font-semibold",
-                  POSITION_BADGE_CLASS[agent.player.position]
-                )}
-              >
-                {agent.player.position}
-              </span>
+              <PositionBadge position={agent.player.position} />
 
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium text-foreground">{agent.player.name}</p>

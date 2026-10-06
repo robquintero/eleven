@@ -1,5 +1,7 @@
 "use client";
 
+import { PositionBadge } from "@/components/players/position-badge";
+
 import { AvailabilityStatus } from "@/components/players/availability-status";
 import { MarketAction } from "@/components/players/market-action";
 import { leagueLabels } from "@/lib/leagues";
@@ -43,17 +45,15 @@ export function PlayerListMobile({
               }
             }}
             className={cn(
-              "flex w-full cursor-pointer items-center gap-3 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
+              "flex w-full cursor-pointer items-center gap-2.5 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
               isSelected ? "bg-accent/10" : "hover:bg-surface"
             )}
           >
-            <span className="label-system flex w-9 shrink-0 items-center justify-center rounded-md bg-muted py-1 text-[11px] font-semibold text-foreground-secondary">
-              {player.position}
-            </span>
+            <PositionBadge position={player.position} />
 
             <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1.5 truncate text-sm font-medium text-foreground">
-                {player.name}
+              <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                <span className="min-w-0 truncate" title={player.name}>{player.name}</span>
                 {isUnavailable && (
                   <AvailabilityStatus
                     availability={player.availability}

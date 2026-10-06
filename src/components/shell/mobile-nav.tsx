@@ -22,12 +22,12 @@ export function MobileNav() {
           const Icon = item.icon;
 
           return (
-            <li key={item.href} className="flex-1">
+            <li key={item.href} className="min-w-0 flex-1">
               <TransitionLink
                 href={item.href}
                 label={item.label}
                 aria-current={isActive ? "page" : undefined}
-                className="flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors active:bg-surface"
+                className="flex min-h-14 flex-col outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent items-center justify-center gap-1 py-2.5 text-[11px] font-medium transition-colors active:bg-surface"
               >
                 <Icon
                   className={cn(

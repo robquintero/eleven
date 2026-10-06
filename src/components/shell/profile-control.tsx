@@ -30,7 +30,7 @@ export function ProfileControl({ profile }: { profile: Profile | null }) {
   if (!profile) {
     return (
       <span
-        className="flex items-center rounded-full"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent"
         aria-label="Profile unavailable"
       >
         <Avatar>
@@ -49,7 +49,7 @@ export function ProfileControl({ profile }: { profile: Profile | null }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex items-center rounded-full transition-opacity hover:opacity-80"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent transition-opacity hover:opacity-80"
         aria-label={`${profile.displayName} profile`}
       >
         <Avatar>

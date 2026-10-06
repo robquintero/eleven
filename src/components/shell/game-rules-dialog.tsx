@@ -38,13 +38,13 @@ export function GameRulesDialog({ version = SCORING_RULE_VERSION_V4 }: { version
         onClick={() => setOpen(true)}
         aria-label="Eleven game rules"
         title="Eleven game rules"
-        className="flex size-6 shrink-0 items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-muted hover:text-foreground-secondary"
+        className="flex size-9 shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-accent items-center justify-center rounded-full text-foreground-tertiary transition-colors hover:bg-muted hover:text-foreground-secondary"
       >
         <Info className="size-3.5" strokeWidth={2} />
       </button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto sm:max-w-xl">
+        <DialogContent className="max-h-[85dvh] w-[calc(100%-2rem)] max-w-xl overflow-y-auto sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>ELEVEN GAME RULES</DialogTitle>
           </DialogHeader>

@@ -272,7 +272,7 @@ export function PlayersWorkspace({
             : "mt-4"
         }
       >
-        <div className={isInlineInspector && selectedPlayer ? "pr-4" : undefined}>
+        <div className={isInlineInspector && selectedPlayer ? "min-w-0 pr-4" : "min-w-0"}>
           {players.length > 0 ? (
             isDesktopTable ? (
               <PlayerTable
@@ -318,7 +318,7 @@ export function PlayersWorkspace({
                 type="button"
                 disabled={page <= 1}
                 onClick={() => goToPage(page - 1)}
-                className="label-system text-[11px] text-foreground-secondary hover:text-foreground disabled:opacity-40"
+                className="label-system min-h-11 px-2 text-[11px] text-foreground-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent hover:text-foreground disabled:opacity-40"
               >
                 ← PREV
               </button>
@@ -329,7 +329,7 @@ export function PlayersWorkspace({
                 type="button"
                 disabled={page >= totalPages}
                 onClick={() => goToPage(page + 1)}
-                className="label-system text-[11px] text-foreground-secondary hover:text-foreground disabled:opacity-40"
+                className="label-system min-h-11 px-2 text-[11px] text-foreground-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent hover:text-foreground disabled:opacity-40"
               >
                 NEXT →
               </button>
@@ -391,7 +391,7 @@ function Header({ total }: { total: number }) {
   return (
     <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-b border-border pb-3">
       <div>
-        <h1 className="label-system text-sm font-semibold text-foreground">PLAYER_DATABASE</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Players</h1>
         <p className="label-system mt-0.5 text-[11px] text-foreground-tertiary">Big Five</p>
       </div>
       <div className="text-right">

@@ -38,7 +38,7 @@ export function SelectTrigger<T extends string>({
         onChange={(e) => onChange(e.target.value as T)}
         aria-label={ariaLabel}
         className={cn(
-          "label-system appearance-none rounded-control bg-transparent py-0.5 pr-4 pl-0.5 text-[11px] text-foreground-secondary outline-none focus-visible:ring-1 focus-visible:ring-accent/50",
+          "label-system appearance-none rounded-control bg-transparent min-h-9 sm:min-h-6 py-0.5 pr-4 pl-0.5 text-[11px] text-foreground-secondary outline-none focus-visible:ring-1 focus-visible:ring-accent/50",
           className
         )}
       >

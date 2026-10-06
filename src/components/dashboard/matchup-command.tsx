@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { TeamName } from "@/components/ui/team-name";
 import type { CurrentMatchup, MatchupFixtureIntelligence } from "@/data-access/matchups";
 import { countStartersInFixture, formatKickoff, pad2, resolveMatchupSides } from "@/lib/team-fixture";
 import type { LineupSlot } from "@/lib/types/fantasy";
@@ -91,8 +92,8 @@ export function MatchupCommand({
   const isStale = isLive && updatedMinutesAgo !== null && updatedMinutesAgo > 15;
 
   return (
-    <div className="border border-border bg-surface-elevated">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
+    <div className="@container border border-border bg-surface-elevated">
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border px-4 py-2.5">
         <span className="label-system text-[11px] text-foreground-secondary">
           MATCHUP_COMMAND
         </span>
@@ -116,42 +117,20 @@ export function MatchupCommand({
         </span>
       </div>
 
-      <div className="p-4 sm:p-6">
-        {/* Pass 13 (§5): one row at every breakpoint, not three blocks
-            stacked vertically on mobile (name / gap / score / gap / name)
-            -- that stacking was the real source of "the score area is too
-            tall relative to the player battle below it." The score scales
-            up with the viewport instead (text-3xl -> text-6xl) so mobile
-            still reads as a confident scoreboard, just in one compact row. */}
-        <div className="flex items-center justify-between gap-2 sm:gap-4">
-          <div className="min-w-0 flex-1 text-left">
-            <p className="truncate text-[13px] font-semibold text-foreground sm:text-[15px] md:text-base">
-              {leftTeamName}
-            </p>
-            <p className="label-system text-[10px] text-accent">YOUR TEAM</p>
-          </div>
-
-          <div className="flex shrink-0 items-center gap-2 sm:gap-3 md:gap-5">
-            {isScheduled ? (
-              <p className="label-system text-lg text-foreground-tertiary sm:text-xl md:text-2xl">VS</p>
-            ) : (
-              <>
-                <p className="text-3xl font-semibold tracking-tight tabular-nums text-foreground sm:text-5xl md:text-6xl">
-                  {leftScore}
-                </p>
-                <span className="text-base font-medium text-foreground-tertiary sm:text-lg md:text-xl">–</span>
-                <p className="text-3xl font-semibold tracking-tight tabular-nums text-foreground sm:text-5xl md:text-6xl">
-                  {rightScore}
-                </p>
-              </>
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1 text-right">
-            <p className="truncate text-[13px] font-semibold text-foreground sm:text-[15px] md:text-base">
-              {rightTeamName}
-            </p>
-          </div>
+      <div className="p-4 @min-[32rem]:p-6">
+        {/* Equal identity columns no longer compete with the central score.
+            Container sizing also works in Home's narrower desktop column. */}
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-x-3 gap-y-2">
+          <TeamName name={leftTeamName} className="block self-start text-sm font-semibold leading-snug text-foreground @min-[32rem]:text-base" />
+          <TeamName name={rightTeamName} className="col-start-3 block self-start text-right text-sm font-semibold leading-snug text-foreground @min-[32rem]:text-base" />
+          <span className="label-system col-span-3 text-[10px] text-accent">YOUR TEAM</span>
+          <p className="min-w-0 text-[clamp(1.5rem,9cqi,3.75rem)] leading-none font-semibold tracking-tight tabular-nums text-foreground">
+            {isScheduled ? "—" : leftScore}
+          </p>
+          <span className="label-system self-center text-sm text-foreground-tertiary">{isScheduled ? "VS" : "–"}</span>
+          <p className="min-w-0 text-right text-[clamp(1.5rem,9cqi,3.75rem)] leading-none font-semibold tracking-tight tabular-nums text-foreground">
+            {isScheduled ? "—" : rightScore}
+          </p>
         </div>
 
         {isScheduled ? (

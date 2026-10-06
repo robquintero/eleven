@@ -215,22 +215,6 @@ export const matchStateLabel: Record<PlayerMatchState, string> = {
  */
 
 /**
- * Pass 14.6: restrained, position-specific accent for the position badge
- * every row (Home, Matchup, Team) shows -- "extremely easy to scan," but
- * never the only signal: the GK/DEF/MID/FWD text itself already identifies
- * the position with zero reliance on color (brief: "position must be
- * readable even without color"). Low-opacity tints only, consistent with
- * Eleven's restrained graphite/warm-white system -- never a saturated
- * rainbow badge.
- */
-export const POSITION_BADGE_CLASS: Record<PlayerPosition, string> = {
-  GK: "bg-amber-500/12 text-amber-700 dark:text-amber-400",
-  DEF: "bg-red-500/10 text-red-700 dark:text-red-400",
-  MID: "bg-blue-500/10 text-blue-700 dark:text-blue-400",
-  FWD: "bg-violet-500/10 text-violet-700 dark:text-violet-400",
-};
-
-/**
  * Pass 14.6.2/14.6.3: the canonical starting-XI display order (attack-first,
  * matching what a manager scans first) -- presentation only, never the
  * source of truth for formation/slot/roster rules, which don't have or

@@ -16,14 +16,14 @@ export type WorkspaceDestination = "Home" | "Team" | "Matchup" | "Players" | "Le
 export function WorkspaceLoading({ destination }: { destination: WorkspaceDestination }) {
   return <div className="flex min-w-0 flex-col gap-6" aria-busy="true">
     <div>
-      <h1 className={destination === "Players" ? "label-system text-sm font-semibold" : "text-3xl font-semibold tracking-tight sm:text-4xl"}>
-        {destination === "Players" ? "PLAYER_DATABASE" : destination === "League" ? "League hub" : destination}
+      <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+        {destination === "League" ? "League hub" : destination}
       </h1>
       <p role="status" className="label-system mt-1.5 text-[11px] text-foreground-tertiary">LOADING {destination.toUpperCase()}</p>
     </div>
     {destination === "Team" ? <>
       <div className="label-system flex flex-wrap gap-4 border border-border px-3 py-2 text-[10px] text-foreground-tertiary">FORMATION <span>STARTERS</span><span>BENCH</span></div>
-      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[1.5fr_0.5fr] lg:items-start">
+      <div className="grid min-w-0 grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.5fr)] lg:items-start">
         <div className="flex flex-col gap-4">
           <p className="label-system text-[11px] text-foreground-secondary">STARTING_XI</p>
           <ModuleLoading title="FORWARDS" rows={2} /><ModuleLoading title="MIDFIELD" rows={4} />

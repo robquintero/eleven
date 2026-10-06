@@ -1,8 +1,9 @@
+import { PositionBadge } from "@/components/players/position-badge";
 import { Lock } from "lucide-react";
 import { leagueLabels } from "@/lib/leagues";
 import { MarketAction } from "@/components/players/market-action";
 import { PlayerAvatar } from "@/components/players/player-avatar";
-import { formatRoundPoints, isPlayerLocked, playerStateWord, POSITION_BADGE_CLASS } from "@/lib/team-fixture";
+import { formatRoundPoints, isPlayerLocked, playerStateWord } from "@/lib/team-fixture";
 import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
@@ -68,14 +69,7 @@ export function PlayerRow({
       >
         <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
 
-        <span
-          className={cn(
-            "label-system flex w-9 shrink-0 items-center justify-center rounded-md py-1 text-[11px] font-semibold",
-            POSITION_BADGE_CLASS[player.position]
-          )}
-        >
-          {player.position}
-        </span>
+        <PositionBadge position={player.position} />
 
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">

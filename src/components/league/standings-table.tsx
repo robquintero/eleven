@@ -1,3 +1,4 @@
+import { TeamName } from "@/components/ui/team-name";
 import { formatRoundPoints } from "@/lib/team-fixture";
 import type { StandingsRow } from "@/data-access/matchups";
 import { cn } from "@/lib/utils";
@@ -34,13 +35,13 @@ export function StandingsTable({
     );
   }
 
-  const gridCols = "grid-cols-[1.5rem_9rem_2rem_2rem_2rem_2rem_3rem_3rem_3.5rem_2.5rem]";
+  const gridCols = "grid-cols-[1.5rem_minmax(9rem,1fr)_2rem_2rem_2rem_2rem_4.25rem_4.25rem_4.75rem_2.5rem]";
 
   return (
-    <div className="overflow-x-auto">
-      <div className={cn("grid min-w-xl items-center gap-2 border-b border-border px-4 py-2 text-right", gridCols)}>
+    <div className="overflow-x-auto outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent" tabIndex={0} role="region" aria-label="League standings; scroll horizontally for all statistics">
+      <div className={cn("grid min-w-[44rem] items-center gap-2 border-b border-border px-4 py-2 text-right", gridCols)}>
         <span />
-        <span className="label-system text-left text-[10px] text-foreground-tertiary">TEAM</span>
+        <span className="sticky left-0 z-10 bg-surface label-system text-left text-[10px] text-foreground-tertiary">TEAM</span>
         <span className="label-system text-[10px] text-foreground-tertiary">P</span>
         <span className="label-system text-[10px] text-foreground-tertiary">W</span>
         <span className="label-system text-[10px] text-foreground-tertiary">D</span>
@@ -50,7 +51,7 @@ export function StandingsTable({
         <span className="label-system text-[10px] text-foreground-tertiary">DIFF</span>
         <span className="label-system text-[10px] text-foreground-tertiary">PTS</span>
       </div>
-      <div className="min-w-xl divide-y divide-border">
+      <div className="min-w-[44rem] divide-y divide-border">
         {standings.map((row, index) => {
           const isMe = row.fantasyTeamId === myTeamId;
           const diff = Math.round((row.pointsFor - row.pointsAgainst) * 100) / 100;
@@ -64,8 +65,8 @@ export function StandingsTable({
               )}
             >
               <span className="label-system text-left text-xs text-foreground-tertiary">{index + 1}</span>
-              <span className="flex min-w-0 items-center gap-1.5 text-left">
-                <span className="truncate text-sm font-medium text-foreground">{row.teamName}</span>
+              <span className="sticky left-0 z-10 flex min-w-0 items-center gap-1.5 bg-surface text-left">
+                <TeamName name={row.teamName} className="text-sm font-medium text-foreground" />
                 {isMe && <span className="label-system shrink-0 text-[9px] text-accent">YOU</span>}
               </span>
               <span className="label-system text-xs tabular-nums text-foreground-secondary">{row.played}</span>
@@ -83,7 +84,7 @@ export function StandingsTable({
                 {diff > 0 ? "+" : ""}
                 {formatRoundPoints(diff)}
               </span>
-              <span className="label-system text-xs font-semibold tabular-nums text-foreground">{row.leaguePoints}</span>
+              <span className="label-system text-sm font-semibold tabular-nums text-foreground">{row.leaguePoints}</span>
             </div>
           );
         })}
