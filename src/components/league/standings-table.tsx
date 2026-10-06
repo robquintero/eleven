@@ -1,3 +1,4 @@
+import { TransitionLink } from "@/components/shell/transition-link";
 import { TeamName } from "@/components/ui/team-name";
 import { formatRoundPoints } from "@/lib/team-fixture";
 import type { StandingsRow } from "@/data-access/matchups";
@@ -66,7 +67,7 @@ export function StandingsTable({
             >
               <span className="label-system text-left text-xs text-foreground-tertiary">{index + 1}</span>
               <span className="sticky left-0 z-10 flex min-w-0 items-center gap-1.5 bg-surface text-left">
-                <TeamName name={row.teamName} className="text-sm font-medium text-foreground" />
+                <TransitionLink href={isMe ? "/team" : `/team/${row.fantasyTeamId}`} label={row.teamName} className="inline-flex min-h-8 min-w-0 items-center text-sm font-medium text-foreground hover:underline max-sm:min-h-11"><TeamName name={row.teamName} /></TransitionLink>
                 {isMe && <span className="label-system shrink-0 text-[9px] text-accent">YOU</span>}
               </span>
               <span className="label-system text-xs tabular-nums text-foreground-secondary">{row.played}</span>

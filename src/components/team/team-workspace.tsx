@@ -1,6 +1,7 @@
 "use client";
 
 import { useOptimistic, useRef, useState, useTransition } from "react";
+import { PlayerInspector } from "@/components/players/player-inspector";
 import { X } from "lucide-react";
 import { BenchRow, EmptySlotRow } from "@/components/team/bench-row";
 import { NextLock } from "@/components/team/next-lock";
@@ -106,6 +107,7 @@ export function TeamWorkspace({
   hasActiveRound = false,
   leagueId,
   fantasyTeamId,
+  readOnly = false,
 }: {
   squad: Squad;
   matchdayNumber: number | null;
@@ -113,6 +115,7 @@ export function TeamWorkspace({
   hasActiveRound?: boolean;
   leagueId: string;
   fantasyTeamId: string | null;
+  readOnly?: boolean;
 }) {
   const [preferredOrder, setPreferredOrder] = useState(canonicalSquad);
   // Keep the latest placement hint across either Flight/result arrival
@@ -139,7 +142,10 @@ export function TeamWorkspace({
   const substitutionBusy = isSaving;
   const editsBlocked = () => substitutionBusy || mutationGuard.current.isPending();
 
-  const canEdit = Boolean(fantasyTeamId);
+  const canEdit = Boolean(fantasyTeamId) && !readOnly;
+  const [inspectedPlayer, setInspectedPlayer] = useState<Player | null>(null);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  function inspect(player: Player) { setInspectedPlayer(player); setInspectorOpen(true); }
 
   const allPlayers = [...squad.starters.map((s) => s.player), ...squad.bench];
 
@@ -172,7 +178,7 @@ export function TeamWorkspace({
    * fresh Flight commit. Rejection/throw drops it back to the exact prior
    * canonical lineup; success uses the returned server state. */
   async function trySwap(starterOut: string, benchIn: string) {
-    if (!fantasyTeamId || editsBlocked()) return;
+    if (!canEdit || !fantasyTeamId || editsBlocked()) return;
     const change = { starterOut, benchIn };
     const preview = optimisticLineupSwap(squad, change);
     if (preview === squad) {
@@ -299,7 +305,7 @@ export function TeamWorkspace({
    * necessarily identical layout.
    */
   async function handleSaveFills() {
-    if (!fantasyTeamId || editsBlocked() || pendingAssignments.size === 0 || !mutationGuard.current.begin()) return;
+    if (!canEdit || !fantasyTeamId || editsBlocked() || pendingAssignments.size === 0 || !mutationGuard.current.begin()) return;
     setError(null);
     const fills = slots
       .filter((slot) => pendingAssignments.has(slot.id))
@@ -323,7 +329,8 @@ export function TeamWorkspace({
 
   return (
     <div>
-      {fantasyTeamId && (
+      {readOnly && <p className="mt-4 text-xs text-foreground-secondary">Read-only lineup · Select a player to inspect.</p>}
+      {canEdit && (
         <div className="mt-4 flex items-center justify-between gap-3">
           <p role="status" aria-live="polite" className="text-xs leading-relaxed text-foreground-secondary">
             {pendingAssignments.size > 0
@@ -387,7 +394,7 @@ export function TeamWorkspace({
                           selected={selected?.kind === "starter" && selected.slotId === row.slotId}
                           swapTarget={rowState.swapTarget}
                           compatibleLocked={rowState.compatibleLocked}
-                          onSelect={() => handleSelectStarterOrPending(row as XiRow & { player: Player })}
+                          onSelect={() => readOnly ? inspect(row.player!) : handleSelectStarterOrPending(row as XiRow & { player: Player })}
                         />
                       );
                     })}
@@ -426,7 +433,7 @@ export function TeamWorkspace({
                       swapTarget={rowState.swapTarget}
                       compatibleLocked={rowState.compatibleLocked}
                       disabled={rowState.disabled}
-                      onSelect={() => handleSelectBench(player)}
+                      onSelect={() => readOnly ? inspect(player) : handleSelectBench(player)}
                     />
                   );
                 })}
@@ -463,6 +470,7 @@ export function TeamWorkspace({
           </RailModule>
         </div>
       </div>
+      {readOnly && <PlayerInspector player={inspectedPlayer} variant="overlay" open={inspectorOpen} onOpenChange={setInspectorOpen} />}
     </div>
   );
 }

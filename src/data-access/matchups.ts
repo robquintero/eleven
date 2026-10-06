@@ -59,6 +59,10 @@ export interface CurrentMatchup {
   homeFinalPoints: number | null;
   awayFinalPoints: number | null;
   isUserHome: boolean;
+  /** Explicit neutral orientation: home stays left when neither side is owned. */
+  isSpectator?: boolean;
+  homeScoreAvailable?: boolean;
+  awayScoreAvailable?: boolean;
   /** Pass 12D: when `matchup_scores` was last recomputed (the later of the two teams' rows) — truthful freshness for the "LIVE" badge, never implied by status alone. `null` only if no score row exists yet at all (a round that just opened). */
   scoresUpdatedAt: string | null;
 }
@@ -166,6 +170,8 @@ export const getCurrentMatchup = cache(async function getCurrentMatchup(
     homeFinalPoints: homeScore?.final_points ?? null,
     awayFinalPoints: awayScore?.final_points ?? null,
     isUserHome,
+    homeScoreAvailable: Boolean(homeScore),
+    awayScoreAvailable: Boolean(awayScore),
     scoresUpdatedAt,
   };
 });
@@ -283,6 +289,7 @@ interface MatchupSlotRow {
     id: string;
     player_id: string;
     status: string;
+    acquired_at: string;
     players: {
       id: string;
       name: string;
@@ -339,7 +346,7 @@ type SupabaseClientType = Awaited<ReturnType<typeof createClient>>;
  */
 const readMatchupSlots = cache(async function readMatchupSlots(supabase: SupabaseClientType, fantasyTeamId: string, roundId: string): Promise<MatchupSlotRow[]> {
   const { data, error } = await supabase.from("lineup_slots")
-    .select("roster_entry_id, starter, locked_at, roster_entries!inner(id, player_id, status, fantasy_team_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))))")
+    .select("roster_entry_id, starter, locked_at, roster_entries!inner(id, player_id, status, acquired_at, fantasy_team_id, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))))")
     .eq("fantasy_round_id", roundId).eq("roster_entries.fantasy_team_id", fantasyTeamId);
   if (error) console.error(`buildMatchupTeamSquad: lineup_slots fetch failed for team ${fantasyTeamId}, round ${roundId}:`, error);
   return (data ?? []) as MatchupSlotRow[];
@@ -360,7 +367,8 @@ function buildMatchupTeamSquad(
   // even while the viewer plainly IS in this league, for any player
   // opened from Home's Starting XI or the Matchup page itself).
   ownershipForTeam: "mine" | "owned" = "owned",
-  ownerTeamNameForTeam?: string
+  ownerTeamNameForTeam?: string,
+  slotPoints?: Map<string, { points: number; excluded: number }>
 ): Squad {
   const empty: Squad = { formation: "—", starters: [], bench: [] };
 
@@ -389,8 +397,8 @@ function buildMatchupTeamSquad(
       // fixtures (see getMatchupSquads), the same aggregation
       // refreshMatchupScores uses to populate matchup_scores.live_points.
       // Never the season total (that's totalPoints, Players-market-only).
-      fantasyPoints: Math.round((pointsByPlayerId.get(player.id) ?? 0) * 100) / 100,
-      preAcquisitionPoints: preAcquisitionPointsByPlayerId.has(player.id)
+      fantasyPoints: Math.round((slotPoints?.get(row.roster_entry_id)?.points ?? pointsByPlayerId.get(player.id) ?? 0) * 100) / 100,
+      preAcquisitionPoints: slotPoints ? slotPoints.get(row.roster_entry_id)?.excluded || undefined : preAcquisitionPointsByPlayerId.has(player.id)
         ? Math.round(preAcquisitionPointsByPlayerId.get(player.id)! * 100) / 100
         : undefined,
       availability: (player.availability_status as Player["availability"]) ?? "available",
@@ -495,6 +503,8 @@ export const getMatchupSquads = cache(async function getMatchupSquads(matchup: C
  */
 export interface RoundPlayerState {
   pointsByPlayerId: Map<string, number>;
+  /** Bounded round evidence, shared for historical acquisition cutoffs. */
+  performances?: { playerId: string; points: number; kickoffAt: string }[];
   teamIdsByPlayerId: Map<string, string[]>;
   /** Pass 14.6: the portion of each player's real round performance that was EXCLUDED by the acquisition cutoff (earned before `acquired_at`) -- shown to the manager for context, never silently dropped. Absent/0 means nothing was withheld. */
   preAcquisitionPointsByPlayerId: Map<string, number>;
@@ -529,6 +539,7 @@ export async function getRoundPlayerState(
   includeScores = true,
   version: ScoringRuleVersion = SCORING_RULE_VERSION
 ): Promise<RoundPlayerState> {
+  const performances: NonNullable<RoundPlayerState["performances"]> = [];
   const pointsByPlayerId = new Map<string, number>();
   const preAcquisitionPointsByPlayerId = new Map<string, number>();
   const fixtureByPlayerId: RoundPlayerState["fixtureByPlayerId"] = new Map();
@@ -556,6 +567,7 @@ export async function getRoundPlayerState(
       for (const row of scores ?? []) {
         const acquiredAt = acquiredAtByPlayerId.get(row.player_id);
         const kickoffAt = kickoffByFixtureId.get(row.fixture_id);
+        if (kickoffAt) performances.push({ playerId: row.player_id, points: row.points, kickoffAt });
         if (!acquiredAt || !kickoffAt) continue;
         // Pass 14.6: acquired at or before this fixture's kickoff -> counts;
         // acquired after -> the real score still exists in
@@ -621,7 +633,7 @@ export async function getRoundPlayerState(
     return teamIdsByPlayer;
   })();
   const [, teamIdsByPlayer] = await Promise.all([pointsPromise, fixturePromise]);
-  return { pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId, teamIdsByPlayerId: teamIdsByPlayer };
+  return { pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId, teamIdsByPlayerId: teamIdsByPlayer, performances };
 }
 
 export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: CurrentMatchup): Promise<MatchupSquads> {
@@ -636,27 +648,16 @@ export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: 
     readMatchupSlots(supabase, matchup.awayFantasyTeamId, matchup.roundId),
   ]);
 
-  const playerIds = Array.from(new Set((entries ?? []).map((e) => e.player_id)));
+  const playerIds = Array.from(new Set([...(entries ?? []).map((e) => e.player_id), ...[...homeSlots, ...awaySlots].map(s => s.roster_entries.player_id)]));
   // Safe keyed by player_id alone: a player can only be actively owned by
   // ONE of these two teams at a time (league_player_ownership's own
   // PRIMARY KEY), so there's exactly one acquired_at per id here.
   const acquiredAtByPlayerId = new Map((entries ?? []).map((e) => [e.player_id, e.acquired_at]));
 
   const window: RoundWindow = { startsAt: new Date(matchup.roundStartsAt), endsAt: new Date(matchup.roundEndsAt) };
-  // Locked historical starters may have left the active roster. Preserve
-  // their participation identity without changing the existing active-only
-  // score/display enrichment. Usually there are no additional IDs to read.
-  const activeIds = new Set(playerIds);
-  const now = new Date();
-  const historicalStarterIds = Array.from(new Set([...homeSlots, ...awaySlots]
-    .filter((s) => s.starter && isLocked(s.locked_at ? new Date(s.locked_at) : null, now))
-    .map((s) => s.roster_entries.player_id).filter((id) => !activeIds.has(id))));
-  const [state, historicalTeamIds] = await Promise.all([
-    getRoundPlayerState(supabase, playerIds, window, acquiredAtByPlayerId, true, matchup.scoringRuleVersion),
-    getTeamIdsByPlayer(supabase, historicalStarterIds),
-  ]);
-  const { pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId } = state;
-  const teamIdsByPlayerId = new Map([...state.teamIdsByPlayerId, ...historicalTeamIds]);
+  const state = await getRoundPlayerState(supabase, playerIds, window, acquiredAtByPlayerId, true, matchup.scoringRuleVersion);
+  const { pointsByPlayerId, preAcquisitionPointsByPlayerId, fixtureByPlayerId, teamIdsByPlayerId } = state;
+  const slotPoints = roundSlotPoints([...homeSlots, ...awaySlots], state.performances ?? []);
 
   const [home, away] = [
     buildMatchupTeamSquad(
@@ -664,16 +665,16 @@ export async function queryMatchupSquads(supabase: SupabaseClientType, matchup: 
       pointsByPlayerId,
       fixtureByPlayerId,
       preAcquisitionPointsByPlayerId,
-      matchup.isUserHome ? "mine" : "owned",
-      matchup.homeTeamName
+      !matchup.isSpectator && matchup.isUserHome ? "mine" : "owned",
+      matchup.homeTeamName, slotPoints
     ),
     buildMatchupTeamSquad(
       awaySlots,
       pointsByPlayerId,
       fixtureByPlayerId,
       preAcquisitionPointsByPlayerId,
-      matchup.isUserHome ? "owned" : "mine",
-      matchup.awayTeamName
+      !matchup.isSpectator && !matchup.isUserHome ? "mine" : "owned",
+      matchup.awayTeamName, slotPoints
     ),
   ];
 
@@ -803,6 +804,7 @@ export async function getStandings(leagueId: string): Promise<StandingsRow[]> {
 
 export interface LeagueMatchupSummary {
   id: string;
+  roundId?: string;
   roundNumber: number;
   roundStartsAt: string;
   roundEndsAt: string;
@@ -832,7 +834,12 @@ export interface LeagueRecords {
   mostPointsAgainst: { teamName: string; value: number } | null;
 }
 
+export interface LeagueRoundSummary { seasonId?: string; seasonNumber?: number; id: string; number: number; status: CurrentMatchup["roundStatus"]; startsAt: string; endsAt: string; }
 export interface LeagueCompetitionSummary {
+  rounds?: LeagueRoundSummary[];
+  currentRoundId?: string;
+  allRoundMatchups?: LeagueMatchupSummary[];
+  teams?: { id: string; name: string }[];
   /** This league's current (in-progress, else soonest upcoming) round's matchups -- every pairing, not scoped to one manager. `[]` once every round is final (season concluded) or before the draft/first round exists. */
   currentRoundMatchups: LeagueMatchupSummary[];
   /** Closed pending and final matchups, most recent round first. Official records stay final-only. */
@@ -850,14 +857,15 @@ export interface LeagueCompetitionSummary {
  * (plus one small `fantasy_rounds`/`fantasy_teams` lookup) powers all
  * three sections -- never a separate fetch per section.
  */
-export async function getLeagueCompetitionSummary(leagueId: string): Promise<LeagueCompetitionSummary> {
+export async function getLeagueCompetitionSummary(leagueId: string, requestedRoundId?: string): Promise<LeagueCompetitionSummary> {
   if (!isSupabaseConfigured()) return emptyCompetitionSummary();
   const supabase = await resolveClient();
-  return queryLeagueCompetitionSummary(supabase, leagueId);
+  return queryLeagueCompetitionSummary(supabase, leagueId, new Date(), requestedRoundId);
 }
 
 function emptyCompetitionSummary(): LeagueCompetitionSummary {
   return {
+    rounds: [], allRoundMatchups: [], teams: [],
     currentRoundMatchups: [],
     recentResults: [],
     records: {
@@ -889,7 +897,8 @@ function emptyCompetitionSummary(): LeagueCompetitionSummary {
 export async function queryLeagueCompetitionSummary(
   supabase: SupabaseClientType,
   leagueId: string,
-  now: Date = new Date()
+  now: Date = new Date(),
+  requestedRoundId?: string
 ): Promise<LeagueCompetitionSummary> {
   const empty = emptyCompetitionSummary();
 
@@ -907,19 +916,17 @@ export async function queryLeagueCompetitionSummary(
   // (confirmed live elsewhere in this file, see getPlayerDatabase's own
   // club-sort fix in src/data-access/players.ts); sorted in JS below
   // instead, after `roundNumber` has been pulled out of the embed.
-  const { data: allMatchups } = await supabase
+  const [{ data: allMatchups }, { data: roundRows }] = await Promise.all([supabase
     .from("matchups")
     .select(
-      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(number, season_id, starts_at, ends_at, status), matchup_scores(fantasy_team_id, live_points, final_points)"
+      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(id, number, season_id, starts_at, ends_at, status), matchup_scores(fantasy_team_id, live_points, final_points)"
     )
-    .eq("fantasy_rounds.season_id", season.id);
+    .eq("fantasy_rounds.season_id", season.id),
+    supabase.from("fantasy_rounds").select("id, number, status, starts_at, ends_at, season_id, seasons(season_number)").eq("league_id",leagueId).order("starts_at",{ascending:true}),
+  ]);
 
-  if (!allMatchups || allMatchups.length === 0) return empty;
-
-  const teamIds = Array.from(
-    new Set(allMatchups.flatMap((m) => [m.home_fantasy_team_id, m.away_fantasy_team_id]))
-  );
-  const { data: teams } = await supabase.from("fantasy_teams").select("id, name").in("id", teamIds);
+  const rounds: LeagueRoundSummary[] = (roundRows ?? []).map(r => ({id:r.id,seasonId:r.season_id,seasonNumber:r.seasons?.season_number,number:r.number,status:r.status as CurrentMatchup["roundStatus"],startsAt:r.starts_at,endsAt:r.ends_at}));
+  const { data: teams } = await supabase.from("fantasy_teams").select("id, name").eq("league_id",leagueId);
   const nameById = new Map((teams ?? []).map((t) => [t.id, t.name]));
 
   function toSummary(m: NonNullable<typeof allMatchups>[number]): LeagueMatchupSummary {
@@ -928,6 +935,7 @@ export async function queryLeagueCompetitionSummary(
     const away = scores.find((s) => s.fantasy_team_id === m.away_fantasy_team_id);
     return {
       id: m.id,
+      roundId: (m.fantasy_rounds as unknown as { id: string }).id,
       roundNumber: (m.fantasy_rounds as unknown as { number: number }).number,
       roundStartsAt: (m.fantasy_rounds as unknown as { starts_at: string }).starts_at,
       roundEndsAt: (m.fantasy_rounds as unknown as { ends_at: string }).ends_at,
@@ -944,7 +952,15 @@ export async function queryLeagueCompetitionSummary(
     };
   }
 
-  const summaries = allMatchups.map(toSummary).sort((a, b) => b.roundNumber - a.roundNumber);
+  // An archive link can select one old round without re-reading every old
+  // season's scores or blending historical results into current records.
+  const requested = rounds.find(r => r.id === requestedRoundId);
+  const { data: archivedMatchups } = requested && requested.seasonId !== season.id
+    ? await supabase.from("matchups").select(
+      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(id, number, season_id, starts_at, ends_at, status), matchup_scores(fantasy_team_id, live_points, final_points)"
+    ).eq("league_id", leagueId).eq("fantasy_round_id", requested.id)
+    : { data: [] };
+  const summaries = (allMatchups ?? []).map(toSummary).sort((a, b) => b.roundNumber - a.roundNumber);
   const finalSummaries = summaries.filter((s): s is LeagueMatchupSummary & { homePoints: number; awayPoints: number } =>
     s.status === "final" && s.homePoints !== null && s.awayPoints !== null);
 
@@ -1006,7 +1022,13 @@ export async function queryLeagueCompetitionSummary(
     records.mostPointsAgainst = mostAgainst;
   }
 
-  return { currentRoundMatchups, recentResults, records };
+  const seasonRounds = rounds.filter(r => r.seasonId === season.id);
+  const currentRoundId = seasonRounds.filter(r => r.status === "in_progress").at(-1)?.id
+    ?? seasonRounds.find(r => r.status === "upcoming")?.id ?? seasonRounds.at(-1)?.id;
+  return {
+    currentRoundMatchups, recentResults, records, rounds, currentRoundId,
+    allRoundMatchups: [...summaries, ...(archivedMatchups ?? []).map(toSummary)], teams: teams ?? [],
+  };
 }
 
 /**
@@ -1020,7 +1042,7 @@ export async function getSeasonMatchupResults(supabase: SupabaseClientType, seas
   const { data: rows } = await supabase
     .from("matchups")
     .select(
-      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(number, season_id, starts_at, ends_at, status), matchup_scores(fantasy_team_id, live_points, final_points)"
+      "id, status, home_fantasy_team_id, away_fantasy_team_id, fantasy_rounds!inner(id, number, season_id, starts_at, ends_at, status), matchup_scores(fantasy_team_id, live_points, final_points)"
     )
     .eq("fantasy_rounds.season_id", seasonId)
     .eq("status", "final");
@@ -1038,6 +1060,7 @@ export async function getSeasonMatchupResults(supabase: SupabaseClientType, seas
       const away = scores.find((s) => s.fantasy_team_id === m.away_fantasy_team_id);
       return {
         id: m.id,
+        roundId: (m.fantasy_rounds as unknown as { id: string }).id,
         roundNumber: (m.fantasy_rounds as unknown as { number: number }).number,
         roundStartsAt: (m.fantasy_rounds as unknown as { starts_at: string }).starts_at,
         roundEndsAt: (m.fantasy_rounds as unknown as { ends_at: string }).ends_at,
@@ -1052,4 +1075,27 @@ export async function getSeasonMatchupResults(supabase: SupabaseClientType, seas
       };
     })
     .sort((a, b) => a.roundNumber - b.roundNumber);
+}
+
+function roundSlotPoints(rows: MatchupSlotRow[], performances: NonNullable<RoundPlayerState["performances"]>) {
+  const totals = new Map<string, { points: number; excluded: number }>();
+  for (const row of rows) {
+    let points = 0, excluded = 0;
+    for (const p of performances) if (p.playerId === row.roster_entries.player_id) {
+      if (new Date(p.kickoffAt) >= new Date(row.roster_entries.acquired_at)) points += p.points;
+      else excluded += p.points;
+    }
+    totals.set(row.roster_entry_id, { points: Math.round(points * 100) / 100, excluded: Math.round(excluded * 100) / 100 });
+  }
+  return totals;
+}
+
+/** One explicitly authorized team's stored round lineup; never today's roster fallback. */
+export async function queryTeamRoundSquad(supabase: SupabaseClientType, teamId: string, round: { id: string; startsAt: string; endsAt: string; scoringRuleVersion: ScoringRuleVersion }, isOwner: boolean, teamName: string): Promise<Squad> {
+  const rows = await readMatchupSlots(supabase, teamId, round.id);
+  const ids = [...new Set(rows.map(r => r.roster_entries.player_id))];
+  const state = await getRoundPlayerState(supabase, ids, { startsAt: new Date(round.startsAt), endsAt: new Date(round.endsAt) }, new Map(rows.map(r => [r.roster_entries.player_id, r.roster_entries.acquired_at])), true, round.scoringRuleVersion);
+  const squad = buildMatchupTeamSquad(rows, state.pointsByPlayerId, state.fixtureByPlayerId, state.preAcquisitionPointsByPlayerId, isOwner ? "mine" : "owned", teamName, roundSlotPoints(rows, state.performances ?? []));
+  for (const player of [...squad.starters.map(s => s.player), ...squad.bench]) player.scoringRuleVersion = round.scoringRuleVersion;
+  return squad;
 }

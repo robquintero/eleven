@@ -1,16 +1,12 @@
-import { Suspense } from "react";
+import { MatchupPageView } from "@/components/matchup/matchup-page-view";
 import type { Metadata } from "next";
 import { Swords } from "lucide-react";
 import { ComingSoon } from "@/components/shell/coming-soon";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
-import { MatchupAnticipation, MatchupCommand } from "@/components/dashboard/matchup-command";
-import { MatchupLineups } from "@/components/matchup/matchup-lineups";
-import { MatchupPlayerCounts } from "@/components/matchup/matchup-player-counts";
-import { RoundWindow } from "@/components/football/round-window";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
-import { getCurrentMatchup, getMatchupFixtureIntelligence, getMatchupSquads } from "@/data-access/matchups";
+import { getCurrentMatchup } from "@/data-access/matchups";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
 
@@ -47,68 +43,5 @@ export default async function MatchupPage() {
   }
 
   const matchup = team ? await getCurrentMatchup(league.id, team.id) : null;
-  const now = new Date();
-  // Fixture intelligence is only used by the pre-kickoff anticipation panel.
-  const fixturePromise = matchup?.roundStatus === "upcoming" ? getMatchupFixtureIntelligence(matchup, now) : Promise.resolve(null);
-  // Observe early rejection; the streamed component still receives the original error.
-  void fixturePromise.catch(() => {});
-  const squads = matchup ? await getMatchupSquads(matchup) : null;
-  const myStarters = squads ? (matchup!.isUserHome ? squads.home.starters : squads.away.starters) : undefined;
-  const teamIdsByPlayerId = squads?.teamIdsByPlayerId;
-
-  return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-          Matchup
-        </h1>
-        <p className="mt-1.5 text-sm text-foreground-secondary">{league.name}</p>
-      </div>
-
-      {matchup && (
-        <RoundWindow
-          round={{ number: matchup.roundNumber, startsAt: matchup.roundStartsAt, endsAt: matchup.roundEndsAt, status: matchup.roundStatus }}
-        />
-      )}
-
-      {/* Pass 13 (§5): tighter rhythm (gap-3, not the page's own gap-6)
-          between the score module and the XI below it -- proximity is the
-          cheapest, safest way to read "these belong to one matchday
-          surface" without merging independently-rendered borders between
-          sibling components (DESIGN.md §5's hierarchy order puts
-          whitespace ahead of borders for exactly this reason). */}
-      <div className="flex flex-col gap-3">
-        <MatchupCommand matchup={matchup} hasLeague now={now} scheduledDetails={<Suspense fallback={<p role="status" className="label-system text-[11px] text-foreground-tertiary">LOADING NEXT KICKOFF</p>}>
-          <FixtureAnticipation fixturePromise={fixturePromise} starters={myStarters} teamIdsByPlayerId={teamIdsByPlayerId} />
-        </Suspense>} starters={myStarters} teamIdsByPlayerId={teamIdsByPlayerId} />
-
-        {matchup && squads && (
-          <>
-            <MatchupPlayerCounts
-              myTeamName={matchup.isUserHome ? matchup.homeTeamName : matchup.awayTeamName}
-              opponentTeamName={matchup.isUserHome ? matchup.awayTeamName : matchup.homeTeamName}
-              mySquad={matchup.isUserHome ? squads.home : squads.away}
-              opponentSquad={matchup.isUserHome ? squads.away : squads.home}
-            />
-
-            <MatchupLineups
-              homeTeamName={matchup.homeTeamName}
-              awayTeamName={matchup.awayTeamName}
-              isUserHome={matchup.isUserHome}
-              homeSquad={squads.home}
-              awaySquad={squads.away}
-            />
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-async function FixtureAnticipation({ fixturePromise, starters, teamIdsByPlayerId }: {
-  fixturePromise: Promise<Awaited<ReturnType<typeof getMatchupFixtureIntelligence>> | null>;
-  starters?: import("@/lib/types/fantasy").LineupSlot[];
-  teamIdsByPlayerId?: Map<string, string[]>;
-}) {
-  return <MatchupAnticipation fixtureIntel={await fixturePromise} starters={starters} teamIdsByPlayerId={teamIdsByPlayerId} />;
+  return <MatchupPageView league={league} matchup={matchup} />;
 }

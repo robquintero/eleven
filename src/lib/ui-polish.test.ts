@@ -17,6 +17,7 @@ function load(file: string): Record<string, (props: Record<string, unknown>) => 
   }).outputText;
   const localRequire = (id: string): unknown => {
     if (id.startsWith("@/data-access/") || id.includes("/actions")) throw new Error(`Unexpected server dependency: ${id}`);
+    if (id === "@/components/shell/transition-link") return { TransitionLink: (props: Record<string, unknown>) => ({type:"a",props}) };
     if (id === "lucide-react") return new Proxy({}, { get: () => () => null });
     if (id === "@/components/players/player-avatar") return { PlayerAvatar: () => null };
     if (id.startsWith("@/") || id.startsWith(".")) {

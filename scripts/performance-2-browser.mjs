@@ -158,7 +158,7 @@ createRoot(document.getElementById('root')).render(<Harness/>);
     if (viewport.width >= 1280) await page.getByText("PLAYER_RECORD", { exact: true }).waitFor();
     await page.evaluate(() => window.mount("Matchup"));
     await page.getByText("MY TEAM", { exact: true }).first().waitFor();
-    const teamNames = await page.locator('p').filter({ hasText: /^(MY TEAM|OPPONENT)$/ }).allTextContents();
+    const teamNames = await page.locator('[title="MY TEAM"],[title="OPPONENT"]').allTextContents();
     assert.equal(teamNames[0], "MY TEAM"); assert.equal(teamNames[1], "OPPONENT");
     for (const destination of ["Home", "Team", "Matchup", "Players", "League", "Draft"]) {
       await page.evaluate(destination => window.mount(destination === "Team" ? "TeamLoading" : destination === "Players" ? "PlayersLoading" : destination === "Matchup" ? "MatchupLoading" : destination), destination);

@@ -22,8 +22,10 @@ function load(file: string, mocks: Record<string, unknown> = {}): Record<string,
   const compiled = { exports: {} };
   const localRequire = (id: string): unknown => {
     if (id in mocks) return mocks[id];
+    if (id === "next/link") return nextLink;
+    if (id === "next/navigation") return { notFound: () => { throw new Error("NOT_FOUND"); } };
     if (id.startsWith("@/data-access/")) throw new Error(`Unmocked data access: ${id}`);
-    if (id.startsWith("@/components/") && !id.includes("workspace-loading") && !id.includes("matchup-command") && !id.includes("transition-link") && !id.includes("league-matchups") && !id.includes("matchup-status") && !id.includes("team-name")) {
+    if (id.startsWith("@/components/") && !id.includes("workspace-loading") && !id.includes("matchup-command") && !id.includes("transition-link") && !id.includes("league-matchups") && !id.includes("matchup-status") && !id.includes("team-name") && !id.includes("matchup-page-view")) {
       return new Proxy({}, { get: (_target, name) => name === "__esModule" ? true : ({ children, title }: { children?: ReactNode; title?: string }) => createElement("div", {}, title ?? String(name), children) });
     }
     if (id.startsWith("@/") || id.startsWith(".")) {

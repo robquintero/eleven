@@ -144,12 +144,14 @@ export function MatchupLineups({
   homeTeamName,
   awayTeamName,
   isUserHome,
+  isSpectator = false,
   homeSquad,
   awaySquad,
 }: {
   homeTeamName: string;
   awayTeamName: string;
   isUserHome: boolean;
+  isSpectator?: boolean;
   homeSquad: Squad;
   awaySquad: Squad;
 }) {
@@ -169,9 +171,9 @@ export function MatchupLineups({
   return (
     <>
       <div className="grid grid-cols-2 gap-1.5 lg:hidden">
-        <MatchupCompactColumn label="MY XI" teamName={myTeamName} isUserTeam squad={mySquad} onSelect={handleSelect} />
+        <MatchupCompactColumn label={isSpectator ? "HOME XI" : "MY XI"} teamName={myTeamName} isUserTeam={!isSpectator} squad={mySquad} onSelect={handleSelect} />
         <MatchupCompactColumn
-          label="OPPONENT"
+          label={isSpectator ? "AWAY XI" : "OPPONENT"}
           teamName={opponentTeamName}
           isUserTeam={false}
           squad={opponentSquad}
@@ -180,9 +182,9 @@ export function MatchupLineups({
       </div>
 
       <div className="hidden grid-cols-2 gap-6 lg:grid">
-        <TeamLineupColumn label="MY XI" teamName={myTeamName} isUserTeam squad={mySquad} onSelect={handleSelect} />
+        <TeamLineupColumn label={isSpectator ? "HOME XI" : "MY XI"} teamName={myTeamName} isUserTeam={!isSpectator} squad={mySquad} onSelect={handleSelect} />
         <TeamLineupColumn
-          label="OPPONENT XI"
+          label={isSpectator ? "AWAY XI" : "OPPONENT XI"}
           teamName={opponentTeamName}
           isUserTeam={false}
           squad={opponentSquad}

@@ -1,3 +1,6 @@
+import { notFound } from "next/navigation";
+import { RoundNavigation } from "@/components/league/round-navigation";
+import { eligibleByeTeams } from "@/lib/spectator-navigation";
 import { DeleteLeagueSection } from "@/components/league/delete-league-section";
 import { canDeleteLeague } from "@/lib/league-deletion";
 import { Suspense } from "react";
@@ -34,7 +37,9 @@ import { leagueSeasonIdentityLabel, standingsEmptyContext } from "@/domain/fanta
 
 export const metadata: Metadata = { title: "League" };
 
-export default async function LeaguePage() {
+export default async function LeaguePage({ searchParams }: { searchParams?: Promise<{ round?: string | string[] }> } = {}) {
+  const requestedRound = (await searchParams)?.round;
+  if (Array.isArray(requestedRound)) notFound();
   const profile = await getCurrentProfile();
 
   if (!profile) {
@@ -70,7 +75,7 @@ export default async function LeaguePage() {
   const activeLeagueId = await getActiveLeagueId(leagues);
 
   const myTeamPromise = activeLeagueId ? getUserTeamInLeague(activeLeagueId) : Promise.resolve(null);
-  const competitionPromise = activeLeagueId ? getLeagueCompetitionSummary(activeLeagueId) : Promise.resolve(null);
+  const competitionPromise = activeLeagueId ? getLeagueCompetitionSummary(activeLeagueId, requestedRound) : Promise.resolve(null);
   const activityPromise = activeLeagueId ? getRecentActivity(activeLeagueId) : Promise.resolve([]);
   const archivePromise = activeLeagueId ? listSeasons(activeLeagueId) : Promise.resolve([]);
   const tradePromise = myTeamPromise.then(async team => {
@@ -204,7 +209,7 @@ export default async function LeaguePage() {
               </div>
 
               <Suspense fallback={<ModuleLoading title="MATCHUPS" rows={4} />}>
-                <LeagueCompetition competitionPromise={competitionPromise} myTeamId={myTeam?.id ?? null} />
+                <LeagueCompetition competitionPromise={competitionPromise} myTeamId={myTeam?.id ?? null} requestedRound={requestedRound} />
               </Suspense>
             </div>
 
@@ -297,10 +302,19 @@ function SetActiveLeagueButton({ leagueId }: { leagueId: string }) {
   );
 }
 
-async function LeagueCompetition({ competitionPromise, myTeamId }: {
+async function LeagueCompetition({ competitionPromise, myTeamId, requestedRound }: {
+  requestedRound?: string;
   competitionPromise: Promise<Awaited<ReturnType<typeof getLeagueCompetitionSummary>> | null>; myTeamId: string | null;
 }) {
   const competition = await competitionPromise;
+  const rounds = competition?.rounds ?? [];
+  const currentId = competition?.currentRoundId ?? competition?.currentRoundMatchups[0]?.roundId ?? rounds.at(-1)?.id;
+  const selectedId = requestedRound ?? currentId;
+  const selected = rounds.find(r => r.id === selectedId);
+  if (requestedRound && !selected) notFound();
+  const matchups = selected ? (competition?.allRoundMatchups ?? []).filter(m => m.roundId === selected.id) : competition?.currentRoundMatchups ?? [];
+  const byes = selected ? eligibleByeTeams(competition?.teams ?? [], matchups) : [];
+
   return <>
     {/* Current round + recent results merged into one module
         (was two identically-weighted boxes) -- they're the same
@@ -320,12 +334,14 @@ async function LeagueCompetition({ competitionPromise, myTeamId }: {
         )}
       </div>
       <div>
-        <p className="label-system px-4 pt-3 text-[10px] text-foreground-tertiary">THIS ROUND</p>
+        {selected && <><RoundNavigation rounds={rounds} selectedId={selected.id} currentId={currentId} /><RoundWindow className="px-4 pt-3" round={{number:selected.number,startsAt:selected.startsAt,endsAt:selected.endsAt,status:selected.status}} /></>}
+        <p className="label-system px-4 pt-3 text-[10px] text-foreground-tertiary">{selected ? `ROUND ${selected.number}` : "THIS ROUND"}</p>
         <LeagueMatchups
-          matchups={competition?.currentRoundMatchups ?? []}
+          matchups={matchups}
           myTeamId={myTeamId}
-          emptyLabel="NO MATCHUPS SCHEDULED YET"
+          emptyLabel="NO MATCHUPS FOR ROUND"
         />
+        {byes.map(team => <TransitionLink key={team.id} href={selected ? `/team/${team.id}?round=${selected.id}` : `/team/${team.id}`} label={team.name} className="flex min-h-11 items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-foreground"><span className="min-w-0 break-words">{team.name}</span><span className="label-system shrink-0 text-[11px] text-foreground-tertiary">BYE</span></TransitionLink>)}
       </div>
       <div className="border-t border-border">
         <p className="label-system px-4 pt-3 text-[10px] text-foreground-tertiary">RECENT RESULTS</p>

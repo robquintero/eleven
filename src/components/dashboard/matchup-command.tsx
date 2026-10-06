@@ -1,3 +1,4 @@
+import { TransitionLink } from "@/components/shell/transition-link";
 import { matchupResultState } from "@/domain/fantasy/matchup-result-state";
 import { MatchupStatus } from "@/components/football/matchup-status";
 import type { ReactNode } from "react";
@@ -20,7 +21,9 @@ export function MatchupCommand({
   starters,
   teamIdsByPlayerId,
   scheduledDetails,
+  teamLinks,
 }: {
+  teamLinks?: { home: string; away: string };
   scheduledDetails?: ReactNode;
   matchup: CurrentMatchup | null;
   hasLeague: boolean;
@@ -85,6 +88,15 @@ export function MatchupCommand({
     awayScore,
   });
   const leftShare = (leftScore / total) * 100;
+  const leftKnown = matchup.isUserHome ? matchup.homeScoreAvailable !== false : matchup.awayScoreAvailable !== false;
+  const rightKnown = matchup.isUserHome ? matchup.awayScoreAvailable !== false : matchup.homeScoreAvailable !== false;
+  const leftFinal = matchup.isUserHome ? matchup.homeFinalPoints : matchup.awayFinalPoints;
+  const rightFinal = matchup.isUserHome ? matchup.awayFinalPoints : matchup.homeFinalPoints;
+  const displayedLeft = resultState === "final" ? leftFinal : leftKnown ? leftScore : null;
+  const displayedRight = resultState === "final" ? rightFinal : rightKnown ? rightScore : null;
+  const leftHref = matchup.isUserHome ? teamLinks?.home : teamLinks?.away;
+  const rightHref = matchup.isUserHome ? teamLinks?.away : teamLinks?.home;
+
 
   // Pass 12D: truthful freshness, never implied by the "LIVE" label alone
   // — if the automated sync hasn't actually run recently (e.g. the
@@ -111,27 +123,32 @@ export function MatchupCommand({
         {/* Equal identity columns no longer compete with the central score.
             Container sizing also works in Home's narrower desktop column. */}
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-x-3 gap-y-2">
-          <TeamName name={leftTeamName} className="block self-start text-sm font-semibold leading-snug text-foreground @min-[32rem]:text-base" />
-          <TeamName name={rightTeamName} className="col-start-3 block self-start text-right text-sm font-semibold leading-snug text-foreground @min-[32rem]:text-base" />
-          <span className="label-system col-span-3 text-[10px] text-accent">YOUR TEAM</span>
+          <div className="min-w-0 self-start text-sm font-semibold leading-snug text-foreground @min-[32rem]:text-base">
+            {leftHref ? <TransitionLink href={leftHref} label={leftTeamName} className="block min-h-11 py-1 hover:underline"><TeamName name={leftTeamName} /></TransitionLink> : <TeamName name={leftTeamName} />}
+          </div>
+          <div className="col-start-3 min-w-0 self-start text-right text-sm font-semibold leading-snug text-foreground @min-[32rem]:text-base">
+            {rightHref ? <TransitionLink href={rightHref} label={rightTeamName} className="block min-h-11 py-1 hover:underline"><TeamName name={rightTeamName} /></TransitionLink> : <TeamName name={rightTeamName} />}
+          </div>
+          <span className="label-system col-span-3 text-[10px] text-accent">{matchup.isSpectator ? "LEAGUE MATCHUP" : "YOUR TEAM"}</span>
           <p className="min-w-0 text-[clamp(1.5rem,9cqi,3.75rem)] leading-none font-semibold tracking-tight tabular-nums text-foreground">
-            {isScheduled ? "—" : leftScore}
+            {isScheduled || displayedLeft === null ? "—" : displayedLeft}
           </p>
           <span className="label-system self-center text-sm text-foreground-tertiary">{isScheduled ? "VS" : "–"}</span>
           <p className="min-w-0 text-right text-[clamp(1.5rem,9cqi,3.75rem)] leading-none font-semibold tracking-tight tabular-nums text-foreground">
-            {isScheduled ? "—" : rightScore}
+            {isScheduled || displayedRight === null ? "—" : displayedRight}
           </p>
         </div>
 
+        {resultState === "final" && displayedLeft !== null && displayedRight !== null && <p className="label-system mt-3 text-xs text-foreground-secondary [overflow-wrap:anywhere]">{displayedLeft === displayedRight ? "DRAW" : `WINNER · ${displayedLeft > displayedRight ? leftTeamName : rightTeamName}`}</p>}
         {isScheduled ? (
           <div className="mt-4 flex flex-col items-center gap-1 border-t border-border pt-4 text-center sm:mt-6">
             {scheduledDetails ?? <MatchupAnticipation fixtureIntel={fixtureIntel} starters={starters} teamIdsByPlayerId={teamIdsByPlayerId} />}
           </div>
         ) : (
           <>
-            <div className="relative mt-4 h-1.5 overflow-hidden border border-border bg-muted sm:mt-6">
+            {displayedLeft !== null && displayedRight !== null && <div className="relative mt-4 h-1.5 overflow-hidden border border-border bg-muted sm:mt-6">
               <div className="h-full bg-accent transition-all" style={{ width: `${leftShare}%` }} />
-            </div>
+            </div>}
 
             {isLive && (
               <p className="label-system mt-2 text-center text-[10px] text-foreground-tertiary">
