@@ -59,7 +59,7 @@ function aggregation(version: string, completed = false) {
       assert.equal(filter(q, "scoring_rule_version"), version);
       return result([{ player_id: "p", fixture_id: "pre", points: 100 }, { player_id: "p", fixture_id: "a", points: correction ? 7.1 : 10.1 }, { player_id: "p", fixture_id: "b", points: 0.2 }, { player_id: "p", fixture_id: "c", points: 0.15 }]);
     }
-    if (q.table === "matchup_scores") return result(q.operation === "select" ? [{ id: "score", live_points: correction ? 7.45 : 10.45, final_points: 10.45 }] : null);
+    if (q.table === "matchup_scores") return result(q.operation === "select" ? [{ id: "score", live_points: correction ? 7.45 : 10.45, final_points: completed ? 10.45 : null }] : null);
     throw new Error(`Unexpected query ${q.table}`);
   });
   return { client, calls, correct: () => { correction = true; } };
@@ -73,10 +73,10 @@ test("real round aggregator sums three fixtures in hundredths, excludes pre-acqu
     assert.deepEqual(writes.map(w => w.live_points), [10.45, 0]);
   }
 });
-test("completed round provider correction recomputes final score under same pinned V3 version, never newest V4", async () => {
+test("completed round provider correction leaves official scores and locks frozen", async () => {
   const { client, calls, correct } = aggregation("ELEVEN_STANDARD_V3", true);
   correct(); await reconcileFantasyRound(client, "r");
-  assert.ok(calls.some(q => q.table === "matchup_scores" && q.operation === "update" && (q.payload as { final_points: number }).final_points === 7.45));
+  assert.equal(calls.length, 1, "completed reconciliation is a single read, no score/lock writes");
   assert.ok(calls.every(q => q.table !== "fantasy_rounds" || q.operation === "select"));
 });
 test("backfill without explicit model fails before any query or write", async () => {
@@ -84,7 +84,7 @@ test("backfill without explicit model fails before any query or write", async ()
   await assert.rejects(backfillScores(client, {} as Parameters<typeof backfillScores>[1]), /Unknown scoring version/);
   assert.equal(calls.length, 0);
 });
-test("live correction discovers completed and active pinned models and retains catalog V3 without duplication", async () => {
+test("live correction discovers unfinished pinned models and retains catalog V3 without duplication", async () => {
   const { client } = testClient(q => q.table === "get_catalog_scoring_version" ? result("ELEVEN_STANDARD_V3") : q.table === "fixtures" ? result([{ kickoff_at: "2026-10-07T00:00:00Z" }]) : result([
     { id: "one", starts_at: "2026-10-06T00:00:00Z", ends_at: "2026-10-13T00:00:00Z", scoring_rule_version: "ELEVEN_STANDARD_V3" },
     { id: "two", starts_at: "2026-10-06T00:00:00Z", ends_at: "2026-10-13T00:00:00Z", scoring_rule_version: "ELEVEN_STANDARD_V4" },

@@ -93,7 +93,7 @@ export async function AppShell({ children }: { children: ReactNode }) {
                   <Wordmark authenticated />
                 </div>
                 <LeagueSwitcher leagues={leagues} activeLeagueId={activeLeagueId} />
-                {leagues.length > 0 && <Suspense fallback={null}><RoundRules statusPromise={statusPromise} /></Suspense>}
+                {leagues.length > 0 && <Suspense fallback={null}><RoundRules /></Suspense>}
               </div>
               <div className="flex items-center gap-3">
                 <CommandPalette />
@@ -119,6 +119,6 @@ export async function AppShell({ children }: { children: ReactNode }) {
 async function RoundStatus({ statusPromise }: { statusPromise: ReturnType<typeof loadStatusBarData> }) {
   return <StatusBar data={await statusPromise} />;
 }
-async function RoundRules({ statusPromise }: { statusPromise: ReturnType<typeof loadStatusBarData> }) {
-  return <GameRulesDialog version={(await statusPromise)?.scoringRuleVersion ?? await getCurrentCatalogScoringVersion()} />;
+async function RoundRules() {
+  return <GameRulesDialog version={await getCurrentCatalogScoringVersion()} />;
 }

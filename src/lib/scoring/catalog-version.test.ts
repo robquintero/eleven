@@ -39,7 +39,7 @@ test("Players and free-agent ranking/Inspector context follow V3 then V4; zero/n
   }
 });
 
-test("active V4 catalog corrections still regenerate historical pinned V3; explicit historical reads never query catalog", async () => {
+test("active V4 catalog corrections respect unfinished pins; explicit historical reads never query catalog", async () => {
   const { client, calls } = testClient(q => {
     if (q.table === "get_catalog_scoring_version") return result("ELEVEN_STANDARD_V4");
     if (q.table === "fixtures") return result([{ kickoff_at: "2026-10-07T00:00:00Z" }]);

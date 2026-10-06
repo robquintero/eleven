@@ -43,8 +43,9 @@ export function PlayerInspector({
   // ever calls setState from inside the resolved promise callback (never
   // synchronously in the effect body) — the loading state is *derived*
   // below by comparing this to the current player, not tracked separately.
-  const version = player?.scoringRuleVersion;
-  const selectionKey = player ? `${player.id}:${version ?? "catalog"}` : null;
+  // Inspector history always follows canonical player analytics, independent
+  // of the frozen model on the fantasy matchup from which it was opened.
+  const selectionKey = player ? `${player.id}:catalog` : null;
   const [loadedMatches, setLoadedMatches] = useState<{ playerId: string; matches: RecentMatchRow[] } | null>(null);
   const [loadedBreakdown, setLoadedBreakdown] = useState<{ playerId: string; breakdown: PlayerScoreBreakdown | null } | null>(null);
 
@@ -52,17 +53,17 @@ export function PlayerInspector({
     if (!player) return;
     let cancelled = false;
     const playerId = player.id;
-    getPlayerRecentMatchesAction(playerId, version).then((matches) => {
-      if (!cancelled) setLoadedMatches({ playerId: `${playerId}:${version ?? "catalog"}`, matches });
+    getPlayerRecentMatchesAction(playerId).then((matches) => {
+      if (!cancelled) setLoadedMatches({ playerId: `${playerId}:catalog`, matches });
     });
-    getPlayerScoreBreakdownAction(playerId, version).then((breakdown) => {
-      if (!cancelled) setLoadedBreakdown({ playerId: `${playerId}:${version ?? "catalog"}`, breakdown });
+    getPlayerScoreBreakdownAction(playerId).then((breakdown) => {
+      if (!cancelled) setLoadedBreakdown({ playerId: `${playerId}:catalog`, breakdown });
     });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [player?.id, version]);
+  }, [player?.id]);
 
   const recentMatches =
     loadedMatches && player && loadedMatches.playerId === selectionKey ? loadedMatches.matches : null;

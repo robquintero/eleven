@@ -39,6 +39,13 @@ export type Database = {
   }
   public: {
     Tables: {
+      football_provider_snapshots: {
+        Row: { provider: string; endpoint: string; external_id: string; fixture_id: string; payload: Json; fetched_at: string; observed_fixture_status: string | null; schema_version: number }
+        Insert: { provider: string; endpoint: string; external_id: string; fixture_id: string; payload: Json; fetched_at: string; observed_fixture_status?: string | null; schema_version?: number }
+        Update: { provider?: string; endpoint?: string; external_id?: string; fixture_id?: string; payload?: Json; fetched_at?: string; observed_fixture_status?: string | null; schema_version?: number }
+        Relationships: [{ foreignKeyName: "football_provider_snapshots_fixture_id_fkey"; columns: ["fixture_id"]; isOneToOne: false; referencedRelation: "fixtures"; referencedColumns: ["id"] }]
+      }
+
       clubs: {
         Row: {
           code: string
@@ -1428,6 +1435,7 @@ export type Database = {
         Args: { p_fantasy_team_id: string; p_round_id: string; p_changes: Json; p_now?: string }
         Returns: undefined
       }
+      activate_scoring_v4_now: { Args: Record<PropertyKey, never>; Returns: string };
       get_catalog_scoring_version: { Args: Record<PropertyKey, never>; Returns: string };
       get_player_score_totals: {
         Args: { p_season: number; p_version: string; p_player_ids?: string[] }

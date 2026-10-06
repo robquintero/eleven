@@ -1,5 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { providerSnapshotRow, saveProviderSnapshots } from "./provider-snapshots.ts";
 import { getFixtures } from "../football-providers/api-football/client.ts";
 import { normalizeFixture } from "../football-providers/api-football/adapter.ts";
 import { createMappings, getExistingMappings } from "./identity.ts";
@@ -13,6 +14,8 @@ export interface SyncFixturesOptions {
   from?: string;
   to?: string;
   page?: number;
+  /** Completed history only; excludes future/unplayed metadata requests. */
+  completedBefore?: string;
   /** UEFA competitions only — excludes qualifying-round/play-off fixtures (see rounds.ts), keeping only the main League Stage/knockout competition. No-op for domestic leagues, which have no qualifying rounds. */
   excludeQualifying?: boolean;
 }
@@ -61,9 +64,18 @@ export async function syncFixtures(
       page: options.page,
       from: options.from,
       to: options.to,
+      status: options.completedBefore ? "FT-AET-PEN" : undefined,
     });
 
-    const rawNormalized = data.response.map(normalizeFixture);
+    if (options.completedBefore && data.response.some(f =>
+      f.league.id !== config.providerLeagueId || f.league.season !== competitionRow.season ||
+      !["FT", "AET", "PEN"].includes(f.fixture.status.short) ||
+      new Date(f.fixture.date).getTime() > new Date(options.completedBefore!).getTime() ||
+      (options.from && new Date(f.fixture.date).getTime() < new Date(`${options.from}T00:00:00Z`).getTime())
+    )) throw new Error("OUT_OF_SCOPE_PROVIDER_FIXTURE_STOP");
+
+    const received = options.completedBefore ? data.response.filter(f => new Date(f.fixture.date).getTime() <= new Date(options.completedBefore!).getTime() && ["FT", "AET", "PEN"].includes(f.fixture.status.short)) : data.response;
+    const rawNormalized = received.map(normalizeFixture);
     const normalized = options.excludeQualifying
       ? rawNormalized.filter((f) => {
           const isQualifying = isQualifyingRound(f.round);
@@ -149,6 +161,13 @@ export async function syncFixtures(
         counts.updated += 1;
       }
     }
+
+    const canonicalFixtures = await getExistingMappings(admin, "fixture", resolvable.map(f => f.externalId));
+    const fetchedAt = new Date().toISOString();
+    await saveProviderSnapshots(admin, received.flatMap(item => {
+      const externalId = String(item.fixture.id), fixtureId = canonicalFixtures.get(externalId);
+      return fixtureId ? [providerSnapshotRow("/fixtures", externalId, fixtureId, item, fetchedAt, normalizeFixture(item).status)] : [];
+    }));
 
     return {
       operation: "sync-fixtures",

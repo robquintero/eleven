@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getFixturePlayers } from "../football-providers/api-football/client.ts";
 import { normalizeFixturePlayerStats } from "../football-providers/api-football/adapter.ts";
+import { providerSnapshotRow, saveProviderSnapshots } from "./provider-snapshots.ts";
 import { PROVIDER } from "./identity.ts";
 import { emptySyncCounts } from "./reconcile.ts";
 import type { SyncResult } from "./types.ts";
@@ -19,7 +20,8 @@ import type { Database } from "@/lib/supabase/database.types";
  */
 export async function syncFixtureStats(
   admin: SupabaseClient<Database>,
-  fixtureExternalId: string
+  fixtureExternalId: string,
+  storedResponse?: { data: Awaited<ReturnType<typeof getFixturePlayers>>["data"]; fetchedAt: string }
 ): Promise<SyncResult> {
   const counts = emptySyncCounts();
   const errors: string[] = [];
@@ -43,17 +45,23 @@ export async function syncFixtureStats(
   }
   const fixtureId = fixtureMapping.internal_entity_id;
 
+  const { data: fixture, error: fixtureError } = await admin.from("fixtures").select("status").eq("id", fixtureId).maybeSingle();
+  if (fixtureError || !fixture) return fail(`Cannot resolve fixture provenance: ${fixtureError?.message ?? "missing fixture"}`);
+
   try {
-    const { data, meta } = await getFixturePlayers({ fixture: Number(fixtureExternalId) });
+    const { data, meta } = storedResponse ? { data: storedResponse.data, meta: { quota: {} } } : await getFixturePlayers({ fixture: Number(fixtureExternalId) });
+    if (data.parameters?.fixture && String(data.parameters.fixture) !== fixtureExternalId) throw new Error("PROVIDER_FIXTURE_ID_MISMATCH_STOP");
+    await saveProviderSnapshots(admin, [providerSnapshotRow("/fixtures/players", fixtureExternalId, fixtureId, data, storedResponse?.fetchedAt ?? new Date().toISOString(), fixture.status)]);
     const rows = normalizeFixturePlayerStats(data.response, fixtureExternalId);
 
     const playerExternalIds = rows.map((r) => r.playerExternalId);
-    const { data: playerMappings } = await admin
+    const { data: playerMappings, error: mappingError } = await admin
       .from("provider_mappings")
       .select("external_id, internal_entity_id")
       .eq("provider", PROVIDER)
       .eq("internal_entity_type", "player")
       .in("external_id", playerExternalIds);
+    if (mappingError) return fail(`Cannot resolve player identities: ${mappingError.message}`, storedResponse ? 0 : 1);
     const playerIdByExternalId = new Map((playerMappings ?? []).map((m) => [m.external_id, m.internal_entity_id]));
 
     const resolvedRows = rows
@@ -76,7 +84,7 @@ export async function syncFixtureStats(
           "player_id",
           resolvedRows.map((e) => e.playerId)
         );
-      if (existingError) return fail(`Cannot preserve scoring provenance: ${existingError.message}`, 1);
+      if (existingError) return fail(`Cannot preserve scoring provenance: ${existingError.message}`, storedResponse ? 0 : 1);
       const existingPlayerIds = new Set((existingStats ?? []).map((r) => r.player_id));
       const pinnedPositions = new Map((existingStats ?? []).map(r => [r.player_id, r.scoring_position]));
       const [{ data: players, error: playerError }, { data: teams, error: teamError }] = await Promise.all([
@@ -84,7 +92,7 @@ export async function syncFixtureStats(
         admin.from("provider_mappings").select("external_id, internal_entity_id").eq("provider", PROVIDER)
           .eq("internal_entity_type", "club").in("external_id", data.response.map(team => String(team.team.id))),
       ]);
-      if (playerError || teamError) return fail(`Cannot resolve scoring provenance: ${playerError?.message ?? teamError?.message}`, 1);
+      if (playerError || teamError) return fail(`Cannot resolve scoring provenance: ${playerError?.message ?? teamError?.message}`, storedResponse ? 0 : 1);
       const positions = new Map((players ?? []).map(p => [p.id, p.position]));
       const teamIds = new Map((teams ?? []).map(t => [t.external_id, t.internal_entity_id]));
 
@@ -109,15 +117,16 @@ export async function syncFixtureStats(
 
     return {
       operation: "sync-fixture-stats",
-      scope,
+      scope: { ...scope, providerPerformances: rows.length, mappedPerformances: resolvedRows.length, unmappedPerformances: counts.skipped,
+        playersWithoutStatistics: data.response.reduce((n, t) => n + t.players.filter(p => !p.statistics?.length).length, 0) },
       counts,
-      requestsUsed: 1,
+      requestsUsed: storedResponse ? 0 : 1,
       quota: meta.quota,
       errors,
       stoppedForQuota: false,
     };
   } catch (err) {
-    return fail(err instanceof Error ? err.message : String(err), 1);
+    return fail(err instanceof Error ? err.message : String(err), storedResponse ? 0 : 1);
   }
 }
 

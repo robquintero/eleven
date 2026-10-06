@@ -113,6 +113,8 @@ export function getFixtures(params: {
   /** YYYY-MM-DD — bounds a fixtures sync to a date range instead of an entire season at once. */
   from?: string;
   to?: string;
+  /** Provider-documented completed-status filter, used only by scoped history refetch. */
+  status?: "FT-AET-PEN";
 }) {
   return request<ApiFootballFixtureItem>("/fixtures", params);
 }

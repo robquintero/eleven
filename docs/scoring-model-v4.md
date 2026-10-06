@@ -1,10 +1,8 @@
 # Eleven Standard V4 — implementation and review report
 
-The reviewed V4 foundation migration was applied to production through Supabase migration history during the approved final release. Existing round pins remain V3 and results are unchanged. V4 activation uses a separately scheduled future policy boundary; it never converts existing rounds. No provider requests, historical backfill or weight changes were performed by this release.
+The immediate canonical V4 rollout supersedes the earlier future-boundary policy. Player analytics, Inspector history and Game Rules use the current canonical model; unfinished fantasy rounds move to V4, while settled fantasy results remain immutable. The model and weights are unchanged. See [the canonical rollout report](scoring-v4-canonical-rollout.md) for schema, current-season provider scope, storage and release evidence.
 
-The subsequent release-safety pass added active-policy catalog selection and removed exactly 30 proven synthetic football rows under explicit authorization. Its current validation and cleanup evidence is in [scoring-v4-release-safety.md](scoring-v4-release-safety.md); the historical calibration project was cancelled and these earlier partial artifacts were not expanded.
-
-The proposed model is reviewable, but **activation is gated on real advanced-field coverage and full-model calibration**. A provider exposing a nullable field does not establish consistent populated coverage across domestic, European and international fixtures. Newly supported fields are dormant proposed categories, not an approval to enable inconsistent feeds.
+The sections below retain the earlier implementation/review evidence. Their historical activation/calibration gates describe that earlier pass, not the current product policy.
 
 ## 1. Starting state
 

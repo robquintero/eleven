@@ -24,11 +24,11 @@ async function bootstrap() {
 async function migrations(db: PGlite, includeCandidate: boolean) {
   const files = (await readdir(folder)).filter(f => f.endsWith(".sql")).sort();
   for (const file of files) {
-    if (!includeCandidate && file === candidate) continue;
+    if (file > candidate || (!includeCandidate && file === candidate)) continue;
     const sql = await readFile(new URL(file, folder), "utf8");
     await db.transaction(tx => tx.exec(sql));
   }
-  return files.length;
+  return files.filter(f => f <= candidate && (includeCandidate || f !== candidate)).length;
 }
 async function seed(db: PGlite) {
   await db.exec(`insert into auth.users values('${id(1)}','owner@example.invalid','{}'),('${id(2)}','other@example.invalid','{}');
@@ -134,5 +134,68 @@ test("full-schema populated upgrade: atomic failure/retry, unchanged results, pi
       });
     } catch (error) { assert.match(String(error), /TEST_ROLLBACK/); }
     assert.equal((await db.query<{ v: string }>("select get_catalog_scoring_version() as v")).rows[0].v, "ELEVEN_STANDARD_V3");
+  } finally { await db.close(); }
+});
+
+
+test("canonical upgrade: immediate V4, frozen 102–98 result/winner/standings, active round switch, raw JSON natural key and client denial", async () => {
+  const db = await bootstrap();
+  try {
+    await migrations(db, false); await seed(db);
+    await db.exec(await readFile(new URL(candidate, folder), "utf8"));
+    await db.exec("insert into scoring_version_activations values('2090-01-03','ELEVEN_STANDARD_V4')");
+    const historical = async () => (await db.query(`select to_jsonb(m) as matchup, to_jsonb(s) as scores from matchups m join matchup_scores s on s.matchup_id=m.id where m.id='${id(14)}' order by s.fantasy_team_id`)).rows;
+    const original = await historical();
+    const upgrade = await readFile(new URL("20261009000000_scoring_v4_canonical_and_raw_evidence.sql", folder), "utf8");
+    await db.transaction(tx => tx.exec(upgrade));
+    assert.equal((await db.query<{v:string}>("select get_catalog_scoring_version() v")).rows[0].v, "ELEVEN_STANDARD_V3", "schema installation alone is dormant");
+    await db.exec("set role service_role; select activate_scoring_v4_now(); reset role");
+    assert.equal((await db.query<{v:string}>("select get_catalog_scoring_version() v")).rows[0].v, "ELEVEN_STANDARD_V4");
+    assert.deepEqual((await db.query<{v:string}>("select scoring_rule_version v from fantasy_rounds order by number")).rows.map(r=>r.v), ["ELEVEN_STANDARD_V3","ELEVEN_STANDARD_V4","ELEVEN_STANDARD_V4"]);
+    assert.deepEqual(await historical(), original);
+    await db.exec(`insert into fantasy_player_scores(player_id,fixture_id,points,scoring_rule_version,breakdown) values('${id(20)}','${id(13)}',999,'ELEVEN_STANDARD_V4','{}');`);
+    assert.deepEqual(await historical(), original, "revaluing a historical player performance cannot alter 102–98, its winner or W/L inputs");
+    assert.equal((await db.query<{total_points:string}>("select total_points from get_player_score_totals(2026,'ELEVEN_STANDARD_V4')")).rows[0].total_points, "999.00");
+    assert.equal((await db.query<{total_points:string}>("select total_points from get_player_score_totals(2026,'ELEVEN_STANDARD_V3')")).rows[0].total_points, "11.00");
+    for (const sql of [
+      "update matchup_scores set final_points=999", "update matchup_scores set live_points=999", "delete from matchup_scores",
+      `update matchups set status='live' where id='${id(14)}'`, `delete from matchups where id='${id(14)}'`,
+      `update fantasy_rounds set status='in_progress' where id='${id(7)}'`, `delete from fantasy_rounds where id='${id(7)}'`,
+      `update fantasy_rounds set scoring_rule_version='ELEVEN_STANDARD_V4' where id='${id(7)}'`,
+    ]) await assert.rejects(db.exec(sql), /IMMUTABLE/);
+    assert.deepEqual(await historical(), original, "official winner and final-point inputs to standings remain exactly 102–98");
+    await db.exec(`insert into fantasy_rounds(id,league_id,season_id,number,starts_at,ends_at,status,scoring_rule_version) values('${id(61)}','${id(3)}','${id(6)}',4,'2026-09-01','2026-09-08','in_progress','ELEVEN_STANDARD_V3')`);
+    assert.equal((await db.query<{v:string}>(`select scoring_rule_version v from fantasy_rounds where id='${id(61)}'`)).rows[0].v, "ELEVEN_STANDARD_V4", "new round uses canonical V4 even if its start precedes activation");
+    const payload = { response: [{ player: { id: 99 }, statistics: [{ games: { rating: "9.2", captain: true }, unused: { future: [0,null,"raw"] } }] }], extra: "retained" };
+    for (let i=0;i<2;i++) await db.query(`insert into football_provider_snapshots(provider,endpoint,external_id,fixture_id,payload,fetched_at) values('api-football','/fixtures/players','99',$1,$2,now()) on conflict(provider,endpoint,external_id) do update set payload=excluded.payload,fetched_at=excluded.fetched_at`,[id(13),JSON.stringify(payload)]);
+    assert.deepEqual((await db.query<{payload:unknown}>("select payload from football_provider_snapshots")).rows,[{payload}]);
+    await assert.rejects(db.exec("insert into scoring_version_activations values('2026-01-06','ELEVEN_STANDARD_V4')"),/ACTIVATION_REQUIRES/);
+    for (const role of ["anon","authenticated"]) {
+      await db.exec(`set role ${role}`);
+      await assert.rejects(db.exec("select activate_scoring_v4_now()"),/permission denied/);
+      await assert.rejects(db.exec("select * from football_provider_snapshots"),/permission denied/);
+      await db.exec("reset role");
+    }
+    await db.exec(`insert into competitions(id,name,code,country,season) values('${id(70)}','Current international','AFCON_Q','International',2027);
+      insert into fixtures(id,competition_id,home_club_id,away_club_id,kickoff_at,status,season) values('${id(71)}','${id(70)}','${id(11)}','${id(12)}','2026-09-30','final',2027);
+      insert into fantasy_player_scores(player_id,fixture_id,points,scoring_rule_version,breakdown) values('${id(20)}','${id(71)}',2,'ELEVEN_STANDARD_V4','{}');`);
+    assert.equal((await db.query<{total_points:string}>("select total_points from get_player_score_totals(2026,'ELEVEN_STANDARD_V4')")).rows[0].total_points, "1001.00", "actual current-season international dates count despite provider season label");
+    // One side settled in an unfinished round: switching policy must stop atomically.
+    await db.exec(`insert into matchups(id,league_id,fantasy_round_id,home_fantasy_team_id,away_fantasy_team_id,status) values('${id(62)}','${id(3)}','${id(8)}','${id(4)}','${id(5)}','scheduled'); insert into matchup_scores(matchup_id,fantasy_team_id,live_points,final_points) values('${id(62)}','${id(4)}',0,0);`);
+    await assert.rejects(db.exec("select activate_scoring_v4_now()"),/MIXED_SETTLEMENT_STOP/);
+    await assert.rejects(db.exec(`update matchups set status='final' where id='${id(62)}'`),/SETTLEMENT_INCOMPLETE/);
+    await assert.rejects(db.exec(`update fantasy_rounds set status='completed' where id='${id(8)}'`),/SETTLEMENT_INCOMPLETE/);
+    assert.deepEqual(await historical(),original);
+  } finally { await db.close(); }
+});
+
+test("complete 35-migration clean installation includes raw storage and immutable settlement without activating V4", async () => {
+  const db = await bootstrap();
+  try {
+    const files=(await readdir(folder)).filter(f=>f.endsWith('.sql')).sort();
+    for(const file of files){const sql=await readFile(new URL(file,folder),'utf8');await db.transaction(tx=>tx.exec(sql));}
+    assert.equal(files.length,35);
+    assert.equal((await db.query<{v:string}>('select get_catalog_scoring_version() v')).rows[0].v,'ELEVEN_STANDARD_V3');
+    assert.equal((await db.query<{n:number}>('select count(*)::int n from football_provider_snapshots')).rows[0].n,0);
   } finally { await db.close(); }
 });

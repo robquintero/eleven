@@ -5,7 +5,7 @@ import { getCatalogScoringVersion } from "./catalog-version.ts";
 import { scoringVersion } from "./versions.ts";
 
 /** Provider corrections must regenerate every pinned model touched by a
- * fixture, including completed rounds. Also regenerate the currently active catalog model. */
+ * fixture, only while those rounds are unfinished. Settled fantasy records are frozen. Also regenerate the currently active catalog model. */
 export async function getAffectedScoringVersions(admin: SupabaseClient<Database>, fixtureIds: string[]): Promise<ScoringRuleVersion[]> {
   const versions = new Set<ScoringRuleVersion>([await getCatalogScoringVersion(admin)]);
   if (!fixtureIds.length) return [...versions];
@@ -15,7 +15,7 @@ export async function getAffectedScoringVersions(admin: SupabaseClient<Database>
   if (!kickoffs.length) return [...versions];
   for (let offset = 0; ; offset += 1000) {
     const { data: rounds, error } = await admin.from("fantasy_rounds").select("id, starts_at, ends_at, scoring_rule_version")
-      .lte("starts_at", kickoffs[kickoffs.length - 1]).gte("ends_at", kickoffs[0]).order("id").range(offset, offset + 999);
+      .neq("status", "completed").lte("starts_at", kickoffs[kickoffs.length - 1]).gte("ends_at", kickoffs[0]).order("id").range(offset, offset + 999);
     if (error) throw new Error(`Cannot read pinned scoring versions: ${error.message}`);
     for (const round of rounds ?? []) if (kickoffs.some(k => k >= round.starts_at && k < round.ends_at)) versions.add(scoringVersion(round.scoring_rule_version));
     if ((rounds ?? []).length < 1000) break;

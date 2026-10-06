@@ -62,7 +62,7 @@ export interface BackfillResult {
  */
 export async function backfillScores(
   admin: SupabaseClient<Database>,
-  options: { scoringRuleVersion: ScoringRuleVersion; season?: number; fixtureIds?: string[] }
+  options: { scoringRuleVersion: ScoringRuleVersion; season?: number; fixtureIds?: string[]; skipUnavailableV4?: boolean }
 ): Promise<BackfillResult> {
   const version = scoringVersion(options?.scoringRuleVersion);
   const season = options.season ?? 2026;
@@ -163,6 +163,7 @@ export async function backfillScores(
           "player_id, fixture_id, minutes, goals, assists, shots_on_target, chances_created, tackles, interceptions, blocks, saves, yellow_cards, red_cards, reported_stats, participation_club_id, scoring_position"
         )
         .in("fixture_id", fixtureIds)
+        .order("player_id").order("fixture_id")
         .range(from, from + 999);
       if (error) {
         errors.push(`Failed to load player_match_stats page at offset ${from}: ${error.message}`);
@@ -270,6 +271,12 @@ export async function backfillScores(
     if (version === "ELEVEN_STANDARD_V4") {
       concededByOwnClub = row.participation_club_id === fixture.home_club_id ? fixture.away_score
         : row.participation_club_id === fixture.away_club_id ? fixture.home_score : null;
+    }
+    if (version === "ELEVEN_STANDARD_V4" && options.skipUnavailableV4 &&
+        (row.reported_stats == null || !row.scoring_position)) {
+      skipped += 1;
+      errors.push(`V4 unavailable for player=${row.player_id}, fixture=${row.fixture_id}: no rich snapshot or captured position.`);
+      continue;
     }
     const breakdown = scoreStoredPerformance(version, row, player.position, concededByOwnClub);
 

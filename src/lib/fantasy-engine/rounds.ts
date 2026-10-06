@@ -445,18 +445,19 @@ interface StarterRow {
  * needing a second score row or any mutation of the real score.
  */
 export async function refreshMatchupScores(admin: SupabaseClient<Database>, roundId: string): Promise<void> {
-  const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at, scoring_rule_version").eq("id", roundId).maybeSingle();
-  if (!round) return;
+  const { data: round } = await admin.from("fantasy_rounds").select("starts_at, ends_at, scoring_rule_version, status").eq("id", roundId).maybeSingle();
+  if (!round || round.status === "completed") return;
   const version = scoringVersion(round.scoring_rule_version);
 
   const window: RoundWindow = { startsAt: new Date(round.starts_at), endsAt: new Date(round.ends_at) };
   const fixtureIds = await getEligibleFixtureIds(admin, window);
 
-  const { data: matchups } = await admin
+  const { data: candidateMatchups } = await admin
     .from("matchups")
-    .select("id, home_fantasy_team_id, away_fantasy_team_id")
+    .select("id, status, home_fantasy_team_id, away_fantasy_team_id, matchup_scores(final_points)")
     .eq("fantasy_round_id", roundId);
-  if (!matchups || matchups.length === 0) return;
+  const matchups = (candidateMatchups ?? []).filter(m => m.status !== "final" && !(m.matchup_scores ?? []).some(s => s.final_points !== null));
+  if (matchups.length === 0) return;
 
   const teamIds = Array.from(new Set(matchups.flatMap((m) => [m.home_fantasy_team_id, m.away_fantasy_team_id])));
 
@@ -520,7 +521,8 @@ export async function refreshMatchupScores(admin: SupabaseClient<Database>, roun
     live_points: (pointsByTeamId.get(teamId) ?? 0) / 100,
   }));
 
-  await admin.from("matchup_scores").upsert(rows, { onConflict: "matchup_id,fantasy_team_id" });
+  const { error: scoreError } = await admin.from("matchup_scores").upsert(rows, { onConflict: "matchup_id,fantasy_team_id" });
+  if (scoreError) throw new Error(`Cannot refresh unfinished matchup scores: ${scoreError.message}`);
 
   // Matchup state: "live" iff at least one of this round's fixtures is
   // currently live/ht, "final" is set separately by finalizeRoundIfReady
@@ -535,7 +537,7 @@ export async function refreshMatchupScores(admin: SupabaseClient<Database>, roun
   await admin
     .from("matchups")
     .update({ status: liveCount && liveCount > 0 ? "live" : "scheduled" })
-    .eq("fantasy_round_id", roundId)
+    .in("id", matchups.map(m => m.id))
     .neq("status", "final");
 }
 
@@ -579,11 +581,14 @@ export async function finalizeRoundIfReady(
 
   await refreshMatchupScores(admin, roundId);
 
-  const { data: matchups } = await admin.from("matchups").select("id").eq("fantasy_round_id", roundId);
+  const { data: matchups } = await admin.from("matchups").select("id, status").eq("fantasy_round_id", roundId);
   for (const matchup of matchups ?? []) {
-    const { data: scores } = await admin.from("matchup_scores").select("id, live_points").eq("matchup_id", matchup.id);
+    if (matchup.status === "final") continue;
+    const { data: scores } = await admin.from("matchup_scores").select("id, live_points, final_points").eq("matchup_id", matchup.id);
     for (const score of scores ?? []) {
-      await admin.from("matchup_scores").update({ final_points: score.live_points }).eq("id", score.id);
+      if (score.final_points !== null && score.final_points !== undefined) continue;
+      const { error } = await admin.from("matchup_scores").update({ final_points: score.live_points }).eq("id", score.id).is("final_points", null);
+      if (error) throw new Error(`Cannot settle matchup score: ${error.message}`);
     }
     await admin.from("domain_events").insert({
       event_type: "MATCHUP_FINALIZED",
@@ -594,8 +599,10 @@ export async function finalizeRoundIfReady(
     });
   }
 
-  await admin.from("matchups").update({ status: "final" }).eq("fantasy_round_id", roundId);
-  await admin.from("fantasy_rounds").update({ status: "completed" }).eq("id", roundId);
+  const { error: matchupError } = await admin.from("matchups").update({ status: "final" }).eq("fantasy_round_id", roundId);
+  if (matchupError) throw new Error(`Cannot settle matchups: ${matchupError.message}`);
+  const { error: roundError } = await admin.from("fantasy_rounds").update({ status: "completed" }).eq("id", roundId);
+  if (roundError) throw new Error(`Cannot complete round: ${roundError.message}`);
 
   await admin.from("domain_events").insert({
     event_type: "ROUND_FINALIZED",

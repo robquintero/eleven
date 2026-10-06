@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { FORMATION_RULES, ROSTER_RULES } from "@/domain/fantasy/constants";
 import { HistoricalScoringRules } from "@/components/players/historical-scoring-rules";
 import { ScoringRulesV4 } from "@/components/players/scoring-rules-v4";
-import { SCORING_RULE_VERSION_V3, SCORING_V3_WEIGHTS, type ScoringRuleVersion } from "@/domain/fantasy/scoring";
+import { SCORING_RULE_VERSION_V3, SCORING_RULE_VERSION_V4, SCORING_V3_WEIGHTS, type ScoringRuleVersion } from "@/domain/fantasy/scoring";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -26,16 +26,8 @@ function Row({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-/**
- * Pass 14.6 §Phase 9: "ELEVEN GAME RULES" — a lightweight info surface
- * reachable from the active league control in the top bar, never a
- * navigation away from the current workflow. The scoring section renders
- * directly from `SCORING_V3_WEIGHTS` (domain/fantasy/scoring.ts) — the
- * SAME constants the real engine computes from — so this can never
- * silently drift from the actual formula; a weight change there is
- * automatically reflected here with no second edit.
- */
-export function GameRulesDialog({ version = SCORING_RULE_VERSION_V3 }: { version?: ScoringRuleVersion }) {
+/** Current canonical Game Rules; legacy versions remain readable as historical rules. */
+export function GameRulesDialog({ version = SCORING_RULE_VERSION_V4 }: { version?: ScoringRuleVersion }) {
   const [open, setOpen] = useState(false);
   const w = SCORING_V3_WEIGHTS;
 
