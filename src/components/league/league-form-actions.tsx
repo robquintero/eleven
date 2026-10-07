@@ -7,13 +7,16 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle, Dia
 import { CreateLeagueForm, JoinLeagueForm } from "./league-forms";
 
 /** Existing actions and fields, mounted only when their flow is opened. */
-export function LeagueFormActions() {
+export function LeagueFormActions({ choices = false }: { choices?: boolean }) {
   const [flow, setFlow] = useState<"create" | "join" | null>(null);
   return <Dialog open={flow !== null} onOpenChange={open => { if (!open) setFlow(null); }}>
-    <div className="flex flex-wrap gap-2">
+    {choices ? <div className="onboarding-choices">
+      <div><h2>Create a league</h2><p>Bring your managers together. You’ll be the commissioner and choose when to start the draft.</p><DialogTrigger onClick={() => setFlow("create")} render={<Button />}>Create league</DialogTrigger></div>
+      <div><h2>Join a league</h2><p>Have an invite? Use the code from your commissioner and give your team a name.</p><DialogTrigger onClick={() => setFlow("join")} render={<Button variant="outline" />}>Join league</DialogTrigger></div>
+    </div> : <div className="flex flex-wrap gap-2">
       <DialogTrigger onClick={() => setFlow("create")} render={<Button variant="outline" className="v2-secondary-button" />}><Plus className="size-4" />Create league</DialogTrigger>
       <DialogTrigger onClick={() => setFlow("join")} render={<Button variant="outline" className="v2-secondary-button" />}><UserPlus className="size-4" />Join league</DialogTrigger>
-    </div>
+    </div>}
     <DialogContent className="eleven-v2 v2-dialog sm:max-w-md">
       <DialogTitle>{flow === "create" ? "Create a league" : "Join a league"}</DialogTitle>
       <DialogDescription>{flow === "create" ? "Build your league and name your first team." : "Use an invite code from your commissioner to join."}</DialogDescription>

@@ -32,7 +32,7 @@
 .core-v2 .core-progress-side { display: flex; flex-wrap: wrap; gap: 8px 16px; color: var(--v2-secondary); font-size: 12px; }
 .core-v2 .core-progress-side strong { font-size: 16px; font-variant-numeric: tabular-nums; margin-right: 4px; }
 .core-v2 .core-compact-player { display: flex; flex-direction: column; min-height: 90px; padding: 12px 10px; gap: 7px; width: 100%; text-align: left; }
-.core-v2 .core-compact-player:hover { background: var(--v2-hover); }
+@media (hover: hover) and (pointer: fine) { .core-v2 .core-compact-player:hover { background: var(--v2-hover); } }
 .core-v2 .core-compact-name { font-size: 13px; line-height: 1.35; font-weight: 550; width: 100%; min-width: 0; overflow-wrap: anywhere; }
 .core-v2 .core-compact-meta { display: flex; align-items: center; justify-content: space-between; gap: 4px; width: 100%; font-size: 11px; color: var(--v2-muted); }
 .core-v2 .core-compact-points { font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; color: var(--v2-text); }
@@ -96,7 +96,7 @@
 .core-v2 .core-player-name { display: block; font-size: 14px; line-height: 1.35; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .core-v2 .core-player-club { display: block; font-size: 11px; color: var(--v2-muted); line-height: 1.45; }
 .core-v2 .core-catalog-points { font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; }
-.core-v2 .core-player-table tbody tr:hover,.core-v2 .core-mobile-result:hover { background: var(--v2-hover); }
+@media (hover: hover) and (pointer: fine) { .core-v2 .core-player-table tbody tr:hover,.core-v2 .core-mobile-result:hover { background: var(--v2-hover); } }
 .core-v2 .core-row-selected { background: var(--v2-selected); box-shadow: inset 3px 0 var(--v2-accent); }
 .core-v2 .core-row-highlighted { outline: 1px solid var(--v2-accent); outline-offset: -1px; }
 .core-v2 .core-mobile-result { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 12px; padding: 12px; }
@@ -136,7 +136,7 @@
 .core-v2 .core-draft-clock { text-align: right; }
 .core-v2 .core-draft-clock > p:nth-child(2) { font-size: 72px; line-height: 1.2; font-weight: 650; letter-spacing: -.05em; font-variant-numeric: tabular-nums; }
 .core-v2 .core-draft-player { display: flex; min-width: 0; align-items: center; gap: 14px; padding: 10px 16px; }
-.core-v2 .core-draft-player:hover { background: var(--v2-hover); }
+@media (hover: hover) and (pointer: fine) { .core-v2 .core-draft-player:hover { background: var(--v2-hover); } }
 .core-v2 .core-draft-points { flex-shrink: 0; font-size: 18px; font-weight: 650; font-variant-numeric: tabular-nums; text-align: right; }
 .core-v2 .core-draft-player > :last-child { min-width: 64px; justify-content: center; }
 .core-v2 .core-draft-board { overflow: hidden; }

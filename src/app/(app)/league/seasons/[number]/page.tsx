@@ -4,7 +4,8 @@ import { ArrowLeft, Trophy } from "lucide-react";
 import { StandingsTable } from "@/components/league/standings-table";
 import { LeagueMatchups } from "@/components/league/league-matchups";
 import { TransitionLink } from "@/components/shell/transition-link";
-import { ModuleHeader } from "@/components/ui/module-header";
+import { V2Heading, V2Surface } from "@/components/ui/v2";
+import "../../v2.css";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getSeasonArchiveDetail } from "@/data-access/seasons";
 import { getUserLeagues } from "@/data-access/leagues";
@@ -43,15 +44,15 @@ export default async function SeasonArchiveDetailPage({ params }: { params: Prom
   if (!detail) notFound();
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="eleven-v2 archive-v2 flex flex-col gap-6">
       <div>
         <TransitionLink
           href="/league"
           label="League"
-          className="label-system flex items-center gap-1.5 text-[11px] text-foreground-tertiary hover:text-foreground"
+          className="v2-link gap-1.5"
         >
           <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-          BACK TO LEAGUE
+          Back to league
         </TransitionLink>
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">Season {detail.seasonNumber}</h1>
@@ -67,19 +68,13 @@ export default async function SeasonArchiveDetailPage({ params }: { params: Prom
         )}
       </div>
 
-      <section className="border border-border">
-        <div className="border-b border-border px-4 py-2.5">
-          <ModuleHeader title="FINAL_TABLE" meta={`${detail.standings.length} TEAMS`} />
-        </div>
-        <StandingsTable standings={detail.standings} myTeamId={myTeam?.id ?? null} />
-      </section>
+      <V2Surface><V2Heading title={detail.status === "COMPLETED" ? "Final standings" : "Standings"} meta={<span className="v2-meta">{detail.standings.length} teams</span>} />
+        <StandingsTable variant="v2" standings={detail.standings} myTeamId={myTeam?.id ?? null} />
+      </V2Surface>
 
-      <section className="border border-border">
-        <div className="border-b border-border px-4 py-2.5">
-          <ModuleHeader title="RESULTS" meta={`${detail.results.length} MATCHUPS`} />
-        </div>
-        <LeagueMatchups matchups={detail.results} myTeamId={myTeam?.id ?? null} emptyLabel="NO RESULTS FOR THIS SEASON" />
-      </section>
+      <V2Surface><V2Heading title="Results" meta={<span className="v2-meta">{detail.results.length} matchups</span>} />
+        <div className="px-4 pb-4 sm:px-6"><LeagueMatchups variant="v2" compact preserveOrder matchups={detail.results} myTeamId={myTeam?.id ?? null} emptyLabel="No results for this season yet." /></div>
+      </V2Surface>
     </div>
   );
 }

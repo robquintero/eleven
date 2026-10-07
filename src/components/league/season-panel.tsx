@@ -53,11 +53,11 @@ export function SeasonPanel({
     <div className="v2-season-panel mt-4 border border-border p-4">
       {season.championTeamName ? (
         <div className="flex items-center gap-2">
-          <Trophy className="size-4 text-accent" strokeWidth={1.75} />
-          <p className="text-sm font-medium text-foreground">{season.championTeamName} — Season {season.seasonNumber} Champion</p>
+          <Trophy className="size-4 shrink-0 text-accent" strokeWidth={1.75} />
+          <p className="min-w-0 text-sm font-medium text-foreground [overflow-wrap:anywhere]">{season.championTeamName} — Season {season.seasonNumber} Champion</p>
         </div>
       ) : (
-        <p className="label-system text-[11px] text-foreground-tertiary">SEASON {season.seasonNumber} COMPLETED</p>
+        <p className="label-system text-[11px] text-foreground-tertiary">Season {season.seasonNumber} completed</p>
       )}
 
       {isCommissioner && (
@@ -85,20 +85,20 @@ function ScheduleFormatForm({ leagueId }: { leagueId: string }) {
           className="label-system flex cursor-pointer items-center gap-1.5 border border-border px-2.5 py-1.5 text-[11px] text-foreground-secondary has-checked:border-accent has-checked:text-accent"
         >
           <input type="radio" name="cycles" value={cycles} defaultChecked={cycles === 2} className="accent-accent" />
-          {SCHEDULE_CYCLES_LABEL[cycles]}
+          {SCHEDULE_CYCLES_LABEL[cycles].slice(0, 1) + SCHEDULE_CYCLES_LABEL[cycles].slice(1).toLowerCase()}
         </label>
       ))}
       <Button type="submit" disabled={pending} className="rounded-control">
         {pending ? "Saving…" : "Set format"}
       </Button>
-      {state?.error && <p className="w-full text-xs text-destructive">{state.error}</p>}
+      {state?.error && <p role="alert" className="w-full text-sm text-destructive">{state.error}</p>}
     </form>
   );
 }
 
 const ROSTER_MODE_OPTIONS: { value: RosterMode; label: string; description: string }[] = [
-  { value: "REDRAFT", label: "REDRAFT", description: "Release every roster and run a fresh snake draft." },
-  { value: "KEEP_ROSTERS", label: "KEEP ROSTERS", description: "Carry every roster forward (ineligible players are released)." },
+  { value: "REDRAFT", label: "Redraft", description: "Release every roster and run a fresh snake draft." },
+  { value: "KEEP_ROSTERS", label: "Keep rosters", description: "Carry every roster forward (ineligible players are released)." },
 ];
 
 function StartNextSeasonForm({ leagueId, defaultCycles }: { leagueId: string; defaultCycles: ScheduleCycles }) {
@@ -130,7 +130,7 @@ function StartNextSeasonForm({ leagueId, defaultCycles }: { leagueId: string; de
             className="label-system flex cursor-pointer items-center gap-1.5 border border-border px-2.5 py-1.5 text-[11px] text-foreground-secondary has-checked:border-accent has-checked:text-accent"
           >
             <input type="radio" name="cycles" value={cycles} defaultChecked={cycles === defaultCycles} className="accent-accent" />
-            {SCHEDULE_CYCLES_LABEL[cycles]}
+            {SCHEDULE_CYCLES_LABEL[cycles].slice(0, 1) + SCHEDULE_CYCLES_LABEL[cycles].slice(1).toLowerCase()}
           </label>
         ))}
       </div>
@@ -138,7 +138,7 @@ function StartNextSeasonForm({ leagueId, defaultCycles }: { leagueId: string; de
       <Button type="submit" disabled={pending} className="w-full rounded-control">
         {pending ? "Starting…" : "Start next season"}
       </Button>
-      {state?.error && <p className="text-xs text-destructive">{state.error}</p>}
+      {state?.error && <p role="alert" className="text-sm text-destructive">{state.error}</p>}
     </form>
   );
 }

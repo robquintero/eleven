@@ -6,7 +6,7 @@ import type { LeagueLifecycleState } from "@/domain/fantasy/league-lifecycle";
 
 const nextActionCopy: Partial<Record<LeagueLifecycleState, string>> = {
   WAITING_FOR_MANAGERS: `Invite more managers — the commissioner can start the draft once at least ${MIN_MANAGERS_TO_START_DRAFT} have joined, without waiting for the full league.`,
-  READY_FOR_DRAFT: "Your league has enough managers — the draft isn't built yet.",
+  READY_FOR_DRAFT: "Your league is ready. Open the draft room for the next step.",
 };
 
 /**

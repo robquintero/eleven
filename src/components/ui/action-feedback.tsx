@@ -18,7 +18,7 @@ export function ActionFeedback({ kind, message }: { kind: ActionFeedbackKind; me
     <div
       role={kind === "error" ? "alert" : "status"}
       className={cn(
-        "mt-2 flex items-start gap-2 border px-3 py-2 text-xs",
+        "action-feedback mt-2 flex items-start gap-2 border px-3 py-2 text-xs",
         kind === "rule" ? "border-warning/30 bg-warning/5 text-foreground-secondary" : "border-destructive/30 bg-destructive/5 text-destructive"
       )}
     >

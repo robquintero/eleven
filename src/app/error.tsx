@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import { Wordmark } from "@/components/shell/wordmark";
+import { SystemState } from "@/components/shell/system-state";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -14,35 +15,22 @@ import { Button } from "@/components/ui/button";
  */
 export default function GlobalError({
   error,
+  retry,
   reset,
 }: {
   error: Error & { digest?: string };
+  retry?: () => void;
   reset: () => void;
 }) {
   useEffect(() => {
     console.error(error);
   }, [error]);
 
-  return (
-    <div className="flex min-h-dvh flex-col items-center justify-center gap-8 px-4 py-12 text-center">
-      <Wordmark />
-      <div>
-        <p className="label-system text-xs text-foreground-tertiary">ERROR</p>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          Something went wrong.
-        </h1>
-        <p className="mt-3 max-w-sm text-sm text-foreground-secondary">
-          This has been logged. Try again, or head back to Eleven.
-        </p>
-      </div>
-      <div className="flex items-center gap-3">
-        <Button variant="outline" onClick={reset}>
-          Try again
-        </Button>
-        <Button nativeButton={false} render={<Link href="/" />}>
-          Back to Eleven
-        </Button>
-      </div>
-    </div>
-  );
+  return <div className="eleven-v2 product-v2 recovery-v2">
+    <Wordmark />
+    <main id="main-content"><SystemState title="Something went wrong." description="Try again, or return to Eleven to continue.">
+      <Button variant="outline" onClick={retry ?? reset}>Try again</Button>
+      <Button nativeButton={false} render={<Link href="/" />}>Back to Eleven</Button>
+    </SystemState></main>
+  </div>;
 }

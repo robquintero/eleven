@@ -66,7 +66,7 @@ export function TradeDesk({
       </div>
 
       {error && (
-        <p className="label-system mt-2 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
+        <p role="alert" className="action-feedback mt-2 border border-destructive/30 bg-destructive/10 px-3 py-2 text-[11px] text-destructive">
           {error}
         </p>
       )}

@@ -12,7 +12,6 @@ import {
   SOCIAL_IMAGE_WIDTH,
   SOCIAL_IMAGE_HEIGHT,
   SOCIAL_IMAGE_ALT,
-  BRAND_BACKGROUND_COLOR,
 } from "@/lib/site-config";
 import "./globals.css";
 
@@ -81,7 +80,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: BRAND_BACKGROUND_COLOR,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+  themeColor: "#0d0f12",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

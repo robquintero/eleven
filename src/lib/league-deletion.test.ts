@@ -45,14 +45,14 @@ test('dialog: actual name, exact phrase gating, Enter suppressed, cancel/reset a
   let calls=0,finish!:(value:unknown)=>void;const view=ui(async()=>{calls++;return new Promise(resolve=>{finish=resolve;});});
   const open=view.find('Dialog').onOpenChange as (value:boolean)=>void;open(true);
   assert.equal(text(view.find('DialogTitle').children),'Delete Actual Commissioner League?');
-  assert.equal(view.find('Button','Permanently Delete League').disabled,true);
+  assert.equal(view.find('Button','Permanently delete league').disabled,true);
   const input=view.find('Input');let prevented=false;(input.onKeyDown as (e:unknown)=>void)({key:'Enter',preventDefault:()=>{prevented=true;}});assert.equal(prevented,true);
-  for(const value of ['delete',' DELETE','DELETE ']){(input.onChange as (e:unknown)=>void)({target:{value}});assert.equal(view.find('Button','Permanently Delete League').disabled,true);}
+  for(const value of ['delete',' DELETE','DELETE ']){(input.onChange as (e:unknown)=>void)({target:{value}});assert.equal(view.find('Button','Permanently delete league').disabled,true);}
   (input.onChange as (e:unknown)=>void)({target:{value:'DELETE'}});
-  assert.equal(view.find('Button','Permanently Delete League').disabled,false);
+  assert.equal(view.find('Button','Permanently delete league').disabled,false);
   (view.find('Button','Cancel').onClick as ()=>void)();assert.equal(view.find('Dialog').open,false);assert.equal(view.find('Input').value,'');
   open(true);(input.onChange as (e:unknown)=>void)({target:{value:'DELETE'}});
-  const submit=view.find('Button','Permanently Delete League').onClick as ()=>void;submit();submit();assert.equal(calls,1);
+  const submit=view.find('Button','Permanently delete league').onClick as ()=>void;submit();submit();assert.equal(calls,1);
   assert.equal(view.find('Button','Deleting…').disabled,true);assert.equal(view.find('Button','Cancel').disabled,true);
   open(false);assert.equal(view.find('Dialog').open,true);
   assert.ok(view.render().some(n=>n.props.role==='status'&&text(n.props.children).includes('Deleting league')));
@@ -64,7 +64,7 @@ test('dialog success closes and soft-navigates home; transport failure stays ope
     const view=ui(async(league,phrase)=>{assert.equal(league,'target-id');assert.equal(phrase,'DELETE');if(!succeeds)throw new Error('transport');return {success:true};});
     (view.find('Dialog').onOpenChange as (value:boolean)=>void)(true);
     (view.find('Input').onChange as (e:unknown)=>void)({target:{value:'DELETE'}});
-    (view.find('Button','Permanently Delete League').onClick as ()=>void)();await view.done();
+    (view.find('Button','Permanently delete league').onClick as ()=>void)();await view.done();
     assert.equal(view.find('Dialog').open,!succeeds);assert.deepEqual(view.destinations,succeeds?['/']:[]);
   }
 });

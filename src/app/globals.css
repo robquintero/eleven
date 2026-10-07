@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "./eleven-v2.css";
+@import "./product-v2.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -80,7 +81,7 @@
 
 :root {
   /* Base surfaces */
-  --background: #f5f5f7;
+  --background: #e9edf3;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
 
@@ -166,7 +167,7 @@
 }
 
 .dark {
-  --background: #000000;
+  --background: #0d0f12;
   --surface: #131316;
   --surface-elevated: #1c1c1f;
 
@@ -282,3 +283,9 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Platform feedback without suppressing document selection or browser zoom. */
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; }
+button, a, [role="button"] { touch-action: manipulation; }
+button, [role="button"] { -webkit-user-select: none; user-select: none; }
+.eleven-v2 button:active:not(:disabled) { opacity: .85; }

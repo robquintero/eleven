@@ -304,19 +304,19 @@ export function ProposeTradeDialog({
                   setTargetTeamId(t.id);
                   setStep("players");
                 }}
-                className="label-system flex items-center justify-between border border-border px-3 py-2 text-left text-[11px] text-foreground hover:bg-muted"
+                className="trade-choice flex items-center justify-between border border-border px-3 py-2 text-left text-[11px] text-foreground hover:bg-muted"
               >
-                {t.name}
+                <span className="min-w-0 [overflow-wrap:anywhere]">{t.name}</span>
               </button>
             ))}
           </div>
         )}
 
         {step === "players" && targetTeam && (
-          <div className="grid max-h-80 grid-cols-1 gap-4 overflow-y-auto sm:grid-cols-2 sm:gap-3">
+          <div className="trade-rosters grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-3">
             <div>
-              <p className="label-system text-[10px] text-foreground-tertiary">YOU SEND</p>
-              <div className="mt-1.5 flex flex-col gap-1">
+              <p id="trade-send-label" className="label-system text-[10px] text-foreground-tertiary">You send</p>
+              <div role="group" aria-labelledby="trade-send-label" className="trade-roster-scroll mt-1.5 flex flex-col gap-1">
                 {myRoster.length === 0 && (
                   <p className="text-xs text-foreground-tertiary">No players on your roster.</p>
                 )}
@@ -331,8 +331,8 @@ export function ProposeTradeDialog({
               </div>
             </div>
             <div>
-              <p className="label-system text-[10px] text-foreground-tertiary">YOU RECEIVE</p>
-              <div className="mt-1.5 flex flex-col gap-1">
+              <p id="trade-receive-label" className="label-system text-[10px] text-foreground-tertiary">You receive</p>
+              <div role="group" aria-labelledby="trade-receive-label" className="trade-roster-scroll mt-1.5 flex flex-col gap-1">
                 {targetRoster.length === 0 && (
                   <p className="text-xs text-foreground-tertiary">No players on their roster.</p>
                 )}
@@ -353,8 +353,8 @@ export function ProposeTradeDialog({
 
         {step === "review" && targetTeam && (
           <div className="text-xs">
-            <p className="label-system text-[11px] text-foreground-tertiary">TO {targetTeam.name.toUpperCase()}</p>
-            <p className="mt-2 label-system text-[10px] text-foreground-tertiary">YOU SEND</p>
+            <p className="label-system text-[11px] text-foreground-tertiary">To {targetTeam.name}</p>
+            <p className="mt-2 label-system text-[10px] text-foreground-tertiary">You send</p>
             {myRoster
               .filter((p) => offeredIds.includes(p.id))
               .map((p) => (
@@ -362,7 +362,7 @@ export function ProposeTradeDialog({
                   {p.name}
                 </p>
               ))}
-            <p className="mt-2 label-system text-[10px] text-foreground-tertiary">YOU RECEIVE</p>
+            <p className="mt-2 label-system text-[10px] text-foreground-tertiary">You receive</p>
             {targetRoster
               .filter((p) => requestedIds.includes(p.id))
               .map((p) => (
@@ -425,12 +425,12 @@ function TradePlayerRow({
       role="checkbox"
       aria-checked={selected}
       onClick={onToggle}
-      className={`flex w-full cursor-pointer items-center gap-2 rounded-control border px-2 py-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 ${
+      className={`trade-player flex w-full cursor-pointer items-center gap-2 rounded-control border px-2 py-1.5 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 ${
         selected ? "border-accent bg-accent/10" : "border-border hover:bg-muted"
       }`}
     >
       <PositionBadge position={player.position} />
-      <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">{player.name}</span>
+      <span className="min-w-0 flex-1 text-xs font-medium text-foreground [overflow-wrap:anywhere]">{player.name}</span>
       <Check
         className={`size-3.5 shrink-0 text-accent transition-opacity ${selected ? "opacity-100" : "opacity-0"}`}
         aria-hidden="true"
@@ -450,20 +450,20 @@ function TradeCountHint({ offeredCount, requestedCount }: { offeredCount: number
   const difference = offeredCount - requestedCount;
 
   return (
-    <div className="mt-3 flex items-center justify-between gap-3 border-t border-border pt-3 text-xs">
+    <div className="mt-3 trade-count-hint flex items-center justify-between gap-3 border-t border-border pt-3 text-xs">
       <div className="flex items-center gap-4">
         <span className="label-system text-[10px] text-foreground-tertiary">
-          YOUR SIDE <span className="font-semibold text-foreground">{offeredCount}</span>
+          Your side <span className="font-semibold text-foreground">{offeredCount}</span>
         </span>
         <span className="label-system text-[10px] text-foreground-tertiary">
-          THEIR SIDE <span className="font-semibold text-foreground">{requestedCount}</span>
+          Their side <span className="font-semibold text-foreground">{requestedCount}</span>
         </span>
       </div>
       {difference !== 0 && (offeredCount > 0 || requestedCount > 0) && (
         <span className="label-system text-[10px] text-accent">
           {difference > 0
-            ? `ADD ${difference} PLAYER${difference === 1 ? "" : "S"} FROM THEIR TEAM`
-            : `ADD ${-difference} PLAYER${-difference === 1 ? "" : "S"} FROM YOUR TEAM`}
+            ? `Add ${difference} player${difference === 1 ? "" : "s"} from their team`
+            : `Add ${-difference} player${-difference === 1 ? "" : "s"} from your team`}
         </span>
       )}
     </div>

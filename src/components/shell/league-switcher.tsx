@@ -1,5 +1,6 @@
 "use client";
 
+import { useMenuFocus } from "./use-menu-focus";
 import { useState, useTransition } from "react";
 import { Check, ChevronDown, Trophy } from "lucide-react";
 import { setActiveLeagueAction } from "@/app/(app)/actions";
@@ -22,6 +23,7 @@ export function LeagueSwitcher({
   activeLeagueId: string | null;
 }) {
   const [open, setOpen] = useState(false);
+  const { triggerRef, menuRef } = useMenuFocus(open, setOpen);
   const [pending, startTransition] = useTransition();
 
   if (leagues.length === 0) {
@@ -64,6 +66,7 @@ export function LeagueSwitcher({
         onClick={() => setOpen((v) => !v)}
         aria-label={`Active league: ${active.name}`}
         title={active.name}
+        ref={triggerRef}
         aria-expanded={open}
         aria-haspopup="listbox"
         disabled={pending}
@@ -87,11 +90,15 @@ export function LeagueSwitcher({
           <button
             type="button"
             aria-label="Close league switcher"
-            onClick={() => setOpen(false)}
+            onClick={() => { setOpen(false); triggerRef.current?.focus(); }}
+            onPointerDown={event => event.preventDefault()}
+            tabIndex={-1}
             className="fixed inset-0 z-40 cursor-default"
           />
           <div
+            ref={menuRef}
             role="listbox"
+            aria-label="Your leagues"
             className="v2-shell-menu absolute top-full left-0 z-50 mt-2 w-64 max-w-[calc(100vw-5rem)] border border-border bg-surface-elevated shadow-lg shadow-black/30"
           >
             {leagues.map((league) => {

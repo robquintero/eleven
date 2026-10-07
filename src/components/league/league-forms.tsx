@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 function FieldError({ error }: { error?: string }) {
   if (!error) return null;
   return (
-    <p className="flex items-start gap-2 text-xs text-destructive">
+    <p role="alert" className="flex items-start gap-2 text-sm text-destructive">
       <AlertCircle className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
       {error}
     </p>
@@ -23,7 +23,7 @@ export function CreateLeagueForm() {
   );
 
   return (
-    <form action={formAction} aria-label="Create league" className="v2-form">
+    <form action={formAction} aria-label="Create league" aria-busy={pending} className="v2-form">
       <label className="block">
         <span className="block">
           League name
@@ -42,6 +42,9 @@ export function CreateLeagueForm() {
         </span>
         <Input
           name="teamAbbreviation"
+          autoCapitalize="characters"
+          autoComplete="off"
+          spellCheck={false}
           required
           minLength={2}
           maxLength={5}
@@ -64,13 +67,16 @@ export function JoinLeagueForm() {
   );
 
   return (
-    <form action={formAction} aria-label="Join league" className="v2-form">
+    <form action={formAction} aria-label="Join league" aria-busy={pending} className="v2-form">
       <label className="block">
         <span className="block">
           Invite code
         </span>
         <Input
           name="inviteCode"
+          autoCapitalize="characters"
+          autoComplete="off"
+          spellCheck={false}
           required
           className="mt-1.5 uppercase"
           placeholder="ABCD2345"
@@ -88,6 +94,9 @@ export function JoinLeagueForm() {
         </span>
         <Input
           name="teamAbbreviation"
+          autoCapitalize="characters"
+          autoComplete="off"
+          spellCheck={false}
           required
           minLength={2}
           maxLength={5}

@@ -97,15 +97,15 @@ export function GameRulesDialog({ version = SCORING_RULE_VERSION_V4 }: { version
 
             }
 
-            <Section title="FORMATION">
-              Eleven V1 uses {FORMATION_RULES.positionRange.DEF.max}-{FORMATION_RULES.positionRange.MID.max}-
+            <Section title="Formation">
+              Your XI uses {FORMATION_RULES.positionRange.DEF.max}-{FORMATION_RULES.positionRange.MID.max}-
               {FORMATION_RULES.positionRange.FWD.max}: {FORMATION_RULES.positionRange.GK.max} GK /{" "}
               {FORMATION_RULES.positionRange.DEF.max} DEF / {FORMATION_RULES.positionRange.MID.max} MID /{" "}
               {FORMATION_RULES.positionRange.FWD.max} FWD — {FORMATION_RULES.startersTotal} starters, no formation
               selection.
             </Section>
 
-            <Section title="ROSTER">
+            <Section title="Roster">
               Every roster carries exactly {ROSTER_RULES.squadSize} players: {ROSTER_RULES.positionRange.GK.min} GK,{" "}
               {ROSTER_RULES.positionRange.DEF.min}–{ROSTER_RULES.positionRange.DEF.max} DEF,{" "}
               {ROSTER_RULES.positionRange.MID.min}–{ROSTER_RULES.positionRange.MID.max} MID, and{" "}
@@ -114,39 +114,39 @@ export function GameRulesDialog({ version = SCORING_RULE_VERSION_V4 }: { version
               real backup at every position, not just enough bodies to fill one matchday.
             </Section>
 
-            <Section title="PLAYER LOCKS">
+            <Section title="Player locks">
               Each starter locks individually at kickoff of their first eligible fixture in the fantasy round.
               Locked does not necessarily mean live — a locked player may still be waiting for kickoff, currently
               playing, or already finished; all three are equally immovable for the rest of the round.
             </Section>
 
-            <Section title="ROUND WINDOW">
+            <Section title="Matchweek">
               Fantasy weeks run Tuesday through Monday; Tuesday begins a fresh week. Weekly rollover is
               Tuesday 06:00 UTC. Fixtures belong to the week containing their kickoff, even if they finish
               or their statistics arrive after rollover. Players lock individually at kickoff, not at rollover.
             </Section>
 
-            <Section title="MULTIPLE FIXTURES">
+            <Section title="Multiple fixtures">
               If a player has more than one eligible fixture in the same fantasy round (a club match and an
               international call-up, for example), every eligible performance aggregates into that round&apos;s
               total.
             </Section>
 
-            <Section title="BENCH">
+            <Section title="Bench">
               Bench players&apos; round points are visible for context but never contribute to your matchup total —
               only starters count.
             </Section>
 
-            <Section title="FREE AGENCY / DROPS">
+            <Section title="Free agents and drops">
               A locked player cannot be dropped during the current fantasy round — once their round lock has
               passed, they stay on your roster until the round ends. An unlocked player may be dropped at any
               time.
             </Section>
 
-            <Section title="ACQUISITION POINTS">
+            <Section title="Acquisition points">
               You only receive a player&apos;s fantasy points for performances that happen while you own them. If a
               player already played earlier in the current round before you acquired them, that performance still
-              shows on their record, but it does not count toward your matchup — shown as PRE-ACQUISITION wherever
+              shows on their record, but it does not count toward your matchup — shown as Pre-acquisition wherever
               it appears.
             </Section>
           </div>

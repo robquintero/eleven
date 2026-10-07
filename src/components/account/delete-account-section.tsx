@@ -18,8 +18,7 @@ export function DeleteAccountSection({ email, blockedReason }: { email: string; 
   const canSubmit = confirmText.trim().toLowerCase() === email.toLowerCase();
 
   return (
-    <div className="border border-destructive/30 bg-destructive/5 p-4">
-      <p className="label-system text-[11px] text-destructive">DELETE_ACCOUNT</p>
+    <div className="account-delete">
 
       {blockedReason ? (
         <p className="mt-1.5 text-sm text-foreground-secondary">{blockedReason}</p>
@@ -30,9 +29,11 @@ export function DeleteAccountSection({ email, blockedReason }: { email: string; 
           </p>
           <form action={formAction} className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
             <label className="block flex-1">
-              <span className="label-system text-[11px] text-foreground-tertiary">Type {email} to confirm</span>
+              <span className="auth-label [overflow-wrap:anywhere]">Type {email} to confirm</span>
               <Input
                 name="confirmEmail"
+                autoCapitalize="none"
+                spellCheck={false}
                 required
                 autoComplete="off"
                 className="mt-1.5"
@@ -44,7 +45,7 @@ export function DeleteAccountSection({ email, blockedReason }: { email: string; 
               {pending ? "Deleting…" : "Delete account"}
             </Button>
           </form>
-          {state?.error && <p className="mt-2 text-xs text-destructive">{state.error}</p>}
+          {state?.error && <p role="alert" className="mt-2 text-sm text-destructive">{state.error}</p>}
         </>
       )}
     </div>

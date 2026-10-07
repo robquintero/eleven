@@ -79,6 +79,7 @@ test("normal, compact and inline position labels share one semantic tone without
     }
     assert.equal(text(label), position);
     assert.match(String(badge.props.className), /w-9 py-1/);
+    assert.ok(String(badge.props.className).includes(`bg-position-${position.toLowerCase()}/5`));
     assert.match(String(compact.props.className), /w-3 py-0\.5/);
   }
   const unknown = PositionLabel({ position: "UNKNOWN" });
@@ -94,15 +95,22 @@ test("position text meets 4.5:1 contrast on dark/light surfaces and selected, ho
   const luminance = (color: RGB) => color.map(n => n / 255).map(n => n <= 0.04045 ? n / 12.92 : ((n + 0.055) / 1.055) ** 2.4)
     .reduce((sum, n, i) => sum + n * [0.2126, 0.7152, 0.0722][i], 0);
   const contrast = (a: RGB, b: RGB) => (Math.max(luminance(a), luminance(b)) + 0.05) / (Math.min(luminance(a), luminance(b)) + 0.05);
-  for (const theme of [":root", ".dark"]) {
-    const block = css.slice(css.indexOf(`${theme} {`)).split("}")[0];
-    const token = (name: string) => rgb(block.match(new RegExp(`--${name}: (#[0-9a-f]{6});`))![1]);
+  const v2 = readFileSync(resolve(root, "src/app/eleven-v2.css"), "utf8");
+  for (const theme of [":root", ".dark", ".eleven-v2", ".dark .eleven-v2"]) {
+    const legacy = theme.startsWith(".dark") ? ".dark" : ":root";
+    const legacyBlock = css.slice(css.indexOf(`${legacy} {`)).split("}")[0];
+    const block = theme.includes("eleven-v2") ? v2.slice(v2.indexOf(`${theme} {`)).split("}")[0] : legacyBlock;
+    const aliases: Record<string, string> = { background: "v2-canvas", surface: "v2-surface", "surface-elevated": "v2-inset", accent: "v2-accent", warning: "v2-warning", foreground: "v2-text" };
+    const token = (name: string) => {
+      const position = name.startsWith("position-");
+      return rgb((position ? legacyBlock : block).match(new RegExp(`--${!position && theme.includes("eleven-v2") ? aliases[name] : name}: (#[0-9a-f]{6});`))![1]);
+    };
     const surfaces = ["background", "surface", "surface-elevated"].map(token);
     const rowBackgrounds = surfaces.flatMap(surface => [surface, mix(token("accent"), surface, 0.1), mix(token("warning"), surface, 0.05), mix(token("foreground"), surface, 0.05)]);
     for (const position of ["gk", "def", "mid", "fwd"]) {
       const color = token(`position-${position}`);
       for (const surface of rowBackgrounds) {
-        for (const background of [surface, mix(color, surface, 0.1)]) {
+        for (const background of [surface, mix(color, surface, 0.05)]) {
           assert.ok(contrast(color, background) >= 4.5, `${theme} ${position}: ${contrast(color, background).toFixed(2)}:1`);
         }
       }

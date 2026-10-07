@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-panel";
+import { AuthPanel, AuthPanelSection } from "@/components/auth/auth-panel";
 import { CheckYourEmail } from "@/components/auth/check-your-email";
 import { resendConfirmationEmail, type AuthActionState, type ResendConfirmationState } from "@/data-access/auth";
 
@@ -18,7 +18,6 @@ interface AuthFormProps {
 
 const copy = {
   "sign-in": {
-    header: "SIGN_IN",
     title: "Sign in",
     submitLabel: "Sign in",
     footerPrompt: "New to Eleven?",
@@ -26,7 +25,6 @@ const copy = {
     footerLinkLabel: "Create an account",
   },
   "sign-up": {
-    header: "CREATE_ACCOUNT",
     title: "Create your account",
     submitLabel: "Create account",
     footerPrompt: "Already have an account?",
@@ -47,15 +45,15 @@ export function AuthForm({ mode, action, callbackError }: AuthFormProps) {
   }
 
   return (
-    <TerminalPanel header={text.header}>
-      <TerminalPanelSection>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+    <AuthPanel>
+      <AuthPanelSection>
+        <h1 className="auth-title">
           {text.title}
         </h1>
 
-        <form action={formAction} className="mt-5 space-y-4">
+        <form action={formAction} aria-busy={pending} className="mt-5 space-y-4">
           {callbackError && (
-            <p className="flex items-start gap-2 text-xs text-destructive">
+            <p role="alert" className="flex items-start gap-2 text-sm text-destructive">
               <AlertCircle className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
               {callbackError}
             </p>
@@ -63,7 +61,7 @@ export function AuthForm({ mode, action, callbackError }: AuthFormProps) {
 
           {mode === "sign-up" && (
             <label className="block">
-              <span className="label-system text-[11px] text-foreground-tertiary">
+              <span className="auth-label">
                 Display name
               </span>
               <Input
@@ -78,10 +76,10 @@ export function AuthForm({ mode, action, callbackError }: AuthFormProps) {
           )}
 
           <label className="block">
-            <span className="label-system text-[11px] text-foreground-tertiary">Email</span>
+            <span className="auth-label">Email</span>
             <Input
               name="email"
-              type="email"
+              type="email" autoCapitalize="none" spellCheck={false}
               autoComplete="email"
               required
               className="mt-1.5"
@@ -89,11 +87,9 @@ export function AuthForm({ mode, action, callbackError }: AuthFormProps) {
             />
           </label>
 
-          <label className="block">
-            <div className="flex items-baseline justify-between">
-              <span className="label-system text-[11px] text-foreground-tertiary">
-                Password
-              </span>
+          <div className="block">
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="auth-password" className="auth-label">Password</label>
               {mode === "sign-in" && (
                 <Link href="/forgot-password" className="label-system text-[11px] text-accent hover:underline">
                   Forgot password?
@@ -101,6 +97,7 @@ export function AuthForm({ mode, action, callbackError }: AuthFormProps) {
               )}
             </div>
             <Input
+              id="auth-password"
               name="password"
               type="password"
               autoComplete={mode === "sign-up" ? "new-password" : "current-password"}
@@ -109,32 +106,32 @@ export function AuthForm({ mode, action, callbackError }: AuthFormProps) {
               className="mt-1.5"
               placeholder="••••••••"
             />
-          </label>
+          </div>
 
           {state?.error && (
-            <p className="flex items-start gap-2 text-xs text-destructive">
+            <p role="alert" className="flex items-start gap-2 text-sm text-destructive">
               <AlertCircle className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
               {state.error}
             </p>
           )}
 
           <Button type="submit" disabled={pending} className="w-full rounded-control">
-            {pending ? "Working…" : text.submitLabel}
+            {pending ? mode === "sign-in" ? "Signing in…" : "Creating account…" : text.submitLabel}
           </Button>
         </form>
 
         {state?.unconfirmedEmail && <ResendInline email={state.unconfirmedEmail} />}
-      </TerminalPanelSection>
+      </AuthPanelSection>
 
-      <TerminalPanelSection>
-        <p className="text-center text-xs text-foreground-tertiary">
+      <AuthPanelSection>
+        <p className="auth-footer">
           {text.footerPrompt}{" "}
           <Link href={text.footerHref} className="text-accent hover:underline">
             {text.footerLinkLabel}
           </Link>
         </p>
-      </TerminalPanelSection>
-    </TerminalPanel>
+      </AuthPanelSection>
+    </AuthPanel>
   );
 }
 
@@ -157,7 +154,7 @@ function ResendInline({ email }: { email: string }) {
       <Button type="submit" disabled={pending || state?.sent} variant="outline" size="sm" className="w-full rounded-control">
         {pending ? "Sending…" : state?.sent ? "Sent — check your inbox" : "Resend confirmation email"}
       </Button>
-      {state?.error && <p className="mt-2 text-xs text-destructive">{state.error}</p>}
+      {state?.error && <p role="alert" className="mt-2 text-sm text-destructive">{state.error}</p>}
     </form>
   );
 }

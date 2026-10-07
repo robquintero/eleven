@@ -1,5 +1,6 @@
 "use client";
 
+import { useMenuFocus } from "./use-menu-focus";
 import { useState } from "react";
 import { LogOut, Settings } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -8,13 +9,10 @@ import type { Profile } from "@/data-access/profiles";
 import { signOut } from "@/data-access/auth";
 
 function initialsFor(name: string) {
-  return name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0])
-    .join("")
-    .toUpperCase();
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const selected = words.length > 1 ? [words[0], words[words.length - 1]] : words;
+  const segments = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+  return selected.map(word => segments.segment(word)[Symbol.iterator]().next().value?.segment ?? "").join("").toUpperCase() || "—";
 }
 
 /**
@@ -26,6 +24,7 @@ function initialsFor(name: string) {
  */
 export function ProfileControl({ profile }: { profile: Profile | null }) {
   const [open, setOpen] = useState(false);
+  const { triggerRef, menuRef } = useMenuFocus(open, setOpen);
 
   if (!profile) {
     return (
@@ -47,6 +46,7 @@ export function ProfileControl({ profile }: { profile: Profile | null }) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        ref={triggerRef}
         aria-expanded={open}
         aria-haspopup="menu"
         className="flex size-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent transition-opacity hover:opacity-80"
@@ -64,15 +64,19 @@ export function ProfileControl({ profile }: { profile: Profile | null }) {
           <button
             type="button"
             aria-label="Close profile menu"
-            onClick={() => setOpen(false)}
+            onClick={() => { setOpen(false); triggerRef.current?.focus(); }}
+            onPointerDown={event => event.preventDefault()}
+            tabIndex={-1}
             className="fixed inset-0 z-40 cursor-default"
           />
           <div
+            ref={menuRef}
             role="menu"
+            aria-label="Account"
             className="v2-shell-menu absolute top-full right-0 z-50 mt-2 w-56 border border-border bg-surface-elevated shadow-lg shadow-black/30"
           >
             <div className="border-b border-border px-3 py-2.5">
-              <p className="truncate text-sm font-medium text-foreground">
+              <p className="profile-name text-sm font-medium text-foreground">
                 {profile.displayName}
               </p>
               <p className="mt-0.5 text-[12px] text-foreground-tertiary">

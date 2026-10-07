@@ -6,7 +6,7 @@ import { AlertCircle, Mail } from "lucide-react";
 import { requestPasswordReset, type ForgotPasswordState } from "@/data-access/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-panel";
+import { AuthPanel, AuthPanelSection } from "@/components/auth/auth-panel";
 
 /**
  * Pass 12F: "enter email → neutral sent state" — the sent state is
@@ -20,45 +20,45 @@ export function ForgotPasswordForm() {
 
   if (state && "sent" in state) {
     return (
-      <TerminalPanel header="CHECK_YOUR_EMAIL">
-        <TerminalPanelSection>
+      <AuthPanel>
+        <AuthPanelSection>
           <div className="flex flex-col items-center gap-3 py-2 text-center">
             <span className="flex size-12 items-center justify-center rounded-full bg-accent/10 text-accent">
               <Mail className="size-5" strokeWidth={1.75} />
             </span>
-            <h1 className="text-xl font-semibold tracking-tight text-foreground">Check your email</h1>
+            <h1 className="auth-title">Check your email</h1>
             <p className="max-w-xs text-sm text-foreground-secondary">
               If an account exists for that address, we sent a link to reset your password.
             </p>
           </div>
-        </TerminalPanelSection>
-        <TerminalPanelSection>
-          <p className="text-center text-xs text-foreground-tertiary">
+        </AuthPanelSection>
+        <AuthPanelSection>
+          <p className="auth-footer">
             <Link href="/login" className="text-accent hover:underline">
               Return to sign in
             </Link>
           </p>
-        </TerminalPanelSection>
-      </TerminalPanel>
+        </AuthPanelSection>
+      </AuthPanel>
     );
   }
 
   return (
-    <TerminalPanel header="FORGOT_PASSWORD">
-      <TerminalPanelSection>
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Reset your password</h1>
+    <AuthPanel>
+      <AuthPanelSection>
+        <h1 className="auth-title">Reset your password</h1>
         <p className="mt-1.5 text-sm text-foreground-secondary">
           Enter your account email and we&apos;ll send you a link to reset your password.
         </p>
 
-        <form action={formAction} className="mt-5 space-y-4">
+        <form action={formAction} aria-busy={pending} className="mt-5 space-y-4">
           <label className="block">
-            <span className="label-system text-[11px] text-foreground-tertiary">Email</span>
-            <Input name="email" type="email" autoComplete="email" required className="mt-1.5" placeholder="you@example.com" />
+            <span className="auth-label">Email</span>
+            <Input name="email" type="email" autoCapitalize="none" spellCheck={false} autoComplete="email" required className="mt-1.5" placeholder="you@example.com" />
           </label>
 
           {state?.error && (
-            <p className="flex items-start gap-2 text-xs text-destructive">
+            <p role="alert" className="flex items-start gap-2 text-sm text-destructive">
               <AlertCircle className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
               {state.error}
             </p>
@@ -68,15 +68,15 @@ export function ForgotPasswordForm() {
             {pending ? "Sending…" : "Send reset link"}
           </Button>
         </form>
-      </TerminalPanelSection>
+      </AuthPanelSection>
 
-      <TerminalPanelSection>
-        <p className="text-center text-xs text-foreground-tertiary">
+      <AuthPanelSection>
+        <p className="auth-footer">
           <Link href="/login" className="text-accent hover:underline">
             Return to sign in
           </Link>
         </p>
-      </TerminalPanelSection>
-    </TerminalPanel>
+      </AuthPanelSection>
+    </AuthPanel>
   );
 }

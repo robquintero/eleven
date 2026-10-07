@@ -2,10 +2,10 @@ import type { PlayerPosition } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
 const POSITION_TONES: Record<PlayerPosition, { text: string; badge: string }> = {
-  GK: { text: "text-position-gk", badge: "bg-position-gk/10 ring-position-gk/20" },
-  DEF: { text: "text-position-def", badge: "bg-position-def/10 ring-position-def/20" },
-  MID: { text: "text-position-mid", badge: "bg-position-mid/10 ring-position-mid/20" },
-  FWD: { text: "text-position-fwd", badge: "bg-position-fwd/10 ring-position-fwd/20" },
+  GK: { text: "text-position-gk", badge: "bg-position-gk/5 ring-position-gk/20" },
+  DEF: { text: "text-position-def", badge: "bg-position-def/5 ring-position-def/20" },
+  MID: { text: "text-position-mid", badge: "bg-position-mid/5 ring-position-mid/20" },
+  FWD: { text: "text-position-fwd", badge: "bg-position-fwd/5 ring-position-fwd/20" },
 };
 
 /** Inline identity uses the same semantic text tone without changing surrounding typography. */

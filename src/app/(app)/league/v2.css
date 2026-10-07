@@ -4,7 +4,7 @@
 .eleven-v2 .v2-focus { border-radius: var(--v2-radius-hero); padding: 24px; background: radial-gradient(ellipse 110% 120% at 0% 0%, var(--v2-atmosphere), transparent 65%), var(--v2-surface); }
 .eleven-v2 .v2-matchup-grid { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 16px; }
 .eleven-v2 .v2-matchup { display: flex; flex-direction: column; gap: 16px; min-width: 0; border: 1px solid var(--v2-divider); border-radius: 16px; padding: 20px; background: var(--v2-surface); transition: background-color 160ms, border-color 160ms; }
-.eleven-v2 .v2-matchup:hover { background: var(--v2-hover); border-color: var(--v2-line); }
+@media (hover: hover) and (pointer: fine) { .eleven-v2 .v2-matchup:hover { background: var(--v2-hover); border-color: var(--v2-line); } }
 .eleven-v2 .v2-matchup-own { background: radial-gradient(ellipse at 0% 0%, var(--v2-atmosphere), transparent 70%), var(--v2-surface); border-color: var(--v2-accent-edge); }
 .eleven-v2 .v2-score { display: block; font-size: clamp(26px, 28cqi, 56px); font-weight: 650; line-height: 1.05; }
 .eleven-v2 .v2-matchup-own:not(.v2-matchup-compact) .v2-score { font-size: clamp(28px, 30cqi, 64px); }
@@ -62,7 +62,7 @@
 .eleven-v2 .v2-results-list { display: grid; }
 .eleven-v2 .v2-matchup-compact { display: grid; grid-template-columns: 110px minmax(0,1fr) minmax(150px,.5fr); align-items: center; gap: 20px; padding: 16px 0; border-radius: 0; border: 0; border-top: 1px solid var(--v2-divider); background: transparent; }
 .eleven-v2 .v2-matchup-compact.v2-matchup-own { background: transparent; border-color: var(--v2-divider); }
-.eleven-v2 .v2-matchup-compact:hover { background: var(--v2-hover); }
+@media (hover: hover) and (pointer: fine) { .eleven-v2 .v2-matchup-compact:hover { background: var(--v2-hover); } }
 .eleven-v2 .v2-matchup-compact > div:first-child { flex-direction: column; align-items: start; gap: 8px; }
 .eleven-v2 .v2-matchup-compact .v2-score,
 .eleven-v2 .v2-matchup-compact .v2-score.v2-score-six { font-size: clamp(20px, 22cqi, 28px); }

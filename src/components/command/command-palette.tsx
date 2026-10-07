@@ -169,8 +169,8 @@ export function CommandPalette() {
 
       <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
         <DialogPrimitive.Portal>
-          <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-          <DialogPrimitive.Popup className="eleven-v2 app-v2-overlay v2-command fixed top-[16vh] left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-soft border border-border bg-surface-elevated shadow-2xl shadow-black/40 outline-none transition duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0">
+          <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/60" />
+          <DialogPrimitive.Popup className="eleven-v2 app-v2-overlay v2-command fixed top-[16vh] left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-soft border border-border bg-surface-elevated shadow-2xl shadow-black/40 outline-none">
             <DialogPrimitive.Title className="sr-only">
               Search Eleven
             </DialogPrimitive.Title>
@@ -193,6 +193,10 @@ export function CommandPalette() {
                   autoFocus
                   value={query}
                   onValueChange={setQuery}
+                  aria-label="Search players, pages, or actions"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   placeholder="Search players, pages, or actions…"
                   className="w-full bg-transparent text-sm text-foreground outline-none placeholder:text-foreground-tertiary"
                 />
@@ -203,7 +207,7 @@ export function CommandPalette() {
 
               <CommandPrimitive.List className="max-h-[60vh] overflow-y-auto p-2">
                 {!hasAnyResults && !searching && (
-                  <p className="px-3 py-6 text-center text-sm text-foreground-tertiary">
+                  <p className="px-3 py-6 [overflow-wrap:anywhere] text-center text-sm text-foreground-tertiary">
                     No results{query.trim() ? ` for "${query.trim()}"` : ""}.
                   </p>
                 )}
@@ -249,8 +253,8 @@ export function CommandPalette() {
                             className="size-4 shrink-0 text-foreground-tertiary group-data-[selected=true]:text-accent"
                             strokeWidth={1.75}
                           />
-                          <span className="flex-1 truncate">{player.name}</span>
-                          <span className="label-system shrink-0 text-[10px] text-foreground-tertiary">
+                          <span className="command-player-name flex-1" title={player.name}>{player.name}</span>
+                          <span className="command-club shrink-0 text-foreground-tertiary">
                             <PositionLabel position={player.position} /> · {player.clubShortName}
                           </span>
                         </CommandPrimitive.Item>

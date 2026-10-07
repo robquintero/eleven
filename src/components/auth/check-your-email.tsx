@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AlertCircle, CheckCircle2, Mail } from "lucide-react";
 import { resendConfirmationEmail, type ResendConfirmationState } from "@/data-access/auth";
 import { Button } from "@/components/ui/button";
-import { TerminalPanel, TerminalPanelSection } from "@/components/ui/terminal-panel";
+import { AuthPanel, AuthPanelSection } from "@/components/auth/auth-panel";
 
 const RESEND_COOLDOWN_SECONDS = 30;
 
@@ -41,13 +41,13 @@ export function CheckYourEmail({ email }: { email: string }) {
   }, [cooldown]);
 
   return (
-    <TerminalPanel header="CHECK_YOUR_EMAIL">
-      <TerminalPanelSection>
+    <AuthPanel>
+      <AuthPanelSection>
         <div className="flex flex-col items-center gap-3 py-2 text-center">
           <span className="flex size-12 items-center justify-center rounded-full bg-accent/10 text-accent">
             <Mail className="size-5" strokeWidth={1.75} />
           </span>
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Check your email</h1>
+          <h1 className="auth-title">Check your email</h1>
           <p className="max-w-xs text-sm text-foreground-secondary">
             We sent a confirmation link to <span className="font-medium text-foreground">{email}</span>. Click it to
             activate your account, then come back and sign in.
@@ -60,28 +60,28 @@ export function CheckYourEmail({ email }: { email: string }) {
             {cooldown > 0 ? `Resend in ${cooldown}s` : pending ? "Sending…" : "Resend confirmation email"}
           </Button>
           {state?.error && (
-            <p className="flex items-start gap-2 text-xs text-destructive">
+            <p role="alert" className="flex items-start gap-2 text-sm text-destructive">
               <AlertCircle className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
               {state.error}
             </p>
           )}
           {state?.sent && (
-            <p className="flex items-start gap-2 text-xs text-live">
+            <p role="status" className="flex items-start gap-2 text-sm text-live">
               <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" strokeWidth={2} />
               Sent — check your inbox (and spam folder).
             </p>
           )}
         </form>
-      </TerminalPanelSection>
+      </AuthPanelSection>
 
-      <TerminalPanelSection>
-        <p className="text-center text-xs text-foreground-tertiary">
+      <AuthPanelSection>
+        <p className="auth-footer">
           Wrong email or already confirmed?{" "}
           <Link href="/login" className="text-accent hover:underline">
             Return to sign in
           </Link>
         </p>
-      </TerminalPanelSection>
-    </TerminalPanel>
+      </AuthPanelSection>
+    </AuthPanel>
   );
 }

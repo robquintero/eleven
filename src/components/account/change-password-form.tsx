@@ -10,20 +10,20 @@ export function ChangePasswordForm() {
   const [state, formAction, pending] = useActionState<UpdatePasswordState, FormData>(changePasswordAction, undefined);
 
   return (
-    <form action={formAction} className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-3">
+    <form action={formAction} aria-busy={pending} className="account-form">
       <label className="block flex-1">
-        <span className="label-system text-[11px] text-foreground-tertiary">New password</span>
+        <span className="auth-label">New password</span>
         <Input name="password" type="password" autoComplete="new-password" required minLength={8} className="mt-1.5" placeholder="••••••••" />
       </label>
       <label className="block flex-1">
-        <span className="label-system text-[11px] text-foreground-tertiary">Confirm new password</span>
+        <span className="auth-label">Confirm new password</span>
         <Input name="confirmPassword" type="password" autoComplete="new-password" required minLength={8} className="mt-1.5" placeholder="••••••••" />
       </label>
       <Button type="submit" disabled={pending} className="rounded-control">
-        {pending ? "Updating…" : "Update"}
+        {pending ? "Updating…" : "Update password"}
       </Button>
-      {state?.error && <p className="text-xs text-destructive sm:w-full">{state.error}</p>}
-      {state?.updated && <p className="text-xs text-live sm:w-full">Password updated.</p>}
+      {state?.error && <p role="alert" className="account-feedback text-sm text-destructive">{state.error}</p>}
+      {state?.updated && <p role="status" className="account-feedback text-sm text-live">Password updated.</p>}
     </form>
   );
 }

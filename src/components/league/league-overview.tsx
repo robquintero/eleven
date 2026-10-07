@@ -8,6 +8,7 @@ import { LeagueFormActions } from "./league-form-actions";
 import { StandingsTable } from "./standings-table";
 import { SeasonPanel } from "./season-panel";
 import { DeleteLeagueSection } from "./delete-league-section";
+import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { standingsEmptyContext } from "@/domain/fantasy/season";
 
 /** Presentation only: streams are supplied by the existing server page loaders. */
@@ -18,6 +19,7 @@ export function LeagueOverview({ league, season, lifecycleLabel, draftStatus, st
   membershipKey?: string; matchweek: ReactNode; records: ReactNode; results: ReactNode; activity: ReactNode;
   trades: ReactNode; managers: ReactNode; archive: ReactNode;
 }) {
+  if (!league) return <NoLeagueOnboarding />;
   const commissioner = league?.members.find(member => member.userId === league.createdByUserId);
   return <div className="eleven-v2 v2-league space-y-6">
     <header className="flex flex-col items-start justify-between gap-5 sm:flex-row">

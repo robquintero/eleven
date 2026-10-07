@@ -22,7 +22,7 @@ export function WorkspaceLoading({ destination }: { destination: WorkspaceDestin
       <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
         {destination === "League" ? "League hub" : destination}
       </h1>
-      <p role="status" className="label-system mt-1.5 text-[11px] text-foreground-tertiary">LOADING {destination.toUpperCase()}</p>
+      <p role="status" className="v2-meta mt-1.5">Loading {destination.toLowerCase()}…</p>
     </div>
     {destination === "League" ? <>
       <ModuleLoading title="YOUR_LEAGUES" rows={1} />

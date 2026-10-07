@@ -68,18 +68,20 @@ export function LeagueMatchups({
   emptyLabel,
   variant = "default",
   compact = false,
+  preserveOrder = false,
 }: {
   matchups: LeagueMatchupSummary[];
   myTeamId: string | null;
   emptyLabel: string;
   variant?: "default" | "v2";
   compact?: boolean;
+  preserveOrder?: boolean;
 }) {
   if (matchups.length === 0) {
     return <p className={variant === "v2" ? "v2-secondary py-6" : "p-4 text-center text-sm text-foreground-secondary"}>{emptyLabel}</p>;
   }
   if (variant === "v2") {
-    const ordered = [...matchups].sort((a, b) => {
+    const ordered = preserveOrder ? matchups : [...matchups].sort((a, b) => {
       const mine = (m: LeagueMatchupSummary) => m.homeTeamId === myTeamId || m.awayTeamId === myTeamId;
       return Number(mine(b)) - Number(mine(a));
     });

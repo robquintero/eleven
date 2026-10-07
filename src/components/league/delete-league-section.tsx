@@ -43,10 +43,10 @@ export function DeleteLeagueSection({ leagueId, leagueName, v2 = false }: { leag
   return (
     <section className={v2 ? "v2-management" : "border-t border-border pt-6"} aria-label="Danger zone">
       <p className={v2 ? "v2-meta" : "label-system text-[11px] text-foreground-secondary"}>{v2 ? "Danger zone" : "DANGER ZONE"}</p>
-      <h2 className="mt-2 text-sm font-medium text-foreground">Delete League</h2>
+      <h2 className="mt-2 text-sm font-medium text-foreground">Delete league</h2>
       <p className="mt-1 text-sm text-foreground-secondary">Permanently delete this league and its fantasy data.</p>
       <Dialog open={open} onOpenChange={changeOpen} disablePointerDismissal={pending}>
-        <DialogTrigger render={<Button variant="destructive" className="mt-3 rounded-control" />}>Delete League</DialogTrigger>
+        <DialogTrigger render={<Button variant="destructive" className="mt-3 rounded-control" />}>Delete league</DialogTrigger>
         <DialogContent showCloseButton={false} initialFocus={cancelRef} className={v2 ? "eleven-v2 v2-dialog sm:max-w-lg" : "sm:max-w-lg"} aria-busy={pending}>
           <DialogTitle className="break-words pr-0 text-sm text-foreground">Delete {leagueName}?</DialogTitle>
           <DialogDescription className="text-foreground-secondary">
@@ -66,7 +66,7 @@ export function DeleteLeagueSection({ leagueId, leagueName, v2 = false }: { leag
           <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
             <Button ref={cancelRef} type="button" variant="outline" disabled={pending} onClick={() => changeOpen(false)}>Cancel</Button>
             <Button type="button" variant="destructive" disabled={pending || !validLeagueDeleteConfirmation(confirmation)} onClick={submit}>
-              {pending ? "Deleting…" : "Permanently Delete League"}
+              {pending ? "Deleting…" : "Permanently delete league"}
             </Button>
           </div>
         </DialogContent>

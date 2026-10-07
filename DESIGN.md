@@ -1239,7 +1239,7 @@ League establishes the canonical authenticated visual system. Shared tokens and
 primitives live in `src/app/eleven-v2.css`, imported once by globals. All rules
 require `.eleven-v2`; `.app-v2` maps existing utility semantics to that palette
 inside the authenticated frame. Portal dialogs/sheets explicitly opt in through
-`.app-v2-overlay`. Public and authentication roots retain their existing tokens.
+`.app-v2-overlay`. Public and authentication roots now opt in through `.product-v2` (see the complete-product migration below).
 League-only compositions remain in the League route stylesheet.
 
 V2 uses layered canvas/surface/inset/hover/selected tokens in both themes,
@@ -1299,3 +1299,27 @@ unchanged. Scores, state, freshness, lineup buckets, fixture participation and
 standings use existing authoritative fields/selectors. Secondary sections retain
 separate Suspense boundaries and the existing shared promises; no added reads,
 refreshes, polling or chart/animation dependencies.
+
+
+## Eleven V2: complete product migration
+
+Public, auth, onboarding, Account, recovery and season archive surfaces now share
+the canonical V2 palette. `PublicShell` owns a minimal public header/footer; the
+landing proof is an explicitly illustrative 4–4–2 with no live/fabricated scores.
+`AuthPanel` removes duplicate terminal captions; Account uses divided settings
+sections rather than nested cards. `SystemState` gives lifecycle/recovery states
+a clear heading and next action. Existing Create/Join forms open directly from
+the first-run choices. All actions, fields, validation and guards remain intact.
+
+Task dialogs use 20px corners, 44px mobile close/action targets, wrap-safe identity
+and viewport-bounded scroll. Trade selectors retain visible headings for both
+rosters. Search is immediate; shell menus support arrows/Home/End and Escape
+with focus return. Handwritten hover styles are capability-gated. Mobile inputs
+remain 16px; safe-area/keyboard viewport metadata is enabled without disabling
+zoom or document selection. Position text hues/borders remain unchanged; shared
+badge tint is 5% to preserve AA contrast against V2 selected/hover surfaces.
+The readable amber from core pages is now shared by the V2 warning token.
+
+Approved six-page compositions, scores, readers, Suspense, optimistic/retained
+state and native navigation remain unchanged. See `docs/v2-product-audit.md` for
+the actual route inventory, review frameworks, fixes, QA coverage and limitations.
