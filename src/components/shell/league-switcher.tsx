@@ -29,10 +29,10 @@ export function LeagueSwitcher({
       <TransitionLink
         href="/league"
         label="League"
-        className="flex w-full min-w-0 items-center gap-1.5 rounded-control border border-border bg-surface px-2 py-2 sm:px-2.5 sm:py-1.5 text-sm font-medium text-foreground-secondary transition-colors hover:bg-surface-elevated"
+        className="v2-shell-control w-full min-w-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
       >
         <Trophy className="size-3.5 shrink-0 text-foreground-tertiary" strokeWidth={2} />
-        <span className="label-system min-w-0 truncate text-[11px]" title="No active league">NO ACTIVE LEAGUE</span>
+        <span className="min-w-0 truncate text-[13px]" title="No active league">No active league</span>
       </TransitionLink>
     );
   }
@@ -41,9 +41,9 @@ export function LeagueSwitcher({
 
   if (leagues.length === 1) {
     return (
-      <span className="flex w-full min-w-0 items-center gap-1.5 rounded-control border border-border bg-surface px-2 py-2 sm:px-2.5 sm:py-1.5 text-sm font-medium text-foreground">
+      <span className="v2-shell-control w-full min-w-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60">
         <Trophy className="size-3.5 shrink-0 text-foreground-tertiary" strokeWidth={2} />
-        <span className="min-w-0 max-w-[9rem] truncate sm:max-w-[14rem]">{active.name}</span>
+        <span title={active.name} className="min-w-0 max-w-[9rem] truncate sm:max-w-[14rem]">{active.name}</span>
       </span>
     );
   }
@@ -67,13 +67,13 @@ export function LeagueSwitcher({
         aria-expanded={open}
         aria-haspopup="listbox"
         disabled={pending}
-        className="flex w-full min-w-0 items-center gap-1.5 rounded-control border border-border bg-surface px-2 py-2 sm:px-2.5 sm:py-1.5 text-sm font-medium text-foreground transition-colors hover:bg-surface-elevated outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-60"
+        className="v2-shell-control w-full min-w-0 font-medium outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-60"
       >
         <Trophy className="size-3.5 shrink-0 text-foreground-tertiary" strokeWidth={2} />
-        <span className="label-system hidden text-[10px] text-foreground-tertiary sm:inline">
-          League /
+        <span className="hidden text-[12px] text-foreground-tertiary sm:inline">
+          League
         </span>
-        <span className="min-w-0 max-w-[9rem] truncate sm:max-w-[14rem]">{active.name}</span>
+        <span title={active.name} className="min-w-0 max-w-[9rem] truncate sm:max-w-[14rem]">{active.name}</span>
         <ChevronDown
           className={cn(
             "size-3.5 shrink-0 text-foreground-tertiary transition-transform",
@@ -92,7 +92,7 @@ export function LeagueSwitcher({
           />
           <div
             role="listbox"
-            className="absolute top-full left-0 z-50 mt-1 w-64 max-w-[calc(100vw-5rem)] border border-border bg-surface-elevated shadow-lg shadow-black/30"
+            className="v2-shell-menu absolute top-full left-0 z-50 mt-2 w-64 max-w-[calc(100vw-5rem)] border border-border bg-surface-elevated shadow-lg shadow-black/30"
           >
             {leagues.map((league) => {
               const isSelected = league.id === active.id;
@@ -105,9 +105,9 @@ export function LeagueSwitcher({
                   onClick={() => selectLeague(league.id)}
                   className="flex w-full items-center justify-between gap-2 border-b border-border min-h-11 px-3 py-2 text-left text-sm transition-colors last:border-b-0 hover:bg-surface"
                 >
-                  <span className="flex flex-col">
-                    <span className="font-medium text-foreground">{league.name}</span>
-                    <span className="label-system text-[10px] text-foreground-tertiary">
+                  <span className="flex min-w-0 flex-col">
+                    <span className="font-medium text-foreground [overflow-wrap:anywhere]">{league.name}</span>
+                    <span className="text-[12px] text-foreground-tertiary">
                       {league.memberCount} / {league.maxTeams} managers
                     </span>
                   </span>

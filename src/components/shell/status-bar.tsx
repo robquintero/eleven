@@ -1,5 +1,5 @@
 import { MATCHUP_RESULT_LABEL, type MatchupResultState } from "@/domain/fantasy/matchup-result-state";
-import { formatKickoff, pad2 } from "@/lib/team-fixture";
+import { formatKickoff } from "@/lib/team-fixture";
 
 export interface StatusBarData {
   scoringRuleVersion?: import("@/domain/fantasy/scoring").ScoringRuleVersion;
@@ -12,39 +12,13 @@ export interface StatusBarData {
   nextLockKickoff: string | null;
 }
 
-/**
- * Pass 14.5: desktop-only operational strip, now wired to the signed-in
- * manager's real active-league round state (`app-shell.tsx`) instead of a
- * permanently-hardcoded "no round scheduler exists yet" placeholder (Pass
- * 8's own honest-at-the-time state, never updated once rounds actually
- * went live — this is the literal source of the "NO ACTIVE ROUND" shown
- * globally even with a real, locked-in-progress round, flagged in the
- * Pass 14.5 brief). `data` is `null` only when genuinely no team/round
- * exists for the active league yet (pre-draft, pre-round) — still a
- * truthful state, not a fabricated one.
- */
+/** Same authoritative round/lineup data, presented as a quiet desktop summary. */
 export function StatusBar({ data }: { data: StatusBarData | null }) {
-  if (!data) {
-    return (
-      <div className="hidden items-center gap-5 border-t border-border px-4 py-1.5 lg:flex lg:px-8">
-        <span className="label-system text-[10px] text-foreground-tertiary">NO ACTIVE ROUND</span>
-        <span className="label-system text-[10px] text-foreground-tertiary">NO FIXTURE DATA</span>
-        <span className="label-system ml-auto text-[10px] text-foreground-tertiary">NEXT LOCK — NOT SCHEDULED</span>
-      </div>
-    );
-  }
-
-  const roundLabel = `MATCHDAY ${pad2(data.roundNumber)} · ${MATCHUP_RESULT_LABEL[data.resultState]}`;
-
-  return (
-    <div className="hidden items-center gap-5 border-t border-border px-4 py-1.5 lg:flex lg:px-8">
-      <span className="label-system text-[10px] text-foreground-tertiary">{roundLabel}</span>
-      <span className="label-system text-[10px] text-foreground-tertiary">
-        {data.liveCount} LIVE / {data.lockedCount} LOCKED / {data.remainingCount} REMAINING
-      </span>
-      <span className="label-system ml-auto text-[10px] text-foreground-tertiary">
-        {data.nextLockKickoff ? `NEXT LOCK — ${formatKickoff(data.nextLockKickoff)}` : "NEXT LOCK — NONE REMAINING"}
-      </span>
-    </div>
-  );
+  if (!data) return <div className="v2-status-bar"><span>No active matchweek</span><span>No fixture data</span><span className="ml-auto">Next lock not scheduled</span></div>;
+  const state = MATCHUP_RESULT_LABEL[data.resultState].toLowerCase();
+  return <div className="v2-status-bar">
+    <span>Matchweek {data.roundNumber} · <span className={data.resultState === "live" ? "v2-live" : ""}>{state}</span></span>
+    <span>{data.liveCount} live · {data.lockedCount} locked · {data.remainingCount} remaining</span>
+    <span className="ml-auto">{data.nextLockKickoff ? <>Next lock <span className="v2-number">{formatKickoff(data.nextLockKickoff)}</span></> : "No remaining locks"}</span>
+  </div>;
 }

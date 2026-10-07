@@ -27,7 +27,7 @@ function load(file: string, mocks: Record<string, unknown> = {}): Record<string,
     if (id === "next/navigation") return { notFound: () => { throw new Error("NOT_FOUND"); } };
     if (id.startsWith("@/data-access/")) throw new Error(`Unmocked data access: ${id}`);
     const componentPath = id.startsWith("@/components/") || (id.startsWith(".") && resolve(dirname(filename), id).includes("/components/"));
-    const serverPresenters = ["workspace-loading", "matchup-command", "transition-link", "league-matchups", "matchup-status", "team-name", "matchup-page-view", "league-overview", "league-sections", "/ui/v2"];
+    const serverPresenters = ["app-frame", "status-bar", "workspace-loading", "matchup-command", "transition-link", "league-matchups", "matchup-status", "team-name", "matchup-page-view", "league-overview", "league-sections", "/ui/v2"];
     if (componentPath && !serverPresenters.some(name => id.includes(name))) {
       return new Proxy({}, { get: (_target, name) => name === "__esModule" ? true : ({ children, title }: { children?: ReactNode; title?: string }) => createElement("div", {}, title ?? String(name), children) });
     }
@@ -54,8 +54,8 @@ test("all destination loading boundaries render safely with destination geometry
     const { default: Loading } = load(`src/app/(app)/${route}/loading.tsx`);
     const result = await flight(createElement(Loading as () => ReactNode));
     assert.match(result, /LOADING/); assert.match(result, /aria-busy/); assert.match(result, /status/);
-    if (route === "team") for (const section of ["FORWARDS", "MIDFIELD", "DEFENCE", "GOALKEEPER", "BENCH"]) assert.match(result, new RegExp(section));
-    if (route === "matchup") assert.match(result, /MATCHUP_COMMAND/);
+    if (route === "team") for (const section of ["Forwards", "Midfield", "Defence", "Goalkeeper", "Bench"]) assert.match(result, new RegExp(section));
+    if (route === "matchup") assert.match(result, /Matchup/);
     assert.doesNotMatch(result, /animate-ping|animate-spin|inset-0/);
   }
 });
@@ -108,7 +108,7 @@ const matchup = { id: "matchup", roundId: "round", roundNumber: 1, roundStartsAt
 async function streamBeforeSecondary(file: string, data: Record<string, unknown>, primary: RegExp, secondary: RegExp) {
   const gate = deferred<void>();
   const reads: string[] = [];
-  const mocks: Record<string, unknown> = { "lucide-react": icons, "next/link": nextLink };
+  const mocks: Record<string, unknown> = { "lucide-react": icons, "next/link": nextLink, "@/lib/scoring/catalog-version": { getCurrentCatalogScoringVersion: async () => "ELEVEN_STANDARD_V4" } };
   for (const [module, functions] of Object.entries(data)) {
     const mapped: Record<string, unknown> = {};
     for (const [name, result] of Object.entries(functions as Record<string, unknown>)) {
@@ -119,7 +119,8 @@ async function streamBeforeSecondary(file: string, data: Record<string, unknown>
     }
     mocks[`@/data-access/${module}`] = mapped;
   }
-  const { default: Page } = load(file, mocks);
+  const exports = load(file, mocks);
+  const Page = exports.default ?? exports.AppShell;
   const stream = await renderToReadableStream(createElement(Page as () => ReactNode), {});
   let chunks = "";
   const consume = (async () => {
@@ -201,7 +202,7 @@ test("V2 matchup cards preserve real scores, UUID destinations, final-only winne
 });
 
 test("V2 tokens remain opt-in and all small-text colors meet AA on every surface state", () => {
-  const css = readFileSync(resolve(root,"src/app/(app)/league/v2.css"),"utf8");
+  const css = readFileSync(resolve(root,"src/app/eleven-v2.css"),"utf8") + "\n" + readFileSync(resolve(root,"src/app/(app)/league/v2.css"),"utf8");
   const postcss = require("postcss");
   postcss.parse(css).walkRules((rule: {selectors: string[]}) => { for(const selector of rule.selectors) assert.ok(selector.trim().startsWith(".eleven-v2") || selector.trim().startsWith(".dark .eleven-v2"),selector); });
   const luminance = (hex:string) => hex.match(/\w\w/g)!.map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
@@ -211,4 +212,28 @@ test("V2 tokens remain opt-in and all small-text colors meet AA on every surface
     for(const text of ["text","secondary","muted","accent","positive","negative"]) for(const background of ["canvas","surface","inset","hover","selected"]) assert.ok(contrast(tokens[text],tokens[background])>=4.5,`${text} on ${background}`);
     assert.ok(contrast("#ffffff",tokens.action)>=4.5,"primary action contrast");
   }
+});
+
+
+test("authenticated frame streams before the same gated lineup status reads without adding queries", async () => {
+  await streamBeforeSecondary("src/components/shell/app-shell.tsx", {
+    profiles: { getCurrentProfile: { displayName: "Manager" } },
+    leagues: { getUserLeagues: [league] }, "active-league": { getActiveLeagueId: "league" },
+    teams: { getUserTeamInLeague: { id: "mine" } },
+    matchups: { getCurrentMatchup: { ...matchup, status: "live", roundStartsAt: "2026-10-06T06:00:00Z", roundEndsAt: "2099-10-13T06:00:00Z" },
+      getMatchupStatusStarters: async (gate: Promise<void>) => { await gate; return [0,1].map(i => ({ id: String(i), player: { fixture: { state: "live" } } })); } },
+  }, /main-content/, /2," live/);
+});
+
+test("shell status preserves authoritative values, result states, null state and next-lock formatting", async () => {
+  const { StatusBar } = load("src/components/shell/status-bar.tsx");
+  const render = (data: unknown) => flight(createElement(StatusBar as (props: {data: unknown}) => ReactNode, {data}));
+  for (const state of ["upcoming", "active", "live", "pending", "final"]) {
+    const result = await render({ roundNumber: 2, resultState: state, liveCount: 3, lockedCount: 4, remainingCount: 5, nextLockKickoff: null });
+    for (const value of ["Matchweek ", "2", state, "3", " live · ", "4", " locked · ", "5", " remaining", "No remaining locks"]) assert.ok(result.includes(value), value);
+    assert.doesNotMatch(result, /MATCHDAY|NEXT_LOCK/);
+  }
+  const empty = await render(null);assert.match(empty, /No active matchweek/);assert.match(empty, /Next lock not scheduled/);
+  const next = await render({ roundNumber: 2, resultState: "active", liveCount: 0, lockedCount: 0, remainingCount: 11, nextLockKickoff: "2026-10-10T13:30:00Z" });
+  assert.match(next, /Next lock /);assert.doesNotMatch(next, /No remaining locks/);
 });

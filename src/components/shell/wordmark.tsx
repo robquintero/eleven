@@ -23,7 +23,7 @@ export function Wordmark({ authenticated = false }: { authenticated?: boolean })
         href="/home"
         label="Home"
         aria-label="Eleven — home"
-        className="flex items-center text-[15px] font-semibold tracking-tight text-foreground"
+        className="v2-brand flex items-center text-[15px] font-semibold tracking-tight text-foreground"
       >
         eleven
       </TransitionLink>

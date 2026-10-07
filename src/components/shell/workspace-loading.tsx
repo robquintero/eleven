@@ -1,8 +1,9 @@
+import { uiLabel } from "@/lib/ui-label";
 /** Cheap server-rendered destination geometry. No data reads, invented
  * players/scores, animated shimmer, or client hydration. */
 export function ModuleLoading({ title, rows = 3 }: { title: string; rows?: number }) {
-  return <section aria-busy="true" aria-label={`Loading ${title}`} className="min-w-0 border border-border">
-    <div className="label-system border-b border-border px-4 py-2.5 text-[11px] text-foreground-secondary">{title}</div>
+  return <section aria-busy="true" aria-label={`Loading ${title}`} className="v2-panel min-w-0 border border-border">
+    <div className="v2-module-label label-system border-b border-border px-4 py-2.5 text-[11px] text-foreground-secondary">{uiLabel(title)}</div>
     <div aria-hidden="true" className="divide-y divide-border">
       {Array.from({ length: rows }, (_, index) => <div key={index} className="flex h-12 items-center justify-between gap-3 px-4">
         <span className="h-px w-1/3 bg-border" /><span className="h-px w-12 bg-border" />

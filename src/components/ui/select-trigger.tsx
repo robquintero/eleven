@@ -34,6 +34,7 @@ export function SelectTrigger<T extends string>({
   return (
     <span className="relative inline-flex shrink-0 items-center">
       <select
+        data-slot="select-trigger"
         value={value}
         onChange={(e) => onChange(e.target.value as T)}
         aria-label={ariaLabel}

@@ -11,7 +11,7 @@ export function MobileNav() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-surface/80 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+      className="v2-mobile-nav fixed inset-x-0 bottom-0 z-50 border-t border-border pb-[env(safe-area-inset-bottom)] lg:hidden"
     >
       <ul className="mx-auto flex max-w-md items-stretch justify-between px-2">
         {primaryNav.map((item) => {
@@ -39,7 +39,7 @@ export function MobileNav() {
                 <span
                   className={cn(
                     "transition-colors",
-                    isActive ? "text-foreground" : "text-foreground-tertiary"
+                    isActive ? "text-accent" : "text-foreground-tertiary"
                   )}
                 >
                   {item.label}

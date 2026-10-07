@@ -30,7 +30,7 @@ export function ProfileControl({ profile }: { profile: Profile | null }) {
   if (!profile) {
     return (
       <span
-        className="flex size-10 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="flex size-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent"
         aria-label="Profile unavailable"
       >
         <Avatar>
@@ -49,7 +49,7 @@ export function ProfileControl({ profile }: { profile: Profile | null }) {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="flex size-10 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent transition-opacity hover:opacity-80"
+        className="flex size-11 shrink-0 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent transition-opacity hover:opacity-80"
         aria-label={`${profile.displayName} profile`}
       >
         <Avatar>
@@ -69,14 +69,14 @@ export function ProfileControl({ profile }: { profile: Profile | null }) {
           />
           <div
             role="menu"
-            className="absolute top-full right-0 z-50 mt-1 w-56 border border-border bg-surface-elevated shadow-lg shadow-black/30"
+            className="v2-shell-menu absolute top-full right-0 z-50 mt-2 w-56 border border-border bg-surface-elevated shadow-lg shadow-black/30"
           >
             <div className="border-b border-border px-3 py-2.5">
               <p className="truncate text-sm font-medium text-foreground">
                 {profile.displayName}
               </p>
-              <p className="label-system mt-0.5 text-[10px] text-foreground-tertiary">
-                SIGNED IN
+              <p className="mt-0.5 text-[12px] text-foreground-tertiary">
+                Signed in
               </p>
             </div>
             <TransitionLink
@@ -84,7 +84,7 @@ export function ProfileControl({ profile }: { profile: Profile | null }) {
               label="Account"
               role="menuitem"
               onClick={() => setOpen(false)}
-              className="label-system flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-foreground-secondary transition-colors hover:bg-surface hover:text-foreground"
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-xs text-foreground-secondary transition-colors hover:bg-surface hover:text-foreground"
             >
               <Settings className="size-3.5" strokeWidth={2} />
               Account settings
@@ -93,7 +93,7 @@ export function ProfileControl({ profile }: { profile: Profile | null }) {
               <button
                 type="submit"
                 role="menuitem"
-                className="label-system flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-xs text-foreground-secondary transition-colors hover:bg-surface hover:text-foreground"
+                className="flex w-full items-center gap-2 border-t border-border px-3 py-2.5 text-left text-xs text-foreground-secondary transition-colors hover:bg-surface hover:text-foreground"
               >
                 <LogOut className="size-3.5" strokeWidth={2} />
                 Sign out

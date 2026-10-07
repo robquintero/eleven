@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { uiLabel } from "@/lib/ui-label";
 import { cn } from "@/lib/utils";
 
 /**
@@ -21,16 +22,16 @@ export function TerminalPanel({
   stickyHeader?: boolean;
 }) {
   return (
-    <div className={cn("border border-border bg-surface-elevated", className)}>
+    <div className={cn("v2-panel border border-border bg-surface-elevated", className)}>
       {header && (
         <div
           className={cn(
-            "flex items-center justify-between border-b border-border bg-surface-elevated px-3 py-2",
+            "v2-panel-header flex items-center justify-between border-b border-border bg-surface-elevated px-3 py-2",
             stickyHeader && "sticky top-0 z-10"
           )}
         >
-          <span className="label-system text-[11px] text-foreground-secondary">
-            {header}
+          <span className="v2-module-label label-system text-[11px] text-foreground-secondary">
+            {typeof header === "string" ? uiLabel(header) : header}
           </span>
           {meta && (
             <span className="label-system flex items-center gap-2 text-[11px] text-foreground-tertiary">

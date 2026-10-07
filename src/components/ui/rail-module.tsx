@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { uiLabel } from "@/lib/ui-label";
 import { cn } from "@/lib/utils";
 
 /**
@@ -22,8 +23,8 @@ export function RailModule({
   return (
     <div className={cn("px-4 py-3.5", className)}>
       <div className="flex items-center justify-between gap-3">
-        <span className="label-system text-[11px] text-foreground-secondary">
-          {header}
+        <span className="v2-module-label label-system text-[11px] text-foreground-secondary">
+          {typeof header === "string" ? uiLabel(header) : header}
         </span>
         {meta && (
           <span className="label-system text-[11px] text-foreground-tertiary">

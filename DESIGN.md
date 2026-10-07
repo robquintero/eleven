@@ -1233,12 +1233,14 @@ Before shipping any new screen or component, ask:
 The target is the middle of all three — never fully satisfied by
 optimizing just one.
 
-## V2 opt-in: League laboratory
+## Eleven V2: shared foundation and authenticated shell
 
-League now establishes a deliberately different visual system. Other routes and
-app-shell components retain the system above until a separate product review.
-The League route imports `v2.css`; all its selectors require `.eleven-v2`.
-Portal dialogs explicitly opt in. Do not move these overrides to global CSS.
+League establishes the canonical authenticated visual system. Shared tokens and
+primitives live in `src/app/eleven-v2.css`, imported once by globals. All rules
+require `.eleven-v2`; `.app-v2` maps existing utility semantics to that palette
+inside the authenticated frame. Portal dialogs/sheets explicitly opt in through
+`.app-v2-overlay`. Public and authentication roots retain their existing tokens.
+League-only compositions remain in the League route stylesheet.
 
 V2 uses layered canvas/surface/inset/hover/selected tokens in both themes,
 10px control and 20–32px module radii, restrained blue action/focus accents,
@@ -1271,4 +1273,17 @@ only the highest-score record receives numerical blue emphasis. Live and signed
 differential semantics remain green/red. Recent results stay divided rows and
 records stay an unboxed six-item grid. Light mode retains its white surfaces.
 Existing system sans is retained; Nunito's proportional hierarchy is adapted
-without a new font dependency. All CSS remains opt-in to League.
+without a new font dependency. The shared shell uses these same tokens; page
+compositions outside League await their own design passes.
+
+`AppShell` owns the unchanged data reads and streamed status/rules slots.
+`AppFrame` is the pure server presentation with a 240px desktop sidebar, quiet
+solid header, native six-destination navigation, existing league/profile controls
+and command search. No numbered navigation. Status copy reads “Matchweek”,
+“live / locked / remaining” and “Next lock” using the same values. Shell controls
+are 44px; shared buttons are 40px desktop/44px mobile, with 10px corners.
+Module labels use sans and a bounded presentation-only label dictionary; timestamps
+and operational data retain mono. Major gaps/padding use 24px, page gutters 32px
+desktop/16px mobile, attached controls 8px. Mobile retains the existing bottom
+navigation with safe-area padding. Reduced-motion, keyboard shortcuts, native
+prefetch and route-loading boundaries remain unchanged.

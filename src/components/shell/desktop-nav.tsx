@@ -3,14 +3,13 @@
 import { TransitionLink } from "@/components/shell/transition-link";
 import { usePathname } from "next/navigation";
 import { primaryNav } from "@/lib/navigation";
-import { cn } from "@/lib/utils";
 
 export function DesktopNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex flex-col gap-0.5">
-      {primaryNav.map((item, index) => {
+    <nav aria-label="Primary" className="v2-desktop-nav">
+      {primaryNav.map((item) => {
         const isActive =
           item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
         const Icon = item.icon;
@@ -22,21 +21,8 @@ export function DesktopNav() {
             label={item.label}
             aria-current={isActive ? "page" : undefined}
             title={`${item.label} — G ${item.shortcutKey.toUpperCase()}`}
-            className={cn(
-              "flex items-center gap-3 border-l-2 py-2 pr-3 pl-2.5 text-sm font-medium transition-colors active:bg-surface-elevated",
-              isActive
-                ? "border-l-accent bg-surface-elevated text-foreground"
-                : "border-l-transparent text-foreground-secondary hover:bg-surface hover:text-foreground"
-            )}
+            className="v2-nav-link"
           >
-            <span
-              className={cn(
-                "label-system w-4 shrink-0 text-[10px]",
-                isActive ? "text-accent" : "text-foreground-tertiary"
-              )}
-            >
-              {String(index + 1).padStart(2, "0")}
-            </span>
             <Icon className="size-[18px] shrink-0" strokeWidth={isActive ? 2.25 : 1.75} />
             <span>{item.label}</span>
           </TransitionLink>

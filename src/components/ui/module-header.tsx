@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { uiLabel } from "@/lib/ui-label";
 import { cn } from "@/lib/utils";
 
 /**
@@ -24,8 +25,8 @@ export function ModuleHeader({
         className
       )}
     >
-      <span className="label-system text-[11px] text-foreground-secondary">
-        {title}
+      <span className="v2-module-label label-system text-[11px] text-foreground-secondary">
+        {typeof title === "string" ? uiLabel(title) : title}
       </span>
       {meta && (
         <span className="label-system text-[11px] text-foreground-tertiary">

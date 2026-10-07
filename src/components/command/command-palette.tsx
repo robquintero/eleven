@@ -158,7 +158,7 @@ export function CommandPalette() {
         type="button"
         onClick={() => handleOpenChange(true)}
         aria-label="Search"
-        className="label-system flex size-10 items-center justify-center gap-2 rounded-control outline-none focus-visible:ring-2 focus-visible:ring-accent sm:h-auto sm:w-auto border border-border bg-surface px-2.5 py-1.5 text-xs text-foreground-secondary transition-colors hover:bg-surface-elevated"
+        className="v2-shell-control size-11 outline-none focus-visible:ring-2 focus-visible:ring-accent sm:w-auto"
       >
         <Search className="size-3.5" strokeWidth={2} aria-hidden="true" />
         <span className="hidden sm:inline" aria-hidden="true">Search</span>
@@ -170,9 +170,9 @@ export function CommandPalette() {
       <DialogPrimitive.Root open={open} onOpenChange={handleOpenChange}>
         <DialogPrimitive.Portal>
           <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0" />
-          <DialogPrimitive.Popup className="fixed top-[16vh] left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-soft border border-border bg-surface-elevated shadow-2xl shadow-black/40 outline-none transition duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0">
+          <DialogPrimitive.Popup className="eleven-v2 app-v2-overlay v2-command fixed top-[16vh] left-1/2 z-50 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 overflow-hidden rounded-soft border border-border bg-surface-elevated shadow-2xl shadow-black/40 outline-none transition duration-150 data-ending-style:scale-[0.98] data-ending-style:opacity-0 data-starting-style:scale-[0.98] data-starting-style:opacity-0">
             <DialogPrimitive.Title className="sr-only">
-              Eleven command
+              Search Eleven
             </DialogPrimitive.Title>
             <DialogPrimitive.Description className="sr-only">
               Jump to a screen, find a player, or run an action.
@@ -186,8 +186,8 @@ export function CommandPalette() {
                 especially the accent-insensitive player matches. */}
             <CommandPrimitive shouldFilter={false} className="flex flex-col">
               <div className="flex items-center gap-3 border-b border-border px-4 py-3">
-                <span className="label-system hidden shrink-0 text-[10px] text-foreground-tertiary sm:inline">
-                  ELEVEN COMMAND
+                <span className="v2-command-heading hidden shrink-0 text-foreground-secondary sm:inline">
+                  Search Eleven
                 </span>
                 <CommandPrimitive.Input
                   autoFocus
