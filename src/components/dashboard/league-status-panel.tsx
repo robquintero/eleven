@@ -1,4 +1,4 @@
-import { OperationalRow } from "@/components/football/operational-row";
+import { HomeSection } from "./home-overview";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { Button } from "@/components/ui/button";
 import { MIN_MANAGERS_TO_START_DRAFT } from "@/domain/fantasy/constants";
@@ -32,22 +32,10 @@ export function LeagueStatusPanel({
   inviteCode: string;
 }) {
   return (
-    <div className="border border-border bg-surface-elevated">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-        <span className="label-system text-[11px] text-foreground-secondary">LEAGUE_STATUS</span>
-        <span className="label-system text-[10px] text-accent">
-          {lifecycle === "READY_FOR_DRAFT" ? "READY FOR DRAFT" : "SETUP"}
-        </span>
-      </div>
-
-      <div className="p-5 sm:p-6">
+    <HomeSection title="League setup" className="home-setup" action={<span className="text-sm text-accent">{lifecycle === "READY_FOR_DRAFT" ? "Ready for draft" : "Setup"}</span>}>
         <p className="text-lg font-semibold tracking-tight text-foreground">{leagueName}</p>
 
-        <div className="mt-3">
-          <OperationalRow label="MANAGERS" value={`${memberCount} / ${maxTeams}`} />
-          <OperationalRow label="DRAFT" value="NOT YET AVAILABLE" />
-          {isCommissioner && <OperationalRow label="INVITE CODE" value={inviteCode} />}
-        </div>
+        <dl><div><dt>Managers</dt><dd>{memberCount} / {maxTeams}</dd></div><div><dt>Draft</dt><dd>Not yet available</dd></div>{isCommissioner && <div><dt>Invite code</dt><dd className="font-mono">{inviteCode}</dd></div>}</dl>
 
         <p className="mt-3 text-sm text-foreground-secondary">{nextActionCopy[lifecycle]}</p>
 
@@ -56,7 +44,6 @@ export function LeagueStatusPanel({
             Manage league
           </Button>
         </div>
-      </div>
-    </div>
+    </HomeSection>
   );
 }

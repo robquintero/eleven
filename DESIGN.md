@@ -1287,3 +1287,15 @@ and operational data retain mono. Major gaps/padding use 24px, page gutters 32px
 desktop/16px mobile, attached controls 8px. Mobile retains the existing bottom
 navigation with safe-area padding. Reduced-motion, keyboard shortcuts, native
 prefetch and route-loading boundaries remain unchanged.
+
+
+Home V2 applies this foundation with a compact team/matchweek identity, a
+full-width matchup hero, next-lock and league-position intelligence, then
+lineup/activity and trade/free-agent supporting columns. Mobile uses a single
+reading column; the hero retains two readable score sides and stacked player
+progress labels. Home-only selectors live under `.home-v2` in
+`src/components/dashboard/home-v2.css`. Shared Matchup/League compositions stay
+unchanged. Scores, state, freshness, lineup buckets, fixture participation and
+standings use existing authoritative fields/selectors. Secondary sections retain
+separate Suspense boundaries and the existing shared promises; no added reads,
+refreshes, polling or chart/animation dependencies.

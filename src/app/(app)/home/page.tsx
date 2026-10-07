@@ -1,19 +1,15 @@
 import { Suspense } from "react";
-import { ModuleLoading } from "@/components/shell/workspace-loading";
+import "@/components/dashboard/home-v2.css";
+import { V2Loading } from "@/components/ui/v2";
+import { HomeIdentity, HomeMatchup, HomeFixtureCard, HomeLeaguePosition, HomeSection } from "@/components/dashboard/home-overview";
 import type { Metadata } from "next";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { ActivityFeed } from "@/components/dashboard/activity-feed";
 import { FormIntelligence } from "@/components/dashboard/form-intelligence";
-import { Greeting } from "@/components/dashboard/greeting";
 import { LeagueStatusPanel } from "@/components/dashboard/league-status-panel";
-import { MatchupCommand } from "@/components/dashboard/matchup-command";
-import { OperationsRail } from "@/components/dashboard/operations-rail";
 import { StartingXI } from "@/components/dashboard/starting-xi";
 import { TradeDesk } from "@/components/dashboard/trade-desk";
-import { MatchupPlayerCounts } from "@/components/matchup/matchup-player-counts";
-import { RoundWindow } from "@/components/football/round-window";
 import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
-import { ModuleHeader } from "@/components/ui/module-header";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus } from "@/data-access/drafts";
 import { getHotFreeAgents } from "@/data-access/intelligence";
@@ -27,12 +23,11 @@ import { getRecentActivity } from "@/data-access/transactions";
 import { getTeamTrades } from "@/data-access/trades";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
 import { rosterVacancies, type RosterCounts } from "@/domain/fantasy/roster-rules";
-import type { FantasyRound } from "@/lib/types/fantasy";
 
 export const metadata: Metadata = { title: "Home" };
 
 export default async function HomePage() {
-  const [profile, leagues] = await Promise.all([getCurrentProfile(), getUserLeagues()]);
+  const [, leagues] = await Promise.all([getCurrentProfile(), getUserLeagues()]);
 
   if (leagues.length === 0) {
     return <NoLeagueOnboarding />;
@@ -95,131 +90,63 @@ export default async function HomePage() {
           return best;
         }, null)
     : null;
-  // Pass 14.5: reads the round's own authoritative `roundStatus`
-  // (fantasy_rounds.status), never the transient `matchup.status` --
-  // see data-access/matchups.ts's `CurrentMatchup.roundStatus` comment.
-  const round: FantasyRound | null = matchup
-    ? {
-        number: matchup.roundNumber,
-        label: `Matchday ${matchup.roundNumber}`,
-        deadline: fixtureIntel?.nextFixture?.kickoffAt ?? null,
-        status:
-          matchup.roundStatus === "completed" ? "completed" : matchup.roundStatus === "in_progress" ? "in-progress" : "upcoming",
-      }
-    : null;
-
   return (
-    <div className="flex flex-col gap-8">
-      <Greeting
-        managerName={profile?.displayName ?? "Manager"}
-        teamName={team?.name ?? league.name}
-        leagueName={league.name}
-        round={round}
-      />
-
-      {matchup && (
-        <RoundWindow
-          round={{ number: matchup.roundNumber, startsAt: matchup.roundStartsAt, endsAt: matchup.roundEndsAt, status: matchup.roundStatus }}
-        />
-      )}
+    <div className="home-v2">
+      <HomeIdentity teamName={team?.name ?? league.name} leagueName={league.name} matchup={matchup} />
+      <HomeMatchup matchup={matchup} now={now} squads={matchupSquads} topPerformer={topPerformer} />
 
       {lifecycle !== "ACTIVE" && lifecycle !== "COMPLETED" && (
-        <LeagueStatusPanel
-          leagueName={league.name}
-          lifecycle={lifecycle}
-          memberCount={league.memberCount}
-          maxTeams={league.maxTeams}
-          isCommissioner={league.role === "commissioner"}
-          inviteCode={league.inviteCode}
-        />
+        <LeagueStatusPanel leagueName={league.name} lifecycle={lifecycle} memberCount={league.memberCount}
+          maxTeams={league.maxTeams} isCommissioner={league.role === "commissioner"} inviteCode={league.inviteCode} />
       )}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px] lg:items-start">
-        <div className="flex flex-col gap-6">
-          <MatchupCommand matchup={matchup} hasLeague now={now} fixtureIntel={fixtureIntel} starters={mySquad.starters} teamIdsByPlayerId={teamIdsByPlayerId} />
+      <div className="home-intelligence">
+        <HomeFixtureCard fixtureIntel={fixtureIntel} starters={mySquad.starters} teamIdsByPlayerId={teamIdsByPlayerId}
+          hasActiveRound={matchup !== null && matchup.roundStatus !== "completed"} />
+        <Suspense fallback={<V2Loading title="League position" rows={3} />}>
+          <HomeOperations standingsPromise={standingsPromise} teamId={team?.id ?? null} />
+        </Suspense>
+      </div>
 
-          {matchup && matchupSquads && matchup.roundStatus !== "upcoming" && (
-            <MatchupPlayerCounts
-              myTeamName={matchup.isUserHome ? matchup.homeTeamName : matchup.awayTeamName}
-              opponentTeamName={matchup.isUserHome ? matchup.awayTeamName : matchup.homeTeamName}
-              mySquad={matchup.isUserHome ? matchupSquads.home : matchupSquads.away}
-              opponentSquad={matchup.isUserHome ? matchupSquads.away : matchupSquads.home}
-            />
-          )}
+      {team && vacancies.length > 0 && <section className="home-attention" aria-label="Roster vacancy">
+        <div><h2>Your squad has room to fill</h2><p className="home-secondary mt-1">Short on {vacancies.map(v => `${v.short} ${v.position}`).join(", ")}.</p></div>
+        <TransitionLink href="/players" label="Players" className="v2-link">Browse players →</TransitionLink>
+      </section>}
 
-          {topPerformer && topPerformer.points > 0 && (
-            <p className="label-system text-center text-[11px] text-foreground-tertiary">
-              TOP PERFORMANCE · {topPerformer.name} ({topPerformer.club}) · {topPerformer.points.toFixed(1)} PTS
-            </p>
-          )}
-
-          {team && vacancies.length > 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-3 border border-accent/30 bg-accent/5 px-4 py-3">
-              <div>
-                <p className="label-system text-[11px] text-accent">ROSTER VACANCY</p>
-                <p className="mt-0.5 text-xs text-foreground-secondary">
-                  Short on {vacancies.map((v) => `${v.short} ${v.position}`).join(", ")}.
-                </p>
-              </div>
-              <TransitionLink href="/players" label="Players" className="label-system shrink-0 text-[11px] text-accent hover:underline">
-                BROWSE MARKET →
-              </TransitionLink>
-            </div>
-          )}
-
-          <StartingXI players={mySquad.starters.map((slot) => slot.player)} />
-        </div>
-
-        <div className="flex flex-col gap-6">
-          <Suspense fallback={<ModuleLoading title="OPERATIONS" rows={4} />}>
-            <HomeOperations standingsPromise={standingsPromise} starters={mySquad.starters} matchup={matchup} fixtureIntel={fixtureIntel} teamId={team?.id ?? null} />
+      <div className="home-support-grid">
+        <div className="home-stack">
+          <StartingXI players={mySquad.starters.map(slot => slot.player)} />
+          <Suspense fallback={<V2Loading title="Recent activity" rows={3} />}>
+            <HomeActivity activityPromise={activityPromise} />
           </Suspense>
-          {team && <Suspense fallback={<ModuleLoading title="TRADE_DESK" rows={2} />}>
+        </div>
+        <div className="home-stack">
+          {team && <Suspense fallback={<V2Loading title="Trades" rows={2} />}>
             <HomeTrades leagueId={league.id} teamId={team.id} teamsPromise={teamsPromise} tradesPromise={tradesPromise} />
           </Suspense>}
-          <Suspense fallback={<ModuleLoading title="FORM_INTELLIGENCE" rows={3} />}>
+          <Suspense fallback={<V2Loading title="Free agents in form" rows={3} />}>
             <HomeForm agentsPromise={agentsPromise} leagueId={league.id} canTransact={Boolean(team)} />
           </Suspense>
         </div>
       </div>
-
-      <Suspense fallback={<ModuleLoading title="OPERATIONS_FEED" rows={3} />}>
-        <HomeActivity activityPromise={activityPromise} />
-      </Suspense>
     </div>
   );
 }
 
-async function HomeOperations({ standingsPromise, starters, matchup, fixtureIntel, teamId }: {
-  standingsPromise: ReturnType<typeof getStandings>;
-  starters: import("@/lib/types/fantasy").LineupSlot[];
-  matchup: Awaited<ReturnType<typeof getCurrentMatchup>>;
-  fixtureIntel: Awaited<ReturnType<typeof getMatchupFixtureIntelligence>> | null;
-  teamId: string | null;
+async function HomeOperations({ standingsPromise, teamId }: {
+  standingsPromise: ReturnType<typeof getStandings>; teamId: string | null;
 }) {
-  const standings = await standingsPromise;
-  return <OperationsRail starters={starters} standings={standings}
-    hasActiveRound={matchup !== null && matchup.roundStatus !== "completed"} fixtureIntel={fixtureIntel} myTeamId={teamId} />;
+  return <HomeLeaguePosition standings={await standingsPromise} myTeamId={teamId} />;
 }
 
 async function HomeTrades({ leagueId, teamId, teamsPromise, tradesPromise }: {
   leagueId: string; teamId: string; teamsPromise: ReturnType<typeof getLeagueTeams>; tradesPromise: ReturnType<typeof getTeamTrades>;
 }) {
   const [allTeams, trades] = await Promise.all([teamsPromise, tradesPromise]);
-  return (
-  <div className="border border-border p-4">
-    <p className="label-system text-[11px] text-foreground-tertiary">TRADE_DESK</p>
-    <div className="mt-2.5">
-      <TradeDesk
-        leagueId={leagueId}
-        myTeamId={teamId}
-        otherTeams={allTeams.filter(team => team.id !== teamId)}
-        incoming={trades.incoming}
-        outgoing={trades.outgoing}
-      />
-    </div>
-  </div>
-  );
+  return <HomeSection title="Trades" description="Your league's transfer conversations.">
+    <TradeDesk leagueId={leagueId} myTeamId={teamId} otherTeams={allTeams.filter(team => team.id !== teamId)}
+      incoming={trades.incoming} outgoing={trades.outgoing} />
+  </HomeSection>;
 }
 
 async function HomeForm({ agentsPromise, leagueId, canTransact }: {
@@ -230,7 +157,7 @@ async function HomeForm({ agentsPromise, leagueId, canTransact }: {
 
 async function HomeActivity({ activityPromise }: { activityPromise: ReturnType<typeof getRecentActivity> }) {
   const activity = await activityPromise;
-  return <section><ModuleHeader title="OPERATIONS_FEED" meta={activity.length} />
-    <div className="mt-1"><ActivityFeed items={activity} /></div>
-  </section>;
+  return <HomeSection title="Recent activity" description={activity.length > 0 ? `${activity.length} recent league events` : undefined} action={<TransitionLink href="/league" label="League" className="v2-link">Open league →</TransitionLink>}>
+    <ActivityFeed items={activity} />
+  </HomeSection>;
 }

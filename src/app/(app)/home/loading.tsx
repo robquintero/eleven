@@ -1,5 +1,6 @@
-import { WorkspaceLoading } from "@/components/shell/workspace-loading";
+import { HomeLoading } from "@/components/dashboard/home-overview";
+import "@/components/dashboard/home-v2.css";
 
 export default function Loading() {
-  return <WorkspaceLoading destination="Home" />;
+  return <HomeLoading />;
 }

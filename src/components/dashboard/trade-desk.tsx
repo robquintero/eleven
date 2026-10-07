@@ -57,11 +57,11 @@ export function TradeDesk({
   return (
     <div>
       <div className="flex items-center justify-between gap-3">
-        <span className="label-system text-[11px] text-foreground-tertiary">
-          {totalPending > 0 ? `${totalPending} PENDING` : "NO PENDING TRADES"}
+        <span className="home-trades-summary">
+          {totalPending > 0 ? `${totalPending} pending` : "No pending trades"}
         </span>
         <Button size="xs" variant="outline" onClick={() => setProposeOpen(true)} disabled={otherTeams.length === 0}>
-          Propose Trade
+          Propose trade
         </Button>
       </div>
 
@@ -74,6 +74,7 @@ export function TradeDesk({
       {totalPending > 0 && (
         <div className="mt-2.5 flex flex-col gap-3">
           <TradeList
+            v2
             direction="incoming"
             trades={incoming}
             myTeamId={myTeamId}
@@ -95,6 +96,7 @@ export function TradeDesk({
             )}
           />
           <TradeList
+            v2
             direction="outgoing"
             trades={outgoing}
             myTeamId={myTeamId}
@@ -114,6 +116,7 @@ export function TradeDesk({
       )}
 
       <LazyProposeTradeDialog
+        v2
         open={proposeOpen}
         onOpenChange={setProposeOpen}
         leagueId={leagueId}

@@ -1,6 +1,7 @@
 "use client";
 
 import { PositionBadge } from "@/components/players/position-badge";
+import { HomeSection } from "./home-overview";
 
 import { useState } from "react";
 import { signPlayerAction } from "@/app/(app)/players/actions";
@@ -56,11 +57,7 @@ export function FormIntelligence({
   if (agents.length === 0) return null;
 
   return (
-    <div className="border border-border p-4">
-      <div className="flex items-center justify-between">
-        <p className="label-system text-[11px] text-foreground-tertiary">FORM_INTELLIGENCE</p>
-        <p className="label-system text-[10px] text-foreground-tertiary">FREE AGENTS</p>
-      </div>
+    <HomeSection title="Free agents in form" description="Available players with strong recent performances.">
       {error && <ActionFeedback kind={error.kind} message={error.message} />}
       <div className="mt-2.5 divide-y divide-border">
         {agents.map((agent) => (
@@ -112,6 +109,6 @@ export function FormIntelligence({
       </div>
 
       <PlayerInspector player={selected} variant="overlay" open={open} onOpenChange={setOpen} />
-    </div>
+    </HomeSection>
   );
 }
