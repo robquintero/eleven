@@ -47,6 +47,7 @@ window.mount=async(mode='normal')=>{
   const page=await browser.newPage({viewport:{width,height:1000},reducedMotion:'reduce'}),errors=[],requests=[];
   page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',route=>{requests.push(route.request().url());return route.abort();});
   await page.setContent('<style>:root{--font-sans:Arial,sans-serif;--font-mono:monospace;}'+css+'\n'+v2+'</style><main id="root" style="padding:16px;max-width:1200px;margin:auto"></main>');await page.evaluate(t=>document.documentElement.classList.toggle('dark',t==='dark'),theme);await page.addScriptTag({path:join(directory,'bundle.js')});await page.getByRole('heading',{name:'FANTASTIC 4',exact:true}).waitFor();
+  assert.ok(await page.getByRole('heading',{name:'FANTASTIC 4',exact:true}).evaluate(el=>el.getBoundingClientRect().width>=220),'League title has usable width');
   assert.equal(await page.locator('.v2-focus .v2-matchup').first().getAttribute('href'),'/matchup/00000000-0000-4000-8000-000000000051');
   assert.equal(await page.locator('.v2-focus .v2-matchup').last().getByText('—',{exact:true}).count(),2);
   assert.equal(await page.locator('.v2-matchup').filter({hasText:'Finalizing result'}).getByText(/Winner/).count(),0);

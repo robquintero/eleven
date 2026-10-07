@@ -20,8 +20,8 @@ export function LeagueOverview({ league, season, lifecycleLabel, draftStatus, st
 }) {
   const commissioner = league?.members.find(member => member.userId === league.createdByUserId);
   return <div className="eleven-v2 v2-league space-y-6">
-    <header className="flex flex-wrap items-start justify-between gap-5">
-      <div className="min-w-0 flex-1">
+    <header className="flex flex-col items-start justify-between gap-5 sm:flex-row">
+      <div className="min-w-0 w-full flex-1 sm:w-auto">
         <div className="mb-2 flex flex-wrap items-center gap-2"><span className="v2-meta">Your league</span>{lifecycleLabel && <span className="v2-status">· {lifecycleLabel.toLowerCase()}</span>}</div>
         <h1 className="text-[30px] font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]">{league?.name ?? "Start your league"}</h1>
         {league ? <>
