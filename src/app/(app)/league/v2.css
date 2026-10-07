@@ -63,7 +63,7 @@
 .eleven-v2 .v2-matchup-grid { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 16px; }
 .eleven-v2 .v2-matchup { display: flex; flex-direction: column; gap: 16px; min-width: 0; border: 1px solid var(--v2-divider); border-radius: 16px; padding: 20px; background: var(--v2-surface); transition: background-color 160ms, border-color 160ms; }
 .eleven-v2 .v2-matchup:hover { background: var(--v2-hover); border-color: var(--v2-line); }
-.eleven-v2 .v2-matchup-own { background: radial-gradient(ellipse at 0% 0%, var(--v2-atmosphere), transparent 70%), var(--v2-surface); border-color: var(--v2-accent-edge); border-left: 2px solid var(--v2-accent); }
+.eleven-v2 .v2-matchup-own { background: radial-gradient(ellipse at 0% 0%, var(--v2-atmosphere), transparent 70%), var(--v2-surface); border-color: var(--v2-accent-edge); }
 .eleven-v2 .v2-score { display: block; font-size: clamp(26px, 28cqi, 56px); font-weight: 650; line-height: 1.05; }
 .eleven-v2 .v2-matchup-own:not(.v2-matchup-compact) .v2-score { font-size: clamp(28px, 30cqi, 64px); }
 .eleven-v2 .v2-matchup .v2-score.v2-score-six { font-size: clamp(24px, 26cqi, 56px); }
@@ -158,8 +158,10 @@
 .eleven-v2 .v2-current-context > .label-system:not(.text-live) { color: var(--v2-accent); }
 .eleven-v2 .text-live { color: var(--v2-positive); }
 .eleven-v2 .v2-week-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; border-top: 1px solid var(--v2-divider); padding-top: 8px; margin-bottom: 16px; }
-.eleven-v2 .v2-round-nav { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 12px; }
-.eleven-v2 .v2-round-nav .v2-control { border-color: var(--v2-accent-edge); }
+.eleven-v2 .v2-round-nav { display: flex; align-items: center; justify-content: flex-start; flex-wrap: nowrap; max-width: 100%; gap: 8px; }
+.eleven-v2 .v2-round-nav > :is(a, span) { display: inline-flex; align-items: center; min-height: 44px; padding-inline: 4px; font-size: 13px; line-height: 20px; white-space: nowrap; }
+.eleven-v2 .v2-round-nav > label { display: flex; align-items: center; min-width: 0; }
+.eleven-v2 .v2-round-nav .v2-control { border-color: var(--v2-accent-edge); padding: 6px 10px; line-height: 20px; }
 .eleven-v2 .v2-team-score { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .eleven-v2 .v2-matchup-own:not(.v2-matchup-compact) .v2-matchup-footer { color: var(--v2-accent); }
 .eleven-v2 .v2-own-standing .v2-standing-rank { color: var(--v2-accent); }
@@ -173,10 +175,10 @@
   .eleven-v2 .v2-focus,
   .eleven-v2 .v2-standings { border-radius: 24px; }
   .eleven-v2 .v2-week-controls { gap: 4px 12px; margin-bottom: 12px; }
-  .eleven-v2 .v2-round-nav { width: 100%; flex-wrap: nowrap; gap: 8px; justify-content: space-between; }
-  .eleven-v2 .v2-round-nav .v2-link { font-size: 12px; }
+  .eleven-v2 .v2-round-nav { width: 100%; }
+  .eleven-v2 .v2-round-nav > :is(a, span) { font-size: 12px; }
   .eleven-v2 .v2-round-nav > label { flex: 1; }
-  .eleven-v2 .v2-round-nav .v2-control { width: 100%; padding: 8px; font-size: 12px; }
+  .eleven-v2 .v2-round-nav .v2-control { width: 100%; font-size: 12px; }
   .eleven-v2 .v2-trades { padding: 16px; }
   .eleven-v2 .v2-support .v2-section-heading { padding: 16px 20px 12px; }
   .eleven-v2 .v2-record-value { font-size: 28px; }
