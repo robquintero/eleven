@@ -11,11 +11,11 @@ import { DeleteLeagueSection } from "./delete-league-section";
 import { standingsEmptyContext } from "@/domain/fantasy/season";
 
 /** Presentation only: streams are supplied by the existing server page loaders. */
-export function LeagueOverview({ league, season, lifecycleLabel, draftStatus, standings, myTeamId, allowDelete,
+export function LeagueOverview({ league, season, lifecycleLabel, draftStatus, standings, myTeamId, allowDelete, membershipKey,
   matchweek, records, results, activity, trades, managers, archive }: {
   league: LeagueDetail | null; season: SeasonSummary | null; lifecycleLabel: string | null;
   draftStatus: string | null; standings: StandingsRow[]; myTeamId: string | null; allowDelete: boolean;
-  matchweek: ReactNode; records: ReactNode; results: ReactNode; activity: ReactNode;
+  membershipKey?: string; matchweek: ReactNode; records: ReactNode; results: ReactNode; activity: ReactNode;
   trades: ReactNode; managers: ReactNode; archive: ReactNode;
 }) {
   const commissioner = league?.members.find(member => member.userId === league.createdByUserId);
@@ -29,7 +29,7 @@ export function LeagueOverview({ league, season, lifecycleLabel, draftStatus, st
           {commissioner && <p className="v2-meta mt-1">Commissioner: {commissioner.displayName}</p>}
         </> : <p className="v2-secondary mt-2">Create a league or join your friends with an invite code.</p>}
       </div>
-      <LeagueFormActions />
+      <LeagueFormActions key={`${league?.id ?? "none"}:${membershipKey ?? ""}`} />
     </header>
     {league && <>
       {matchweek}

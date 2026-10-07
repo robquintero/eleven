@@ -85,6 +85,7 @@ export default async function LeaguePage({ searchParams }: { searchParams?: Prom
 
   return <LeagueOverview
     league={activeDetail} season={season} lifecycleLabel={lifecycle ? LEAGUE_LIFECYCLE_LABEL[lifecycle] : null}
+    membershipKey={leagues.map(league => league.id).join(":")}
     draftStatus={draftStatus} standings={standings} myTeamId={myTeam?.id ?? null}
     allowDelete={Boolean(activeDetail && canDeleteLeague(activeDetail.role, activeDetail.createdByUserId, profile.id))}
     matchweek={<Suspense fallback={<V2Loading title="Matchweek" rows={3} />}><LeagueMatchweek competitionPromise={competitionPromise} myTeamId={myTeam?.id ?? null} requestedRound={requestedRound} /></Suspense>}
