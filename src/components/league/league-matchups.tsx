@@ -30,7 +30,7 @@ function MatchupRow({ matchup, myTeamId }: { matchup: LeagueMatchupSummary; myTe
 /** Container-sized proportional display keeps large scores readable at 320px. */
 function ScoreDisplay({ points, alignRight = false }: { points: number | null; alignRight?: boolean }) {
   const value = points === null ? "—" : formatRoundPoints(points);
-  return <div className={`v2-score-cell ${alignRight ? "text-right" : ""}`}><span className={`v2-display v2-score ${value.length > 6 ? "v2-score-wide" : ""}`}>{value}</span></div>;
+  return <div className={`v2-score-cell ${alignRight ? "text-right" : ""}`}><span className={`v2-display v2-score ${value.length > 6 ? "v2-score-wide" : value.length === 6 ? "v2-score-six" : ""}`}>{value}</span></div>;
 }
 
 /** Score-led sports presentation; the archive's default rows remain unchanged. */
