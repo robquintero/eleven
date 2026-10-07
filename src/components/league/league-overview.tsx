@@ -23,7 +23,7 @@ export function LeagueOverview({ league, season, lifecycleLabel, draftStatus, st
     <header className="flex flex-col items-start justify-between gap-5 sm:flex-row">
       <div className="min-w-0 w-full flex-1 sm:w-auto">
         <div className="mb-2 flex flex-wrap items-center gap-2"><span className="v2-meta">Your league</span>{lifecycleLabel && <span className="v2-status">· {lifecycleLabel.toLowerCase()}</span>}</div>
-        <h1 className="text-[30px] font-semibold leading-tight tracking-tight [overflow-wrap:anywhere]">{league?.name ?? "Start your league"}</h1>
+        <h1 className="v2-page-title">{league?.name ?? "Start your league"}</h1>
         {league ? <>
           <p className="v2-secondary mt-2">{season ? `Season ${season.seasonNumber} · ` : ""}{league.memberCount} / {league.maxTeams} managers{season?.currentRoundNumber !== null && season?.currentRoundNumber !== undefined ? ` · Round ${season.currentRoundNumber}${season.totalRounds ? ` of ${season.totalRounds}` : ""}` : ""}</p>
           {commissioner && <p className="v2-meta mt-1">Commissioner: {commissioner.displayName}</p>}
@@ -34,7 +34,7 @@ export function LeagueOverview({ league, season, lifecycleLabel, draftStatus, st
     {league && <>
       {matchweek}
       <SeasonPanel season={season} leagueId={league.id} isCommissioner={league.role === "commissioner"} />
-      <V2Surface><V2Heading title="Standings" description="Based on official completed matchups." />
+      <V2Surface className="v2-standings"><V2Heading title="Standings" description="Based on official completed matchups." />
         <StandingsTable variant="v2" standings={standings} myTeamId={myTeamId} emptyContext={standingsEmptyContext(season && { status: season.status, currentRoundNumber: season.currentRoundNumber })} />
       </V2Surface>
       {records}

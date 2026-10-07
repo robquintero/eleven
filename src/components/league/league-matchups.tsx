@@ -27,6 +27,12 @@ function MatchupRow({ matchup, myTeamId }: { matchup: LeagueMatchupSummary; myTe
   </TransitionLink>;
 }
 
+/** Container-sized proportional display keeps large scores readable at 320px. */
+function ScoreDisplay({ points, alignRight = false }: { points: number | null; alignRight?: boolean }) {
+  const value = points === null ? "—" : formatRoundPoints(points);
+  return <div className={`v2-score-cell ${alignRight ? "text-right" : ""}`}><span className={`v2-display v2-score ${value.length > 6 ? "v2-score-wide" : ""}`}>{value}</span></div>;
+}
+
 /** Score-led sports presentation; the archive's default rows remain unchanged. */
 function MatchupScoreCard({ matchup, myTeamId, compact }: { matchup: LeagueMatchupSummary; myTeamId: string | null; compact: boolean }) {
   const isMine = myTeamId !== null && (matchup.homeTeamId === myTeamId || matchup.awayTeamId === myTeamId);
@@ -42,8 +48,8 @@ function MatchupScoreCard({ matchup, myTeamId, compact }: { matchup: LeagueMatch
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-5 gap-y-3">
       <TeamName name={matchup.homeTeamName} className="block text-[15px] font-medium leading-snug" />
       <TeamName name={matchup.awayTeamName} className="block text-right text-[15px] font-medium leading-snug" />
-      <span className="v2-number v2-score">{matchup.homePoints === null ? "—" : formatRoundPoints(matchup.homePoints)}</span>
-      <span className="v2-number v2-score text-right">{matchup.awayPoints === null ? "—" : formatRoundPoints(matchup.awayPoints)}</span>
+      <ScoreDisplay points={matchup.homePoints} />
+      <ScoreDisplay points={matchup.awayPoints} alignRight />
     </div>
     <div className="v2-matchup-footer">
       {result ?? (matchup.resultState === "pending" ? "Finalizing result" : matchup.resultState === "upcoming" ? "Awaiting kickoff" : "View matchup →")}
@@ -73,7 +79,7 @@ export function LeagueMatchups({
       const mine = (m: LeagueMatchupSummary) => m.homeTeamId === myTeamId || m.awayTeamId === myTeamId;
       return Number(mine(b)) - Number(mine(a));
     });
-    return <div className="v2-matchup-grid">{ordered.map(m => <MatchupScoreCard key={m.id} matchup={m} myTeamId={myTeamId} compact={compact} />)}</div>;
+    return <div className={compact ? "v2-results-list" : "v2-matchup-grid"}>{ordered.map(m => <MatchupScoreCard key={m.id} matchup={m} myTeamId={myTeamId} compact={compact} />)}</div>;
   }
   return (
     <div className="divide-y divide-border">

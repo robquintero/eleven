@@ -108,14 +108,14 @@ function V2Standings({ standings, myTeamId, emptyContext }: { standings: Standin
         const own = row.fantasyTeamId === myTeamId;
         const diff = Math.round((row.pointsFor - row.pointsAgainst) * 100) / 100;
         return <tr key={row.fantasyTeamId} className={own ? "v2-own-standing" : ""}>
-          <td className={`v2-number ${own ? "border-l-2 border-l-[var(--v2-accent)]" : ""}`}>{i + 1}</td>
+          <td className={`v2-display v2-standing-rank ${own ? "border-l-2 border-l-[var(--v2-accent)]" : ""}`}>{i + 1}</td>
           <th scope="row" className="v2-team-cell v2-sticky-team">
             <div className="flex min-w-0 items-center gap-2"><TransitionLink href={own ? "/team" : `/team/${row.fantasyTeamId}`} label={row.teamName} className="flex min-h-11 min-w-0 items-center text-[14px] font-medium hover:underline"><TeamName name={row.teamName} /></TransitionLink>{own && <span className="text-[10px] text-[var(--v2-accent)]">You</span>}</div>
           </th>
           {[row.played,row.wins,row.draws,row.losses].map((value, j) => <td key={j} className="v2-number">{value}</td>)}
           <td className="v2-number">{formatRoundPoints(row.pointsFor)}</td><td className="v2-number">{formatRoundPoints(row.pointsAgainst)}</td>
           <td className={`v2-number font-medium ${diff > 0 ? "v2-positive" : diff < 0 ? "v2-negative" : ""}`}>{diff > 0 ? "+" : ""}{formatRoundPoints(diff)}</td>
-          <td className="v2-number text-[18px] font-semibold">{row.leaguePoints}</td>
+          <td className="v2-display v2-standing-points">{row.leaguePoints}</td>
         </tr>;
       })}</tbody>
     </table>

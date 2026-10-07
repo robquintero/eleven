@@ -1241,10 +1241,11 @@ The League route imports `v2.css`; all its selectors require `.eleven-v2`.
 Portal dialogs explicitly opt in. Do not move these overrides to global CSS.
 
 V2 uses layered canvas/surface/inset/hover/selected tokens in both themes,
-6/10/14px control/module/hero radii, restrained blue action/focus accents,
+10px control and 32px major-module radii, restrained blue action/focus accents,
 and accessible signed-differential colors. Existing position colors remain
 unchanged. Sans labels provide human hierarchy; mono and tabular figures are
-reserved for data. Titles are 30px, module headings 19px, hero scores 28–40px,
+reserved for compact operational data. Major scores, ranks and record values use
+proportional tabular numerals. Titles are 30–34px, module headings 22–28px, hero scores adapt up to 64px,
 secondary text 13px and operational metadata 11px. Dense data lives inside
 well-separated modules. Existing reduced-motion rules still apply.
 
@@ -1258,3 +1259,11 @@ trades → managers and draft/archive → collapsed commissioner management.
 Mobile preserves that priority, uses two record columns and local standings
 scrolling. Create/Join mount the existing forms in dialogs. Deletion confirmation,
 all business rules, server actions and shared data promises remain unchanged.
+
+The source-Figma addendum governs V2 geometry: a visibly lighter charcoal canvas
+surrounds near-black elevated modules, with low-opacity strokes and soft shadows.
+Major shells own 32px corners and 24px desktop padding; nested controls stay
+compact. Only the matchweek gets a faint ambient radial blue field. Recent
+results use clean divided rows and records use a compact unboxed grid so neither
+competes with current scores or standings. Existing system sans is retained;
+Nunito's proportional hierarchy is adapted without a new font dependency.

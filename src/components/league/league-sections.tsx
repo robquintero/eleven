@@ -35,7 +35,7 @@ export async function LeagueMatchweek({ competitionPromise, myTeamId, requestedR
         <div className="mb-2 flex flex-wrap items-center gap-3"><span className="v2-meta">{selected?.id === currentId ? "This week" : "League matchups"}</span>
           {selected && <MatchupStatus state={matchupResultState({ startsAt: selected.startsAt, endsAt: selected.endsAt, roundStatus: selected.status }, new Date())} />}
         </div>
-        <h2 className="text-[24px] font-semibold leading-tight tracking-tight">{selected ? `Matchweek ${selected.number}` : "Matchweek"}</h2>
+        <h2 className="v2-week-title">{selected ? `Matchweek ${selected.number}` : "Matchweek"}</h2>
         {selected && <><p className="v2-secondary mt-2">{date(selected.startsAt)} — {date(selected.endsAt)}</p><p className="v2-meta mt-1">{formatRoundWindow(selected.startsAt, selected.endsAt)}</p></>}
       </div>
       {myTeamId && <TransitionLink href="/matchup" label="My Matchup" className="v2-link">My matchup →</TransitionLink>}
