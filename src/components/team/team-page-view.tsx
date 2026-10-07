@@ -1,3 +1,4 @@
+import { CoreSurface } from "@/components/ui/core-v2";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { RoundWindow } from "@/components/football/round-window";
 import { TeamWorkspace } from "@/components/team/team-workspace";
@@ -28,11 +29,11 @@ export function TeamPageView({ team, league, squad, matchup, readOnly = false, m
   const vacancies = rosterVacancies(positionCounts);
 
   return (
-    <div>
+    <div className="core-v2">
       {readOnly && <div className="mb-3 flex flex-wrap gap-4"><TransitionLink href={matchup ? `/league?round=${matchup.roundId}` : "/league"} label="League" className="label-system text-[11px] text-accent">← League</TransitionLink>{contextLink && <TransitionLink href={contextLink} label="Matchup" className="label-system text-[11px] text-accent">← Matchup</TransitionLink>}</div>}
-      <div className="flex items-start justify-between gap-4">
+      <CoreSurface className="core-team-identity" label="Team identity">
         <div className="min-w-0">
-          <h1 className="break-words text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <h1 className="v2-page-title">
             {team?.name ?? league.name}
           </h1>
           <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-foreground-secondary">
@@ -40,16 +41,16 @@ export function TeamPageView({ team, league, squad, matchup, readOnly = false, m
             {managerName && <span>· {managerName}</span>}
             <span className="text-foreground-tertiary">·</span>
             <span className="label-system text-xs text-foreground-tertiary">
-              {squadSize} / {ROSTER_RULES.squadSize} PLAYERS
+              {squadSize} / {ROSTER_RULES.squadSize} players
             </span>
           </p>
         </div>
-      </div>
+      </CoreSurface>
 
-      <div className="mt-4 flex divide-x divide-border overflow-x-auto border border-border">
-        <StripCell label="FORMATION" value={squad.formation} />
-        <StripCell label="STARTERS" value={pad2(squad.starters.length)} />
-        <StripCell label="BENCH" value={pad2(squad.bench.length)} />
+      <div className="core-team-summary">
+        <StripCell label="Formation" value={squad.formation} />
+        <StripCell label="Starters" value={pad2(squad.starters.length)} />
+        <StripCell label="Bench" value={pad2(squad.bench.length)} />
       </div>
 
       {matchup && (
@@ -68,7 +69,7 @@ export function TeamPageView({ team, league, squad, matchup, readOnly = false, m
       {team && !readOnly && vacancies.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-accent/30 bg-accent/5 px-4 py-3">
           <div>
-            <p className="label-system text-[11px] text-accent">ROSTER VACANCY</p>
+            <p className="label-system text-[11px] text-accent">Roster vacancy</p>
             <p className="mt-0.5 text-xs text-foreground-secondary">
               Short on {vacancies.map((v) => `${v.short} ${v.position}`).join(", ")}. No auto-fill — sign
               replacements from the free market whenever you&apos;re ready.
@@ -79,7 +80,7 @@ export function TeamPageView({ team, league, squad, matchup, readOnly = false, m
             label="Players"
             className="label-system shrink-0 text-[11px] text-accent hover:underline"
           >
-            BROWSE MARKET →
+            Browse market →
           </TransitionLink>
         </div>
       )}

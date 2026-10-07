@@ -16,6 +16,7 @@ function load(file: string): Record<string, (props: Record<string, unknown>) => 
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true },
   }).outputText;
   const localRequire = (id: string): unknown => {
+    if (id.endsWith(".css")) return {};
     if (id.startsWith("@/data-access/") || id.includes("/actions")) throw new Error(`Unexpected server dependency: ${id}`);
     if (id === "@/components/shell/transition-link") return { TransitionLink: (props: Record<string, unknown>) => ({type:"a",props}) };
     if (id === "lucide-react") return new Proxy({}, { get: () => () => null });
@@ -122,12 +123,12 @@ test("scoreboard keeps user's full identity and exact score on the left in home 
       const result = text(tree);
       assert.ok(result.indexOf(mine) < result.indexOf(opponent));
       assert.ok(result.indexOf("152.1") < result.indexOf("141.15"));
-      assert.match(result, /YOUR TEAM/);
-      assert.doesNotMatch(result, /VS/);
+      assert.match(result, /Your team/i);
+      assert.doesNotMatch(result, /vs/i);
       const titles = nodes(tree).filter(node => node.props.title).map(node => node.props.title);
       assert.ok(titles.includes(mine)); assert.ok(titles.includes(opponent));
       const upcoming = text(MatchupCommand({ matchup: { ...matchup, roundStatus: "upcoming" }, hasLeague: true, now: new Date() }));
-      assert.match(upcoming, /VS/); assert.doesNotMatch(upcoming, /152.1|141.15/);
+      assert.match(upcoming, /vs/i); assert.doesNotMatch(upcoming, /152.1|141.15/);
     }
   }
 });

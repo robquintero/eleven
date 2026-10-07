@@ -10,6 +10,7 @@ function load(file:string,mocks:Record<string,unknown>={}):Record<string,(props:
   const filename=resolve(root,file),compiled={exports:{}};
   const code=ts.transpileModule(readFileSync(filename,"utf8"),{compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText;
   new Function("require","module","exports",code)((id:string)=>{
+    if(id.endsWith(".css")) return {};
     if(id in mocks)return mocks[id];
     if(id==='next/navigation')return {notFound:()=>{throw Error("NOT_FOUND");},redirect:(url:string)=>{throw Error("REDIRECT "+url);},useRouter:()=>({push:()=>{}})};
     if(id==='@/components/shell/transition-link')return {TransitionLink:(props:Record<string,unknown>)=>({type:"a",props})};
@@ -35,10 +36,10 @@ test("matchup presentation retains own-away ordering, neutral home ordering, UUI
     const m={...base,isSpectator,isUserHome:isSpectator};
     const tree=await MatchupCommand({matchup:m,hasLeague:true,now:new Date('2026-10-07'),teamLinks:{home:`/team/${id(3)}?round=${id(7)}`,away:`/team/${id(4)}?round=${id(7)}`}});
     const links=nodes(tree).filter(e=>e.type==='a');assert.equal(links[0].props.href,`/team/${id(isSpectator?3:4)}?round=${id(7)}`);assert.equal(links[1].props.href,`/team/${id(isSpectator?4:3)}?round=${id(7)}`);
-    assert.match(text(tree),/12/);assert.match(text(tree),/9/);assert.doesNotMatch(text(tree),/99|88/);assert.match(text(tree),/WINNER/);
-    assert.match(text(tree),isSpectator?/LEAGUE MATCHUP/:/YOUR TEAM/);
+    assert.match(text(tree),/12/);assert.match(text(tree),/9/);assert.doesNotMatch(text(tree),/99|88/);assert.match(text(tree),/Winner/i);
+    assert.match(text(tree),isSpectator?/League matchup/i:/Your team/i);
   }
-  const missing=await MatchupCommand({matchup:{...base,status:'live',roundStatus:'in_progress',homeFinalPoints:null,awayFinalPoints:null,homeScoreAvailable:false,awayScoreAvailable:false},hasLeague:true,now:new Date('2026-10-01')});assert.match(text(missing),/—/);assert.doesNotMatch(text(missing),/99|88|WINNER/);
+  const missing=await MatchupCommand({matchup:{...base,status:'live',roundStatus:'in_progress',homeFinalPoints:null,awayFinalPoints:null,homeScoreAvailable:false,awayScoreAvailable:false},hasLeague:true,now:new Date('2026-10-01')});assert.match(text(missing),/—/);assert.doesNotMatch(text(missing),/99|88|Winner/i);
 });
 test("every league pairing is one keyboard link; ACTIVE/PENDING/FINAL/missing scores preserve semantics",async()=>{
   const {LeagueMatchups}=load('src/components/league/league-matchups.tsx');

@@ -1,10 +1,11 @@
+import "@/components/ui/core-v2.css";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { matchupResultState } from "@/domain/fantasy/matchup-result-state";
 import { MatchupStatus } from "@/components/football/matchup-status";
 import type { ReactNode } from "react";
 import { TeamName } from "@/components/ui/team-name";
 import type { CurrentMatchup, MatchupFixtureIntelligence } from "@/data-access/matchups";
-import { countStartersInFixture, formatKickoff, pad2, resolveMatchupSides } from "@/lib/team-fixture";
+import { countStartersInFixture, formatKickoff, resolveMatchupSides } from "@/lib/team-fixture";
 import type { LineupSlot } from "@/lib/types/fantasy";
 
 /**
@@ -38,13 +39,13 @@ export function MatchupCommand({
 }) {
   if (!matchup) {
     return (
-      <div className="border border-border bg-surface-elevated">
+      <div className="core-v2 core-hero core-matchup">
         <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
           <span className="label-system text-[11px] text-foreground-secondary">
-            MATCHUP_COMMAND
+            Matchup
           </span>
           <span className="label-system text-[10px] text-foreground-tertiary">
-            NOT SCHEDULED
+            Not scheduled
           </span>
         </div>
         <div className="flex flex-col items-center gap-2 p-8 text-center">
@@ -73,7 +74,6 @@ export function MatchupCommand({
   const isScheduled = resultState === "upcoming";
   const homeScore = matchup.homeFinalPoints ?? matchup.homeLivePoints;
   const awayScore = matchup.awayFinalPoints ?? matchup.awayLivePoints;
-  const total = homeScore + awayScore || 1;
   // Pass 14.8: the logged-in user's team is ALWAYS presented on the left
   // throughout the Matchup page (matching MatchupLineups/MatchupPlayerCounts,
   // which already do this) -- home/away is purely a database/scheduling
@@ -87,7 +87,6 @@ export function MatchupCommand({
     homeScore,
     awayScore,
   });
-  const leftShare = (leftScore / total) * 100;
   const leftKnown = matchup.isUserHome ? matchup.homeScoreAvailable !== false : matchup.awayScoreAvailable !== false;
   const rightKnown = matchup.isUserHome ? matchup.awayScoreAvailable !== false : matchup.homeScoreAvailable !== false;
   const leftFinal = matchup.isUserHome ? matchup.homeFinalPoints : matchup.awayFinalPoints;
@@ -108,47 +107,34 @@ export function MatchupCommand({
   const isStale = isLive && updatedMinutesAgo !== null && updatedMinutesAgo > 15;
 
   return (
-    <div className="@container border border-border bg-surface-elevated">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-border px-4 py-2.5">
-        <span className="label-system text-[11px] text-foreground-secondary">
-          MATCHUP_COMMAND
-        </span>
-        <span className="label-system flex items-center gap-1.5 text-[10px] text-foreground-tertiary">
-          <MatchupStatus state={resultState} />
-          · MATCHDAY {pad2(matchup.roundNumber)}
-        </span>
+    <section aria-label="Matchup score" className="core-v2 core-hero core-matchup">
+      <div className="core-hero-top">
+        <span className="core-kicker">Round {matchup.roundNumber} · {matchup.isSpectator ? "League matchup" : "Your matchup"}</span>
+        <span className="core-state" data-state={resultState}><MatchupStatus state={resultState} /></span>
       </div>
-
-      <div className="p-4 @min-[32rem]:p-6">
-        {/* Equal identity columns no longer compete with the central score.
-            Container sizing also works in Home's narrower desktop column. */}
-        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-end gap-x-3 gap-y-2">
-          <div className="min-w-0 self-start text-sm font-semibold leading-snug text-foreground @min-[32rem]:text-base">
-            {leftHref ? <TransitionLink href={leftHref} label={leftTeamName} className="block min-h-11 py-1 hover:underline"><TeamName name={leftTeamName} /></TransitionLink> : <TeamName name={leftTeamName} />}
-          </div>
-          <div className="col-start-3 min-w-0 self-start text-right text-sm font-semibold leading-snug text-foreground @min-[32rem]:text-base">
-            {rightHref ? <TransitionLink href={rightHref} label={rightTeamName} className="block min-h-11 py-1 hover:underline"><TeamName name={rightTeamName} /></TransitionLink> : <TeamName name={rightTeamName} />}
-          </div>
-          <span className="label-system col-span-3 text-[10px] text-accent">{matchup.isSpectator ? "LEAGUE MATCHUP" : "YOUR TEAM"}</span>
-          <p className="min-w-0 text-[clamp(1.5rem,9cqi,3.75rem)] leading-none font-semibold tracking-tight tabular-nums text-foreground">
-            {isScheduled || displayedLeft === null ? "—" : displayedLeft}
-          </p>
-          <span className="label-system self-center text-sm text-foreground-tertiary">{isScheduled ? "VS" : "–"}</span>
-          <p className="min-w-0 text-right text-[clamp(1.5rem,9cqi,3.75rem)] leading-none font-semibold tracking-tight tabular-nums text-foreground">
-            {isScheduled || displayedRight === null ? "—" : displayedRight}
-          </p>
+      <div className="core-scoreboard">
+        <div className="core-score-side">
+          <span className="core-kicker">{matchup.isSpectator ? "Home" : "Your team"}</span>
+          <div className="core-team-name">{leftHref ? <TransitionLink href={leftHref} label={leftTeamName} className="hover:underline"><TeamName name={leftTeamName} /></TransitionLink> : <TeamName name={leftTeamName} />}</div>
+          <p className="core-score" data-own={!matchup.isSpectator}>{isScheduled || displayedLeft === null ? "—" : displayedLeft}</p>
         </div>
+        <span className="core-versus">{isScheduled ? "vs" : "–"}</span>
+        <div className="core-score-side">
+          <span className="core-kicker">{matchup.isSpectator ? "Away" : "Opponent"}</span>
+          <div className="core-team-name">{rightHref ? <TransitionLink href={rightHref} label={rightTeamName} className="hover:underline"><TeamName name={rightTeamName} /></TransitionLink> : <TeamName name={rightTeamName} />}</div>
+          <p className="core-score">{isScheduled || displayedRight === null ? "—" : displayedRight}</p>
+        </div>
+      </div>
+      <div className="core-matchup-foot">
+        {resultState === "pending" && <p>Finalizing result. These scores remain provisional until settlement.</p>}
 
-        {resultState === "final" && displayedLeft !== null && displayedRight !== null && <p className="label-system mt-3 text-xs text-foreground-secondary [overflow-wrap:anywhere]">{displayedLeft === displayedRight ? "DRAW" : `WINNER · ${displayedLeft > displayedRight ? leftTeamName : rightTeamName}`}</p>}
+        {resultState === "final" && displayedLeft !== null && displayedRight !== null && <p className="label-system mt-3 text-xs text-foreground-secondary [overflow-wrap:anywhere]">{displayedLeft === displayedRight ? "Draw" : `Winner · ${displayedLeft > displayedRight ? leftTeamName : rightTeamName}`}</p>}
         {isScheduled ? (
           <div className="mt-4 flex flex-col items-center gap-1 border-t border-border pt-4 text-center sm:mt-6">
             {scheduledDetails ?? <MatchupAnticipation fixtureIntel={fixtureIntel} starters={starters} teamIdsByPlayerId={teamIdsByPlayerId} />}
           </div>
         ) : (
           <>
-            {displayedLeft !== null && displayedRight !== null && <div className="relative mt-4 h-1.5 overflow-hidden border border-border bg-muted sm:mt-6">
-              <div className="h-full bg-accent transition-all" style={{ width: `${leftShare}%` }} />
-            </div>}
 
             {isLive && (
               <p className="label-system mt-2 text-center text-[10px] text-foreground-tertiary">
@@ -164,7 +150,7 @@ export function MatchupCommand({
           </>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 

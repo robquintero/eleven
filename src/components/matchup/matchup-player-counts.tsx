@@ -40,25 +40,12 @@ export function MatchupPlayerCounts({
   ];
 
   return (
-    <div className="border border-border">
-      <div className="grid grid-cols-[1fr_3.5rem_3.5rem_3.5rem] items-center gap-2 border-b border-border px-4 py-2 text-right">
-        <span />
-        <span className="label-system text-[10px] text-foreground-tertiary">LIVE</span>
-        <span className="label-system text-[10px] text-foreground-tertiary">LOCKED</span>
-        <span className="label-system text-[10px] text-foreground-tertiary">REMAINING</span>
-      </div>
-      <div className="divide-y divide-border">
-        {rows.map((row) => (
-          <div key={row.label} className="grid grid-cols-[1fr_3.5rem_3.5rem_3.5rem] items-center gap-2 px-4 py-2 text-right">
-            <span className="truncate text-left text-xs font-medium text-foreground">{row.label}</span>
-            <span className="label-system text-sm font-semibold text-live">{row.buckets.live}</span>
-            <span className="label-system text-sm font-semibold text-foreground-secondary">
-              {row.buckets.locked + row.buckets.final}
-            </span>
-            <span className="label-system text-sm font-semibold text-foreground">{row.buckets.upcoming}</span>
-          </div>
-        ))}
-      </div>
+    <div className="core-progress" role="group" aria-label="Starting XI progress">
+      {rows.map((row, index) => <div key={index} className="core-progress-side" role="group" aria-label={row.label}>
+        <span><strong className="text-live">{row.buckets.live}</strong>Live</span>
+        <span><strong>{row.buckets.locked + row.buckets.final}</strong>Locked</span>
+        <span><strong>{row.buckets.upcoming}</strong>Remaining</span>
+      </div>)}
     </div>
   );
 }

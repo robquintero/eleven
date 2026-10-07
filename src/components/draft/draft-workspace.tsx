@@ -6,11 +6,11 @@ import { PositionBadge, PositionLabel } from "@/components/players/position-badg
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Ban } from "lucide-react";
-import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { ActionFeedback, type ActionFeedbackKind } from "@/components/ui/action-feedback";
-import { ModuleHeader } from "@/components/ui/module-header";
+import { CoreHeading, CoreSurface } from "@/components/ui/core-v2";
+import { PlayerIdentity } from "@/components/players/player-identity";
 import { RailModule } from "@/components/ui/rail-module";
 import { submitDraftPickAction, resolveExpiredPickAction } from "@/app/(app)/draft/actions";
 import type { DraftPickRecord, DraftState } from "@/data-access/drafts";
@@ -177,80 +177,16 @@ export function DraftWorkspace({
   );
 
   return (
+    <div className="core-v2">
+      {draft.status === "in_progress" && <DraftTurn draft={draft} remainingMs={remainingMs} myPickCount={myPickCount} />}
     <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,0.9fr)]">
       <section className="min-w-0">
-        {/* Pass 11.5: compact mobile-only decision strip -- on mobile the
-            full DRAFT_STATUS/SQUAD rail below sits AFTER the entire
-            player pool, which forced managers to scroll past every
-            available player just to see whose turn it is or what their
-            roster needs. This renders the same real draft/`draft`+
-            `myCounts` state ABOVE the pool instead, restrained to a few
-            lines (never a half-screen sticky header) -- the two
-            RailModules it replaces are hidden below `lg:` (see below) so
-            nothing is shown twice. */}
-        <div className={`mb-3 border border-border px-3 py-2.5 ${draft.status === "completed" ? "hidden" : "lg:hidden"}`}>
-          {draft.status === "completed" ? (
-            <p className="text-xs text-foreground-secondary">Draft complete — {draft.picks.length} picks made.</p>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-3">
-                <span className="label-system shrink-0 text-[10px] text-foreground-tertiary">ON THE CLOCK</span>
-                <TeamName name={draft.currentTeamName ?? "—"} className="text-right text-sm font-semibold text-foreground" />
-              </div>
-              <div className="mt-1 flex items-center justify-between">
-                <span className="label-system text-[10px] text-foreground-tertiary">PICK</span>
-                <span className="label-system text-xs font-semibold tabular-nums text-foreground">
-                  {pad2(draft.currentRound)}.{pad2(draft.currentPick)}
-                </span>
-              </div>
-              <div className="mt-1 flex items-center justify-between">
-                <span className="label-system text-[10px] text-foreground-tertiary">TIME</span>
-                <span
-                  className={`label-system text-xs font-semibold tabular-nums ${remainingMs !== null && remainingMs < 10000 ? "text-destructive" : "text-foreground"}`}
-                >
-                  {remainingMs !== null ? formatCountdown(remainingMs) : "—"}
-                </span>
-              </div>
-              {draft.isMyTurn && (
-                <p className="label-system mt-1 text-[10px] font-semibold text-accent">YOUR PICK</p>
-              )}
-            </>
-          )}
-          <div className="mt-2 flex items-center justify-between border-t border-border pt-1.5">
-            <span className="label-system text-[10px] text-foreground-tertiary">SQUAD</span>
-            <span className="label-system text-xs font-semibold tabular-nums text-foreground">
-              {myPickCount} / {ROSTER_RULES.squadSize}
-            </span>
-          </div>
-          <div className="mt-1 flex items-center justify-between gap-1">
-            {(["GK", "DEF", "MID", "FWD"] as const).map((position) => {
-              const { min, max } = ROSTER_RULES.positionRange[position];
-              const count = myCounts[position] ?? 0;
-              const belowMin = count < min;
-              const atMax = count >= max;
-              return (
-                <span
-                  key={position}
-                  className={`label-system text-[10px] tabular-nums ${
-                    belowMin ? "font-semibold text-accent" : atMax ? "text-foreground-tertiary" : "text-foreground-secondary"
-                  }`}
-                >
-                  <PositionLabel position={position} /> {count}/{min === max ? min : `${min}+`}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-
         {draft.status === "completed" ? (
           <DraftCompleteRecap draft={draft} myPicks={myPicks} myCounts={myCounts} />
         ) : (
-          <>
-            <ModuleHeader
-              title="AVAILABLE_PLAYERS"
-              meta={`${availablePlayers.total} PLAYERS`}
-            />
-            <div className="mt-2 flex min-h-11 items-center gap-2 border border-border px-2.5 py-1.5 focus-within:ring-2 focus-within:ring-accent/60 sm:min-h-9">
+          <CoreSurface className="core-draft-board" label="Draft player board">
+            <CoreHeading title="Player board" meta={`${availablePlayers.total} players`} />
+            <div className="core-search mx-4 flex min-h-11 items-center gap-2 px-3 focus-within:ring-2 focus-within:ring-accent/60">
               <input
                 ref={searchRef}
                 type="text"
@@ -261,7 +197,7 @@ export function DraftWorkspace({
               />
             </div>
 
-            <div className="mt-2 flex items-center gap-1.5">
+            <div className="mx-4 my-3 flex flex-wrap items-center gap-2">
               {POSITION_FILTER_OPTIONS.map((option) => {
                 const value = option === "ALL" ? null : option;
                 const isActive = positionFilter === value;
@@ -270,7 +206,8 @@ export function DraftWorkspace({
                     key={option}
                     type="button"
                     onClick={() => onPositionFilterChange(value)}
-                    className={`label-system min-h-10 rounded-control border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                    aria-pressed={isActive}
+                    className={`label-system min-h-11 rounded-control border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
                       isActive
                         ? "border-accent bg-accent text-accent-foreground"
                         : "border-border text-foreground-secondary hover:bg-muted"
@@ -282,61 +219,46 @@ export function DraftWorkspace({
               })}
             </div>
 
-            <div className="mt-2 divide-y divide-border border border-border">
+            <div className="divide-y divide-border">
               {availablePlayers.players.length === 0 ? (
-                <p className="p-4 text-center text-sm text-foreground-tertiary">NO AVAILABLE PLAYERS MATCH</p>
+                <p className="p-4 text-center text-sm text-foreground-tertiary">No players match these filters</p>
               ) : (
                 availablePlayers.players.map((player) => {
-                  // Pass 10.5C: a drafted player stays on the board (context/
-                  // history), never disappears -- dimmed + struck-through +
-                  // an explicit textual DRAFTED/YOUR PICK state, never
-                  // interactive as a pick, and never relying on color alone
-                  // (the strike-through + Ban icon + text all carry the same
-                  // meaning independently). `ownership` reflects the real,
-                  // authoritative `league_player_ownership` state (Pass
-                  // 10.5B's getPlayerDatabase), so this updates correctly the
-                  // moment polling refreshes it -- for a pick made by this
-                  // manager (isMyTurn's own team) or by any other manager.
+                  // Drafted players stay visible for inspection, with an explicit
+                  // ownership label and no pick control. Ownership remains authoritative.
                   const isDrafted = player.ownership != null && player.ownership !== "free";
                   return (
                     <div
                       key={player.id}
-                      className={`flex items-center gap-3 px-3 py-2 ${isDrafted ? "opacity-50" : ""}`}
+                      className={`core-draft-player ${selected?.id === player.id ? "core-row-selected" : ""}`}
                     >
-                      <PositionBadge position={player.position} />
-                      <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" />
+
                       <button
                         type="button"
                         onClick={() => {
                           setSelected(player);
                           setInspectorOpen(true);
                         }}
-                        className="min-w-0 flex-1 cursor-pointer rounded-sm text-left outline-none hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+                        className="core-inspect-player min-w-0 flex-1 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset"
+                        aria-label={`Inspect ${player.name}`}
                       >
-                        <p
-                          className={`truncate text-sm font-medium text-foreground ${isDrafted ? "line-through decoration-2 decoration-foreground-tertiary" : ""}`}
-                        >
-                          {player.name}
-                        </p>
-                        <p className="label-system truncate text-[11px] text-foreground-tertiary">
-                          {player.club.shortName}
-                          {player.totalPoints !== undefined && ` · ${player.totalPoints} PTS`}
-                        </p>
+                        <PlayerIdentity player={player} />
                       </button>
+                      <span className="core-draft-points">{player.totalPoints ?? "—"}<span className="core-player-club">points</span></span>
                       {isDrafted ? (
                         <span
                           className="label-system flex shrink-0 cursor-not-allowed items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground-tertiary"
                           aria-label={player.ownership === "mine" ? "Already on your roster" : "Already drafted by another team"}
                         >
                           <Ban className="size-3" strokeWidth={2} aria-hidden="true" />
-                          {player.ownership === "mine" ? "YOUR PICK" : "DRAFTED"}
+                          {player.ownership === "mine" ? "Your pick" : "Drafted"}
                         </span>
                       ) : (
                         <button
                           type="button"
                           disabled={!draft.isMyTurn || pending !== null || !legalPositions.has(player.position)}
                           onClick={() => handleDraft(player.id)}
-                          className="label-system flex min-h-10 shrink-0 items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
+                          className="label-system flex min-h-11 shrink-0 items-center gap-1.5 rounded-control border border-border px-2.5 py-1 text-[11px] font-semibold text-foreground transition-colors enabled:hover:bg-accent enabled:hover:text-accent-foreground disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           {pending === player.id && (
                             <span
@@ -344,7 +266,7 @@ export function DraftWorkspace({
                               className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-current border-t-transparent"
                             />
                           )}
-                          {pending === player.id ? "PROCESSING PICK" : "DRAFT"}
+                          {pending === player.id ? "Picking…" : "Draft"}
                         </button>
                       )}
                     </div>
@@ -353,48 +275,12 @@ export function DraftWorkspace({
               )}
             </div>
             {error && <ActionFeedback kind={error.kind} message={error.message} />}
-          </>
+          </CoreSurface>
         )}
       </section>
 
-      <div className="min-w-0 flex flex-col self-start divide-y divide-border border border-border">
-        {/* Pass 11.5: redundant with the compact mobile strip above the
-            player pool now -- desktop-only here, where the rail sits
-            beside (not below) the pool and the original scroll problem
-            doesn't exist. */}
-        <RailModule
-          className="hidden lg:block"
-          header="DRAFT_STATUS"
-          meta={draft.status === "completed" ? "COMPLETE" : `RD ${pad2(draft.currentRound)}`}
-        >
-          {draft.status === "completed" ? (
-            <p className="text-sm text-foreground-secondary">Draft complete — {draft.picks.length} picks made.</p>
-          ) : (
-            <div className="space-y-1.5">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="label-system shrink-0 text-[11px] text-foreground-tertiary">ON THE CLOCK</span>
-                <TeamName name={draft.currentTeamName ?? "—"} className="text-right text-sm font-semibold text-foreground" />
-              </div>
-              <div className="flex items-baseline justify-between">
-                <span className="label-system text-[11px] text-foreground-tertiary">PICK</span>
-                <span className="label-system text-sm font-semibold tabular-nums text-foreground">
-                  {pad2(draft.currentRound)}.{pad2(draft.currentPick)}
-                </span>
-              </div>
-              <div className="flex items-baseline justify-between">
-                <span className="label-system text-[11px] text-foreground-tertiary">TIMER</span>
-                <span className={`label-system text-sm font-semibold tabular-nums ${remainingMs !== null && remainingMs < 10000 ? "text-destructive" : "text-foreground"}`}>
-                  {remainingMs !== null ? formatCountdown(remainingMs) : "—"}
-                </span>
-              </div>
-              {draft.isMyTurn && (
-                <p className="label-system pt-1 text-[11px] font-semibold text-accent">YOUR PICK</p>
-              )}
-            </div>
-          )}
-        </RailModule>
-
-        <RailModule className="hidden lg:block" header="SQUAD" meta={`${myPickCount} / ${ROSTER_RULES.squadSize}`}>
+      <div className="min-w-0 flex flex-col self-start gap-5">
+        <RailModule className="core-surface" header="Your squad" meta={`${myPickCount} / ${ROSTER_RULES.squadSize}`}>
           <div className="space-y-1">
             {(["GK", "DEF", "MID", "FWD"] as const).map((position) => {
               const { min, max } = ROSTER_RULES.positionRange[position];
@@ -421,9 +307,9 @@ export function DraftWorkspace({
           </div>
         </RailModule>
 
-        <RailModule header={draft.status === "completed" ? "DRAFT_ORDER" : "RECENT_PICKS"}>
+        <RailModule className="core-surface" header={draft.status === "completed" ? "Pick history" : "Recent picks"}>
           {draft.picks.length === 0 ? (
-            <p className="text-xs text-foreground-tertiary">NO PICKS YET</p>
+            <p className="text-xs text-foreground-tertiary">No picks yet</p>
           ) : (
             <div className="max-h-128 divide-y divide-border overflow-y-auto">
               {[...draft.picks].reverse().slice(0, draft.status === "completed" ? undefined : 12).map((pick) => (
@@ -442,11 +328,22 @@ export function DraftWorkspace({
             </div>
           )}
         </RailModule>
+        <RailModule className="core-surface" header="Manager order" meta="Snake draft">
+          <ol className="space-y-3">{draft.order.map(manager => <li key={manager.fantasyTeamId} className="flex min-w-0 items-start gap-3 text-sm"><span className="core-meta shrink-0">{manager.position}</span><TeamName name={manager.teamName} className={manager.fantasyTeamId === draft.currentTeamId ? "text-accent" : "text-foreground-secondary"} /></li>)}</ol>
+        </RailModule>
       </div>
 
+      </div>
       <PlayerInspector player={selected} variant="overlay" open={inspectorOpen} onOpenChange={setInspectorOpen} />
     </div>
   );
+}
+
+function DraftTurn({ draft, remainingMs, myPickCount }: { draft: DraftState; remainingMs: number | null; myPickCount: number }) {
+  return <section aria-label="Active draft turn" className={`core-hero core-draft-turn ${draft.isMyTurn ? "core-draft-own-turn" : ""}`}>
+    <div><p className="core-kicker">Round {draft.currentRound} · Pick {draft.currentPick}</p><p className="core-kicker mt-4">On the clock</p><h2><TeamName name={draft.currentTeamName ?? "—"} /></h2><p className="core-draft-turn-note">{draft.isMyTurn ? "Your turn — choose your next player" : "Another manager is picking"}</p></div>
+    <div className="core-draft-clock"><p className="core-kicker">Time remaining</p><p className={remainingMs !== null && remainingMs < 10000 ? "text-destructive" : "text-foreground"}>{remainingMs !== null ? formatCountdown(remainingMs) : "—"}</p><span className="core-meta">Your squad · <span className="whitespace-nowrap">{myPickCount} / {ROSTER_RULES.squadSize}</span></span></div>
+  </section>;
 }
 
 const POSITION_ORDER: Record<PlayerPosition, number> = { GK: 0, DEF: 1, MID: 2, FWD: 3 };
@@ -493,19 +390,19 @@ function DraftCompleteRecap({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="border border-border bg-surface-elevated px-5 py-6 text-center">
-        <p className="label-system text-[11px] text-foreground-tertiary">DRAFT COMPLETE</p>
+      <div className="core-hero px-5 py-6">
+        <p className="label-system text-[11px] text-foreground-tertiary">Draft complete</p>
         <p className="mt-2 text-2xl font-semibold tracking-tight text-foreground">
           {draft.picks.length} picks · {draft.teamCount} managers
         </p>
       </div>
 
-      <div className="border border-border">
+      <div className="core-surface overflow-hidden">
         <div className="border-b border-border px-4 py-2.5">
-          <span className="label-system text-[11px] text-foreground-secondary">YOUR_FINAL_SQUAD</span>
+          <span className="label-system text-[11px] text-foreground-secondary">Your final squad</span>
         </div>
         {sortedMyPicks.length === 0 ? (
-          <p className="p-4 text-center text-sm text-foreground-tertiary">NO PICKS MADE</p>
+          <p className="p-4 text-center text-sm text-foreground-tertiary">No picks made</p>
         ) : (
           <div className="divide-y divide-border">
             {sortedMyPicks.map((pick) => (
@@ -533,9 +430,9 @@ function DraftCompleteRecap({
         </div>
       </div>
 
-      <div className="border border-border">
+      <div className="core-surface overflow-hidden">
         <div className="border-b border-border px-4 py-2.5">
-          <span className="label-system text-[11px] text-foreground-secondary">LEAGUE_DRAFT_RESULTS</span>
+          <span className="label-system text-[11px] text-foreground-secondary">League draft results</span>
         </div>
         <div className="divide-y divide-border">
           {picksByTeam.map((team) => (
@@ -553,8 +450,8 @@ function DraftCompleteRecap({
         </div>
       </div>
 
-      <div className="border border-border p-4">
-        <p className="label-system text-[11px] text-foreground-tertiary">FREE_AGENTS</p>
+      <div className="core-surface p-5">
+        <p className="label-system text-[11px] text-foreground-tertiary">Free agents</p>
         <p className="mt-1 text-sm text-foreground-secondary">
           Undrafted players are still available on the open market.
         </p>
@@ -563,7 +460,7 @@ function DraftCompleteRecap({
           label="Players"
           className="label-system mt-1.5 inline-block text-[11px] text-accent hover:underline"
         >
-          BROWSE PLAYERS ↗
+          Browse players →
         </TransitionLink>
       </div>
     </div>

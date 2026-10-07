@@ -76,7 +76,7 @@ export function PlayerInspector({
   if (variant === "inline") {
     if (!player) return null;
     return (
-      <aside className="h-fit pl-4">
+      <aside className="h-fit min-w-0">
         <PlayerInspectorContent
           key={player.id}
           player={player}
@@ -103,7 +103,7 @@ export function PlayerInspector({
           scroll region (via `stickyHeader`), so it — and the close button
           now rendered inside it — stay reachable no matter how much the
           body grows underneath. */}
-      <SheetContent side={isLgDesktop ? "right" : "bottom"} showCloseButton={false}>
+      <SheetContent side={isLgDesktop ? "right" : "bottom"} showCloseButton={false} className="core-inspector-sheet">
         <SheetHeader className="sr-only">
           <SheetTitle>{player?.name ?? "Player"}</SheetTitle>
           <SheetDescription>Player inspector</SheetDescription>

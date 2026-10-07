@@ -82,9 +82,9 @@ export function DraftPageClient({
   }
 
   return (
-    <div>
+    <div className="core-v2">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Draft</h1>
+        <h1 className="v2-page-title">Draft</h1>
         <p className="mt-1.5 text-sm text-foreground-secondary">
           {!hasTeam && "You don't have a team in this league — spectating only. "}
           {draft.teamCount} managers · {draft.totalRounds} rounds

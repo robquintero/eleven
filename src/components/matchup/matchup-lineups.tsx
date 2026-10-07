@@ -30,20 +30,20 @@ function TeamLineupColumn({
   onSelect: (player: Player) => void;
 }) {
   return (
-    <div className="min-w-0 border border-border">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-2.5">
+    <div className="core-surface core-contributions">
+      <div className="core-contribution-header flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="label-system text-[11px] text-foreground-secondary">{label}</p>
-          <p className="text-sm font-semibold text-foreground">
+          <p className="core-column-name">
             <TeamName name={teamName} />
-            {isUserTeam && <span className="label-system ml-2 text-[10px] text-accent">YOUR TEAM</span>}
+            {isUserTeam && <span className="label-system ml-2 text-[10px] text-accent">Your team</span>}
           </p>
         </div>
         <span className="label-system shrink-0 text-[10px] text-foreground-tertiary">{squad.formation}</span>
       </div>
 
       {squad.starters.length === 0 ? (
-        <p className="p-4 text-center text-sm text-foreground-tertiary">NO STARTING XI SET</p>
+        <p className="p-4 text-center text-sm text-foreground-tertiary">No starting XI set</p>
       ) : (
         <div className="divide-y divide-border">
           {sortByStartingPositionOrder(squad.starters).map((slot: LineupSlot, index) => (
@@ -52,11 +52,11 @@ function TeamLineupColumn({
         </div>
       )}
 
-      <div className="border-t border-border bg-surface px-4 py-1.5">
-        <span className="label-system text-[10px] text-foreground-tertiary">BENCH / {pad2(squad.bench.length)}</span>
+      <div className="core-bench-label">
+        <span className="label-system text-[10px] text-foreground-tertiary">Bench · {pad2(squad.bench.length)}</span>
       </div>
       {squad.bench.length === 0 ? (
-        <p className="p-4 text-center text-xs text-foreground-tertiary">NO BENCH PLAYERS</p>
+        <p className="p-4 text-center text-xs text-foreground-tertiary">No bench players</p>
       ) : (
         <div className="divide-y divide-border">
           {squad.bench.map((player, index) => (
@@ -71,7 +71,7 @@ function TeamLineupColumn({
 /**
  * One manager's side of the head-to-head comparison, compact — the
  * below-`lg:` presentation (phones and most tablets in portrait). Sits in
- * a true half-width column so MY XI and OPPONENT XI stay side by side,
+ * a true half-width column so Your XI and Opponent XI stay side by side,
  * exactly as the brief requires ("my player <-> their player," never
  * stacked, never a horizontal-scroll escape hatch). Team name is
  * abbreviated to fit a narrow header rather than wrapping/truncating
@@ -93,17 +93,17 @@ function MatchupCompactColumn({
   onSelect: (player: Player) => void;
 }) {
   return (
-    <div className="min-w-0 border border-border">
-      <div className="border-b border-border px-1.5 py-1.5">
+    <div className="core-surface core-contributions">
+      <div className="core-contribution-header">
         <p className="label-system truncate text-[10px] text-foreground-secondary">{label}</p>
-        <p className="min-h-8 text-xs font-semibold leading-snug text-foreground">
+        <p className="core-column-name min-h-10">
           <TeamName name={teamName} />
           {isUserTeam && <span className="ml-1 text-accent">●</span>}
         </p>
       </div>
 
       {squad.starters.length === 0 ? (
-        <p className="p-3 text-center text-[11px] text-foreground-tertiary">NO STARTING XI SET</p>
+        <p className="p-3 text-center text-[11px] text-foreground-tertiary">No starting XI set</p>
       ) : (
         <div className="divide-y divide-border">
           {sortByStartingPositionOrder(squad.starters).map((slot: LineupSlot) => (
@@ -112,8 +112,8 @@ function MatchupCompactColumn({
         </div>
       )}
 
-      <div className="border-t border-border bg-surface px-1.5 py-1">
-        <span className="label-system text-[10px] text-foreground-tertiary">BENCH / {pad2(squad.bench.length)}</span>
+      <div className="core-bench-label">
+        <span className="label-system text-[10px] text-foreground-tertiary">Bench · {pad2(squad.bench.length)}</span>
       </div>
       {squad.bench.length > 0 && (
         <div className="divide-y divide-border">
@@ -171,9 +171,9 @@ export function MatchupLineups({
   return (
     <>
       <div className="grid grid-cols-2 gap-1.5 lg:hidden">
-        <MatchupCompactColumn label={isSpectator ? "HOME XI" : "MY XI"} teamName={myTeamName} isUserTeam={!isSpectator} squad={mySquad} onSelect={handleSelect} />
+        <MatchupCompactColumn label={isSpectator ? "Home XI" : "Your XI"} teamName={myTeamName} isUserTeam={!isSpectator} squad={mySquad} onSelect={handleSelect} />
         <MatchupCompactColumn
-          label={isSpectator ? "AWAY XI" : "OPPONENT"}
+          label={isSpectator ? "Away XI" : "Opponent"}
           teamName={opponentTeamName}
           isUserTeam={false}
           squad={opponentSquad}
@@ -182,9 +182,9 @@ export function MatchupLineups({
       </div>
 
       <div className="hidden grid-cols-2 gap-6 lg:grid">
-        <TeamLineupColumn label={isSpectator ? "HOME XI" : "MY XI"} teamName={myTeamName} isUserTeam={!isSpectator} squad={mySquad} onSelect={handleSelect} />
+        <TeamLineupColumn label={isSpectator ? "Home XI" : "Your XI"} teamName={myTeamName} isUserTeam={!isSpectator} squad={mySquad} onSelect={handleSelect} />
         <TeamLineupColumn
-          label={isSpectator ? "AWAY XI" : "OPPONENT XI"}
+          label={isSpectator ? "Away XI" : "Opponent XI"}
           teamName={opponentTeamName}
           isUserTeam={false}
           squad={opponentSquad}

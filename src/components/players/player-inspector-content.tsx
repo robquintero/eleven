@@ -1,5 +1,7 @@
 "use client";
 
+import "@/components/ui/core-v2.css";
+
 import { PositionBadge } from "@/components/players/position-badge";
 
 import { useState, type ReactNode } from "react";
@@ -55,7 +57,7 @@ function FixtureStateBadge({ player }: { player: Player }) {
           <span className="absolute inline-flex size-full animate-ping rounded-full bg-live opacity-75" />
           <span className="relative inline-flex size-1.5 rounded-full bg-live" />
         </span>
-        LIVE
+        Live
       </span>
     );
   }
@@ -63,21 +65,21 @@ function FixtureStateBadge({ player }: { player: Player }) {
     return (
       <span className="label-system flex items-center gap-1.5 text-xs text-foreground-tertiary">
         <Lock className="size-3" strokeWidth={2} />
-        LOCKED
+        Locked
       </span>
     );
   }
   if (fixture.state === "final") {
     return <span className="label-system text-xs text-foreground-tertiary">FT</span>;
   }
-  return <span className="label-system text-xs text-foreground-tertiary">UPCOMING</span>;
+  return <span className="label-system text-xs text-foreground-tertiary">Upcoming</span>;
 }
 
 function StatRow({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between py-1">
-      <span className="label-system text-[11px] text-foreground-tertiary">{label}</span>
-      <span className="label-system text-sm font-semibold text-foreground">{value}</span>
+    <div className="core-stat-row">
+      <dt className="core-stat-label">{label}</dt>
+      <dd className="core-stat-value">{value}</dd>
     </div>
   );
 }
@@ -94,7 +96,7 @@ export function PlayerInspectorContent({
 }: {
   player: Player;
   index?: number;
-  /** `null` while loading, `[]` for INSUFFICIENT MATCH DATA, real rows otherwise — see src/data-access/players.ts. */
+  /** `null` while loading, `[]` for Not enough match data, real rows otherwise — see src/data-access/players.ts. */
   recentMatches?: RecentMatchRow[] | null;
   /** `undefined`/`null` while loading or if this player has no current-version scored match yet — see getPlayerLatestScoreBreakdown. */
   scoreBreakdown?: PlayerScoreBreakdown | null;
@@ -117,19 +119,20 @@ export function PlayerInspectorContent({
 
   return (
     <TerminalPanel
-      header="PLAYER_RECORD"
+      header="Player profile"
+      className="core-v2 core-inspector"
       stickyHeader={stickyHeader}
       meta={
         index !== undefined || onClose ? (
           <>
-            {index !== undefined && String(index + 1).padStart(3, "0")}
+            {index !== undefined && `Result ${index + 1}`}
             {onClose && (
               <Button
                 variant="ghost"
                 size="icon-sm"
                 onClick={onClose}
                 aria-label="Close player record"
-                className="-m-1 size-10"
+                className="-m-1 size-11"
               >
                 <X className="size-4" strokeWidth={2} />
               </Button>
@@ -154,12 +157,12 @@ export function PlayerInspectorContent({
         <div className="mt-2.5">
           {ownership && (
             <div className="flex items-baseline justify-between py-0.5">
-              <span className="label-system text-[11px] text-foreground-tertiary">OWNERSHIP</span>
+              <span className="label-system text-[11px] text-foreground-tertiary">Ownership</span>
               <OwnershipStatus player={player} />
             </div>
           )}
           <div className="flex items-baseline justify-between py-0.5">
-            <span className="label-system text-[11px] text-foreground-tertiary">STATUS</span>
+            <span className="label-system text-[11px] text-foreground-tertiary">Availability</span>
             <AvailabilityStatus availability={player.availability ?? "available"} />
           </div>
         </div>
@@ -180,7 +183,7 @@ export function PlayerInspectorContent({
 
       {player.fixture && (
         <TerminalPanelSection>
-          <p className="label-system text-[11px] text-foreground-tertiary">Next</p>
+          <h3 className="core-inspector-section-title">Next</h3>
           <p className="mt-1.5 text-sm font-medium text-foreground">
             {player.fixture.homeLabel} — {player.fixture.awayLabel}
           </p>
@@ -189,55 +192,54 @@ export function PlayerInspectorContent({
           </p>
           <div className="mt-1 flex items-center justify-between">
             <span className="label-system text-xs text-foreground-tertiary">
-              {player.fixture.isHome ? "HOME" : "AWAY"}
+              {player.fixture.isHome ? "Home" : "Away"}
             </span>
             <FixtureStateBadge player={player} />
           </div>
         </TerminalPanelSection>
       )}
 
-      <TerminalPanelSection>
-        <p className="label-system text-[11px] text-foreground-tertiary">Season</p>
-        <div className="mt-1">
-          <StatRow label="PTS" value={player.totalPoints ?? "—"} />
-          <StatRow label="PTS/APP" value={player.averagePoints ?? "—"} />
-          <StatRow label="APP" value={stats ? stats.appearances : "—"} />
-          <StatRow label="STARTS" value={stats ? stats.starts : "—"} />
-          <StatRow label="MIN" value={stats ? stats.minutes : "—"} />
-          <StatRow label="G" value={stats ? stats.goals : "—"} />
-          <StatRow label="A" value={stats ? stats.assists : "—"} />
-          {stats?.cleanSheets !== undefined && <StatRow label="CS" value={stats.cleanSheets} />}
-          {stats?.saves !== undefined && <StatRow label="SAVES" value={stats.saves} />}
-        </div>
+      <TerminalPanelSection className="core-inspector-season">
+        <h3 className="core-inspector-section-title">Season performance</h3>
+        <div className="core-inspector-score"><div><span className="core-kicker">Fantasy points</span><p>{player.totalPoints ?? "—"}</p></div><div><span className="core-kicker">Per appearance</span><strong>{player.averagePoints ?? "—"}</strong></div></div>
+        <dl className="core-stat-grid">
+          <StatRow label="Appearances" value={stats ? stats.appearances : "—"} />
+          <StatRow label="Starts" value={stats ? stats.starts : "—"} />
+          <StatRow label="Minutes" value={stats ? stats.minutes : "—"} />
+          <StatRow label="Goals" value={stats ? stats.goals : "—"} />
+          <StatRow label="Assists" value={stats ? stats.assists : "—"} />
+          {stats?.cleanSheets !== undefined && <StatRow label="Clean sheets" value={stats.cleanSheets} />}
+          {stats?.saves !== undefined && <StatRow label="Saves" value={stats.saves} />}
+        </dl>
       </TerminalPanelSection>
 
       <TerminalPanelSection>
-        <p className="label-system text-[11px] text-foreground-tertiary">Form_tracker</p>
+        <h3 className="core-inspector-section-title">Recent form</h3>
         {recentMatches === undefined || recentMatches === null ? (
           <p className="mt-2 text-xs text-foreground-tertiary">Loading…</p>
         ) : !formWindows || (formWindows.last3 === null && formWindows.last5 === null && formWindows.last10 === null) ? (
-          <p className="mt-2 text-xs text-foreground-tertiary">INSUFFICIENT MATCH DATA</p>
+          <p className="mt-2 text-xs text-foreground-tertiary">Not enough match data</p>
         ) : (
-          <div className="mt-1">
-            <StatRow label="LAST 3" value={formWindows.last3 ?? "INSUFFICIENT"} />
-            <StatRow label="LAST 5" value={formWindows.last5 ?? "INSUFFICIENT"} />
-            <StatRow label="LAST 10" value={formWindows.last10 ?? "INSUFFICIENT"} />
-          </div>
+          <dl className="mt-1">
+            <StatRow label="Last 3" value={formWindows.last3 ?? "Unavailable"} />
+            <StatRow label="Last 5" value={formWindows.last5 ?? "Unavailable"} />
+            <StatRow label="Last 10" value={formWindows.last10 ?? "Unavailable"} />
+          </dl>
         )}
       </TerminalPanelSection>
 
       <TerminalPanelSection>
-        <p className="label-system text-[11px] text-foreground-tertiary">Recent_usage</p>
+        <h3 className="core-inspector-section-title">Match history & usage</h3>
         {recentMatches === undefined || recentMatches === null ? (
           <p className="mt-2 text-xs text-foreground-tertiary">Loading…</p>
         ) : !usageTrend ? (
-          <p className="mt-2 text-xs text-foreground-tertiary">INSUFFICIENT MATCH DATA</p>
+          <p className="mt-2 text-xs text-foreground-tertiary">Not enough match data</p>
         ) : (
           <>
-            <div className="mt-1">
-              <StatRow label="AVG MIN" value={usageTrend.averageMinutes} />
-              <StatRow label="START RATE" value={`${Math.round(usageTrend.startRate * 100)}%`} />
-            </div>
+            <dl className="mt-1">
+              <StatRow label="Average minutes" value={usageTrend.averageMinutes} />
+              <StatRow label="Start rate" value={`${Math.round(usageTrend.startRate * 100)}%`} />
+            </dl>
             <div className="mt-3">
               <FormSparkline values={usageTrend.minutesByMatch} />
             </div>
@@ -264,7 +266,7 @@ export function PlayerInspectorContent({
       </TerminalPanelSection>
 
       <TerminalPanelSection>
-        <p className="label-system text-[11px] text-foreground-tertiary">Scoring_breakdown</p>
+        <h3 className="core-inspector-section-title">Latest score breakdown</h3>
         <div className="mt-2">
           {scoreBreakdown === undefined ? (
             <p className="text-xs text-foreground-tertiary">Loading…</p>
@@ -296,7 +298,7 @@ export function PlayerInspectorContent({
           // exists yet. Real lineup moves belong to the Team page's own
           // edit-lineup flow (lineupContext above), not this slot.
           <div className="rounded-control border border-border px-3 py-2.5 text-center">
-            <p className="label-system text-xs font-semibold text-accent">ON YOUR ROSTER</p>
+            <p className="label-system text-xs font-semibold text-accent">On your roster</p>
             <p className="mt-1 text-xs text-foreground-tertiary">
               Manage starters from the Team page.
             </p>

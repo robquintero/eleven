@@ -1,5 +1,7 @@
 "use client";
 
+import "@/components/ui/core-v2.css";
+
 import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@base-ui/react/unstable-use-media-query";
@@ -217,10 +219,10 @@ export function PlayersWorkspace({
 
   if (data.total === 0 && !hasAnyFilterOrIngestedData(filters, competitions)) {
     return (
-      <div>
+      <div className="core-v2">
         <Header total={0} />
         <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
-          <p className="label-system text-sm text-foreground-secondary">NO PLAYER DATA AVAILABLE</p>
+          <p className="label-system text-sm text-foreground-secondary">No player data available</p>
           <p className="max-w-sm text-xs text-foreground-tertiary">
             Football data synchronization has not been completed.
           </p>
@@ -230,7 +232,7 @@ export function PlayersWorkspace({
   }
 
   return (
-    <div>
+    <div className="core-v2">
       <Header total={data.total} />
 
       <div className="mt-4">
@@ -261,18 +263,18 @@ export function PlayersWorkspace({
         />
       </div>
 
-      <p role="status" className="label-system mt-2 min-h-4 text-[10px] text-foreground-tertiary">{isNavigating ? "UPDATING PLAYERS…" : ""}</p>
+      <p role="status" className="label-system mt-2 min-h-4 text-[10px] text-foreground-tertiary">{isNavigating ? "Updating players…" : ""}</p>
       {actionError && <ActionFeedback kind={actionError.kind} message={actionError.message} />}
 
       <div
         aria-busy={isNavigating || isMutating}
         className={
           isInlineInspector && selectedPlayer
-            ? "mt-4 grid grid-cols-[1fr_360px] items-start divide-x divide-border"
+            ? "mt-4 grid min-w-0 grid-cols-[minmax(0,1fr)_360px] items-start gap-6"
             : "mt-4"
         }
       >
-        <div className={isInlineInspector && selectedPlayer ? "min-w-0 pr-4" : "min-w-0"}>
+        <div className="min-w-0">
           {players.length > 0 ? (
             isDesktopTable ? (
               <PlayerTable
@@ -320,10 +322,10 @@ export function PlayersWorkspace({
                 onClick={() => goToPage(page - 1)}
                 className="label-system min-h-11 px-2 text-[11px] text-foreground-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent hover:text-foreground disabled:opacity-40"
               >
-                ← PREV
+                ← Previous
               </button>
               <span className="label-system text-[11px] text-foreground-tertiary">
-                PAGE {page} / {totalPages}
+                Page {page} / {totalPages}
               </span>
               <button
                 type="button"
@@ -331,7 +333,7 @@ export function PlayersWorkspace({
                 onClick={() => goToPage(page + 1)}
                 className="label-system min-h-11 px-2 text-[11px] text-foreground-secondary outline-none focus-visible:ring-2 focus-visible:ring-accent hover:text-foreground disabled:opacity-40"
               >
-                NEXT →
+                Next →
               </button>
             </div>
           )}
@@ -366,7 +368,7 @@ export function PlayersWorkspace({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>DROP {dropTarget?.name.toUpperCase()}</DialogTitle>
+            <DialogTitle>Drop {dropTarget?.name}</DialogTitle>
             <DialogDescription>
               This removes {dropTarget?.name} from your roster immediately and returns them to the free
               market. Any current-round lineup points already locked in are unaffected, but you will lose
@@ -389,10 +391,10 @@ export function PlayersWorkspace({
 
 function Header({ total }: { total: number }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-1 border-b border-border pb-3">
+    <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">Players</h1>
-        <p className="label-system mt-0.5 text-[11px] text-foreground-tertiary">Big Five</p>
+        <h1 className="v2-page-title">Players</h1>
+        <p className="label-system mt-0.5 text-[11px] text-foreground-tertiary">Scouting & free agents</p>
       </div>
       <div className="text-right">
         <p className="label-system text-sm font-semibold text-foreground">{total} players</p>

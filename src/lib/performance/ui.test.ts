@@ -27,7 +27,7 @@ function load(file: string, mocks: Record<string, unknown> = {}): Record<string,
     if (id === "next/navigation") return { notFound: () => { throw new Error("NOT_FOUND"); } };
     if (id.startsWith("@/data-access/")) throw new Error(`Unmocked data access: ${id}`);
     const componentPath = id.startsWith("@/components/") || (id.startsWith(".") && resolve(dirname(filename), id).includes("/components/"));
-    const serverPresenters = ["home-overview", "app-frame", "status-bar", "workspace-loading", "matchup-command", "transition-link", "league-matchups", "matchup-status", "team-name", "matchup-page-view", "league-overview", "league-sections", "/ui/v2"];
+    const serverPresenters = ["home-overview", "app-frame", "status-bar", "workspace-loading", "matchup-command", "transition-link", "league-matchups", "matchup-status", "team-name", "matchup-page-view", "league-overview", "league-sections", "/ui/v2", "/ui/core-v2"];
     if (componentPath && !serverPresenters.some(name => id.includes(name))) {
       return new Proxy({}, { get: (_target, name) => name === "__esModule" ? true : ({ children, title }: { children?: ReactNode; title?: string }) => createElement("div", {}, title ?? String(name), children) });
     }
@@ -53,7 +53,7 @@ test("all destination loading boundaries render safely with destination geometry
   for (const route of ["home", "team", "matchup", "players", "league", "draft"]) {
     const { default: Loading } = load(`src/app/(app)/${route}/loading.tsx`);
     const result = await flight(createElement(Loading as () => ReactNode));
-    assert.match(result, route === "home" ? /Loading your matchweek/ : /LOADING/); assert.match(result, /aria-busy/); assert.match(result, /status/);
+    assert.match(result, route === "home" ? /Loading your matchweek/ : /Loading/i); assert.match(result, /aria-busy/); assert.match(result, /status/);
     if (route === "team") for (const section of ["Forwards", "Midfield", "Defence", "Goalkeeper", "Bench"]) assert.match(result, new RegExp(section));
     if (route === "matchup") assert.match(result, /Matchup/);
     assert.doesNotMatch(result, /animate-ping|animate-spin|inset-0/);

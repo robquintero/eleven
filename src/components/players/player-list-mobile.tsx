@@ -1,81 +1,21 @@
 "use client";
 
-import { PositionBadge } from "@/components/players/position-badge";
-
+import { PlayerIdentity } from "@/components/players/player-identity";
 import { AvailabilityStatus } from "@/components/players/availability-status";
 import { MarketAction } from "@/components/players/market-action";
 import { leagueLabels } from "@/lib/leagues";
 import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
 
-export function PlayerListMobile({
-  players,
-  selectedId,
-  onSelect,
-  onAdd,
-  onDrop,
-  pendingPlayerId,
-}: {
-  players: Player[];
-  selectedId: string | null;
-  onSelect: (player: Player) => void;
-  onAdd?: (player: Player) => void;
-  onDrop?: (player: Player) => void;
-  pendingPlayerId?: string | null;
+export function PlayerListMobile({ players, selectedId, onSelect, onAdd, onDrop, pendingPlayerId }: {
+  players: Player[]; selectedId: string | null; onSelect: (player: Player) => void;
+  onAdd?: (player: Player) => void; onDrop?: (player: Player) => void; pendingPlayerId?: string | null;
 }) {
-  return (
-    <div className="divide-y divide-border">
-      {players.map((player) => {
-        const isSelected = player.id === selectedId;
-        const isUnavailable =
-          player.availability === "injured" ||
-          player.availability === "suspended" ||
-          player.availability === "doubtful";
-
-        return (
-          <div
-            key={player.id}
-            role="button"
-            tabIndex={0}
-            onClick={() => onSelect(player)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onSelect(player);
-              }
-            }}
-            className={cn(
-              "flex w-full cursor-pointer items-center gap-2.5 py-3 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
-              isSelected ? "bg-accent/10" : "hover:bg-surface"
-            )}
-          >
-            <PositionBadge position={player.position} />
-
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-                <span className="min-w-0 truncate" title={player.name}>{player.name}</span>
-                {isUnavailable && (
-                  <AvailabilityStatus
-                    availability={player.availability}
-                    className="text-[9px]"
-                  />
-                )}
-              </p>
-              <p className="label-system truncate text-[11px] text-foreground-tertiary">
-                {player.club.shortName} · {leagueLabels[player.club.league]}
-              </p>
-            </div>
-
-            <div className="shrink-0 text-right">
-              <p className="label-system text-sm font-semibold text-foreground">
-                {player.totalPoints ?? "—"}{" "}
-                <span className="text-[10px] font-normal text-foreground-tertiary">PTS</span>
-              </p>
-              <MarketAction player={player} onAdd={onAdd} onDrop={onDrop} pending={pendingPlayerId === player.id} />
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
+  return <ul className="core-surface core-results divide-y divide-border" aria-label="Player results">{players.map(player => <li key={player.id} id={`player-row-${player.id}`} className={cn("core-mobile-result",player.id === selectedId && "core-row-selected")}>
+    <button type="button" className="core-inspect-player" onClick={() => onSelect(player)} aria-label={`Inspect ${player.name}`} aria-pressed={player.id === selectedId}>
+      <PlayerIdentity player={player} />
+      <span className="core-player-club">{leagueLabels[player.club.league]}{player.availability && player.availability !== "available" && <> · <AvailabilityStatus availability={player.availability} /></>}</span>
+    </button>
+    <div className="core-mobile-result-action"><p className="core-catalog-points">{player.totalPoints ?? "—"}<span className="core-player-club">points</span></p><MarketAction player={player} onAdd={onAdd} onDrop={onDrop} pending={pendingPlayerId === player.id} /></div>
+  </li>)}</ul>;
 }

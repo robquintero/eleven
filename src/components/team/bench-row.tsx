@@ -66,6 +66,7 @@ export function BenchRow({
         type="button"
         onClick={onSelect}
         disabled={disabled}
+        aria-pressed={editing ? selected : undefined}
         aria-label={
           disabled
             ? `${player.name} (wrong position for the selected slot)`
@@ -74,7 +75,7 @@ export function BenchRow({
               : undefined
         }
         className={cn(
-          "grid min-h-11 w-full grid-cols-[1rem_1.5rem_2.25rem_minmax(0,1fr)_auto] items-center gap-2 border-l-2 border-l-transparent py-2 pr-2 pl-1 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset @min-[28rem]:grid-cols-[1rem_1.5rem_2.25rem_minmax(0,1fr)_2.25rem_4.75rem]",
+          "core-player-row grid min-h-11 w-full grid-cols-[1rem_1.5rem_2.25rem_minmax(0,1fr)_auto] items-center gap-2 border-l-2 border-l-transparent py-2 pr-2 pl-1 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset @min-[28rem]:grid-cols-[1rem_1.5rem_2.25rem_minmax(0,1fr)_2.25rem_4.75rem]",
           // Pass 14.7 Phase 1: this row is ALWAYS genuinely clickable (opens
           // the player record, or drives Team's swap flow) regardless of
           // `editing` -- `cursor-pointer` must not be gated on it. Only
@@ -162,7 +163,7 @@ export function BenchRow({
             <ArrowLeftRight className="size-3.5 shrink-0 text-foreground-tertiary/70" strokeWidth={2} aria-hidden="true" />
           )}
           <div className="flex flex-col items-end gap-0.5">
-            <span className="label-system tabular-nums text-xs font-semibold text-foreground">
+            <span className="core-player-points label-system tabular-nums text-xs font-semibold text-foreground">
               {formatRoundPoints(player.fantasyPoints)}
             </span>
             <span className={cn("label-system flex items-center gap-1 text-[10px]", toneClass[state.tone])}>
@@ -173,14 +174,14 @@ export function BenchRow({
                 </span>
               )}
               {locked && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
-              {state.text}
+              {state.text === "FT" ? "FT" : state.text.charAt(0) + state.text.slice(1).toLowerCase()}
             </span>
             {Boolean(player.preAcquisitionPoints) && (
               <span
                 className="label-system text-[9px] text-warning"
                 title="Points earned before this player joined your squad do not count toward your matchup."
               >
-                +{formatRoundPoints(player.preAcquisitionPoints!)} PRE-ACQUISITION
+                +{formatRoundPoints(player.preAcquisitionPoints!)} before acquisition
               </span>
             )}
           </div>
@@ -216,6 +217,7 @@ export function EmptySlotRow({
         type="button"
         onClick={onSelect}
         disabled={!editing}
+        aria-pressed={editing ? selected : undefined}
         aria-label={`Empty ${position} slot`}
         className={cn(
           "grid min-h-11 w-full grid-cols-[1rem_1.5rem_2.25rem_minmax(0,1fr)_auto] items-center gap-2 border-l-2 border-l-transparent py-2 pr-2 pl-1 text-left outline-none transition-colors @min-[28rem]:grid-cols-[1rem_1.5rem_2.25rem_minmax(0,1fr)_2.25rem_4.75rem]",
@@ -229,7 +231,7 @@ export function EmptySlotRow({
           <Plus className="size-3 text-foreground-tertiary" strokeWidth={2} />
         </span>
         <PositionBadge position={position} />
-        <span className="label-system min-w-0 text-xs text-foreground-tertiary">EMPTY {position} SLOT</span>
+        <span className="label-system min-w-0 text-xs text-foreground-tertiary">Empty {position} slot</span>
       </button>
     </div>
   );

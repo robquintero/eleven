@@ -22,10 +22,10 @@ export async function MatchupPageView({ league, matchup }: { league: {name:strin
   const homeHref = matchup ? !matchup.isSpectator && matchup.isUserHome && current ? "/team" : teamViewHref(matchup.homeFantasyTeamId, matchup.roundId) : undefined;
   const awayHref = matchup ? !matchup.isSpectator && !matchup.isUserHome && current ? "/team" : teamViewHref(matchup.awayFantasyTeamId, matchup.roundId) : undefined;
   return (
-    <div className="flex flex-col gap-6">
-      <TransitionLink href={matchup ? `/league?round=${matchup.roundId}` : "/league"} label="League" className="label-system text-[11px] text-accent">← League</TransitionLink>
+    <div className="core-v2 flex flex-col gap-6">
+      <TransitionLink href={matchup ? `/league?round=${matchup.roundId}` : "/league"} label="League" className="v2-link">← League</TransitionLink>
       <div>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+        <h1 className="v2-page-title">
           Matchup
         </h1>
         <p className="mt-1.5 text-sm text-foreground-secondary">{league.name}</p>
@@ -44,7 +44,7 @@ export async function MatchupPageView({ league, matchup }: { league: {name:strin
           surface" without merging independently-rendered borders between
           sibling components (DESIGN.md §5's hierarchy order puts
           whitespace ahead of borders for exactly this reason). */}
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-5">
         <MatchupCommand teamLinks={homeHref && awayHref ? { home: homeHref, away: awayHref } : undefined} matchup={matchup} hasLeague now={now} scheduledDetails={<Suspense fallback={<p role="status" className="label-system text-[11px] text-foreground-tertiary">LOADING NEXT KICKOFF</p>}>
           <FixtureAnticipation fixturePromise={fixturePromise} starters={myStarters} teamIdsByPlayerId={teamIdsByPlayerId} />
         </Suspense>} starters={myStarters} teamIdsByPlayerId={teamIdsByPlayerId} />

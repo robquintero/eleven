@@ -17,6 +17,7 @@ const { chromium } = await import(process.env.ELEVEN_PLAYWRIGHT_MODULE ?? "playw
 let browser;
 try {
   await writeFile(join(directory, "loader.cjs"), `const ts = require(${JSON.stringify(require.resolve("typescript"))}); module.exports=function(source){return ts.transpileModule(source,{compilerOptions:{jsx:ts.JsxEmit.ReactJSX,module:ts.ModuleKind.ESNext,target:ts.ScriptTarget.ES2020}}).outputText;};`);
+  await writeFile(join(directory, "css-loader.cjs"), `module.exports=()=>'';`);
   await writeFile(join(directory, "actions.js"), `
 export const swapLineupAction = (...args) => window.action("swap", args);
 export const fillEmptySlotsAction = (...args) => window.action("fill", args);
@@ -68,21 +69,22 @@ createRoot(document.getElementById('root')).render(<Harness/>);
 `);
   await new Promise((done, fail) => webpack({ mode: "production", optimization: { minimize: false }, context: root, entry: join(directory, "entry.jsx"), output: { path: directory, filename: "bundle.js" },
     resolve: { extensions: [".tsx", ".ts", ".jsx", ".js"], modules: [join(root, "node_modules")], alias: { "@": join(root, "src"), "next/navigation$": join(directory, "navigation.jsx"), "next/link$": join(directory, "navigation.jsx") } },
-    module: { rules: [{ test: /\.(tsx?|jsx)$/, exclude: /node_modules/, use: join(directory, "loader.cjs") }] },
+    module: { rules: [{test:/\.css$/,use:join(directory,"css-loader.cjs")},{ test: /\.(tsx?|jsx)$/, exclude: /node_modules/, use: join(directory, "loader.cjs") }] },
     plugins: [new webpack.NormalModuleReplacementPlugin(/app\/\(app\)\/(team|players)\/actions/, join(directory, "actions.js"))],
   }, (error, stats) => error || stats.hasErrors() ? fail(error ?? new Error(stats.toString({ all: false, errors: true }))) : done()));
   // Generate the real Tailwind styles in temp storage for layout/mobile checks.
   const postcss = require("postcss");
   const tailwind = require("@tailwindcss/postcss");
-  const { css } = await postcss([tailwind({ base: root })]).process(await readFile(join(root, "src/app/globals.css"), "utf8"), { from: join(root, "src/app/globals.css") });
+  const { css: baseCss } = await postcss([tailwind({ base: root })]).process(await readFile(join(root, "src/app/globals.css"), "utf8"), { from: join(root, "src/app/globals.css") });
+  const css=baseCss+"\n"+await readFile(join(root,"src/components/ui/core-v2.css"),"utf8");
   browser = await chromium.launch({ headless: true, executablePath: process.env.ELEVEN_CHROMIUM_EXECUTABLE });
   const results = [];
-  for (const viewport of [{ width: 1440, height: 1000 }, { width: 375, height: 812 }]) {
+  for (const viewport of [{ width: 1440, height: 1000 }, { width: 375, height: 812 }, { width: 320, height: 812 }]) {
     const page = await browser.newPage({ viewport, hasTouch: viewport.width < 768 });
     const errors = []; const requests = [];
     page.on("pageerror", error => errors.push(error.message));
     await page.route("**/*", route => { requests.push(route.request().url()); return route.abort(); });
-    await page.setContent(`<style>${css}</style><main style="padding:16px;max-width:1200px;margin:auto" id="root"></main>`);
+    await page.setContent(`<style>${css}</style><script>document.documentElement.classList.add("dark")</script><main class="eleven-v2 app-v2 core-v2" style="padding:16px;max-width:1200px;margin:auto" id="root"></main>`);
     await page.addScriptTag({ path: join(directory, "bundle.js") });
     await page.waitForFunction(() => typeof window.mount === "function");
     const names = () => page.locator('section button p.text-sm').allTextContents();
@@ -142,7 +144,7 @@ createRoot(document.getElementById('root')).render(<Harness/>);
     // Search input stays usable; local inspection does not navigate/refetch the catalog.
     await page.evaluate(() => window.mount("Players"));
     await activate(page.getByText("BENCH_DEF", { exact: true }).first());
-    await page.getByText("PLAYER_RECORD", { exact: true }).waitFor();
+    await page.getByText("Player profile", { exact: true }).waitFor();
     assert.equal(await page.evaluate(() => window.calls.length), 0);
     assert.equal(await page.evaluate(() => window.inspectorReads), 2);
     if (viewport.width < 1280) await page.keyboard.press("Escape");
@@ -150,12 +152,12 @@ createRoot(document.getElementById('root')).render(<Harness/>);
     await input.fill("BENCH");
     await page.waitForFunction(() => window.calls.some(call => call.kind === 'navigate'));
     assert.equal(await input.inputValue(), "BENCH");
-    await page.getByRole("status").filter({ hasText: "UPDATING PLAYERS" }).waitFor();
+    await page.getByRole("status").filter({ hasText: "Updating players" }).waitFor();
     assert.equal(await page.evaluate(() => window.calls.filter(call => call.kind === 'navigate').length), 1);
     assert.equal(await page.evaluate(() => window.calls.at(-1).options.scroll), false);
     await page.evaluate(() => window.finishNavigation());
     await page.getByText("No players match these filters", { exact: true }).waitFor();
-    if (viewport.width >= 1280) await page.getByText("PLAYER_RECORD", { exact: true }).waitFor();
+    if (viewport.width >= 1280) await page.getByText("Player profile", { exact: true }).waitFor();
     await page.evaluate(() => window.mount("Matchup"));
     await page.getByText("MY TEAM", { exact: true }).first().waitFor();
     const teamNames = await page.locator('[title="MY TEAM"],[title="OPPONENT"]').allTextContents();

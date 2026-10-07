@@ -9,10 +9,10 @@ import { RoundIntelligence } from "@/components/team/round-intelligence";
 import { SquadAvailability } from "@/components/team/squad-availability";
 import { ActionFeedback, type ActionFeedbackKind } from "@/components/ui/action-feedback";
 import { Button } from "@/components/ui/button";
-import { ModuleHeader } from "@/components/ui/module-header";
+import { CoreHeading } from "@/components/ui/core-v2";
 import { RailModule } from "@/components/ui/rail-module";
 import { swapLineupAction, fillEmptySlotsAction } from "@/app/(app)/team/actions";
-import { FORMATION_RULES } from "@/domain/fantasy/constants";
+import { FORMATION_RULES, ROSTER_RULES } from "@/domain/fantasy/constants";
 import { assignToSlots, formationSlots, type FormationSlot } from "@/lib/selectors/pitch-layout";
 import { benchSwapRowState, isPlayerLocked, nextLock, pad2, starterBuckets } from "@/lib/team-fixture";
 import type { LineupSlot, Player, PlayerAvailability, PlayerPosition, Squad } from "@/lib/types/fantasy";
@@ -56,10 +56,10 @@ function buildXiRows(slots: FormationSlot[], occupancy: Map<string, LineupSlot>,
 
 /** Attacking-to-defensive section order, matching the brief's own example structure -- "who occupies each positional slot" should be obvious at a glance. */
 const XI_SECTIONS: { label: string; position: PlayerPosition }[] = [
-  { label: "FORWARDS", position: "FWD" },
-  { label: "MIDFIELD", position: "MID" },
-  { label: "DEFENCE", position: "DEF" },
-  { label: "GOALKEEPER", position: "GK" },
+  { label: "Forwards", position: "FWD" },
+  { label: "Midfield", position: "MID" },
+  { label: "Defence", position: "DEF" },
+  { label: "Goalkeeper", position: "GK" },
 ];
 
 /**
@@ -328,14 +328,15 @@ export function TeamWorkspace({
   }
 
   return (
-    <div>
+    <div className="core-team-workspace">
       {readOnly && <p className="mt-4 text-xs text-foreground-secondary">Read-only lineup · Select a player to inspect.</p>}
       {canEdit && (
-        <div className="mt-4 flex items-center justify-between gap-3">
+        <div className="core-selection mt-4 flex items-center justify-between gap-3">
           <p role="status" aria-live="polite" className="text-xs leading-relaxed text-foreground-secondary">
             {pendingAssignments.size > 0
               ? `Building lineup — ${totalAssigned} / ${FORMATION_RULES.startersTotal} selected. Click Done to save.`
               : substitutionBusy ? "Saving lineup…"
+              : selected ? `Selected ${selected.kind === "emptySlot" ? selected.position + " slot" : selected.player.name}. Choose an unlocked ${selected.kind === "emptySlot" ? selected.position : selected.player.position} replacement.`
               : "Select a starter, then a bench player (or vice versa) to swap them — or select an empty slot to fill it from the bench."}
           </p>
           {pendingAssignments.size > 0 && (
@@ -353,20 +354,20 @@ export function TeamWorkspace({
       {error && <ActionFeedback kind={error.kind} message={error.message} />}
 
       <div aria-busy={substitutionBusy} className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.5fr)] lg:items-start">
-        <section className="min-w-0">
-          <ModuleHeader title="STARTING_XI" meta={squad.formation} />
+        <section className="core-surface core-xi">
+          <CoreHeading title="Starting XI" meta={`${totalAssigned} / ${FORMATION_RULES.startersTotal} · ${squad.formation}`} />
           {/* Pass 14.6: the pitch concept is removed entirely -- a dense,
               row-based squad workspace, consistent with every other list
               in Eleven (BenchRow, PlayerRow), grouped into the 4 formation
               sections so "who occupies each positional slot" is obvious at
               a glance without a spatial field metaphor. */}
-          <div className="mt-3 flex flex-col gap-4">
+          <div className="core-position-groups">
             {XI_SECTIONS.map(({ label, position }) => {
               const rows = xiRows.filter((r) => r.position === position);
               const occupied = rows.filter((r) => r.player !== null).length;
               return (
-                <div key={position} className="border border-border">
-                  <div className="flex items-center justify-between border-b border-border px-3 py-1.5">
+                <div key={position} className="core-position-group">
+                  <div className="core-position-heading">
                     <span className="label-system text-[10px] font-semibold text-foreground-secondary">{label}</span>
                     <span className="label-system text-[10px] text-foreground-tertiary">
                       {occupied} / {rows.length}
@@ -404,7 +405,7 @@ export function TeamWorkspace({
             })}
             {!fantasyTeamId && (
               <p className="text-center text-sm text-foreground-tertiary">
-                NO SQUAD — complete your league draft to build your squad.
+                No squad — complete your league draft to build your squad.
               </p>
             )}
           </div>
@@ -415,10 +416,10 @@ export function TeamWorkspace({
             unchanged for every other screen that reuses it (e.g. Draft).
             Bench rows (real content, not padding) still take the space
             they need. */}
-        <div className="min-w-0 flex flex-col divide-y divide-border border border-border">
-          <RailModule header="BENCH" meta={`/ ${pad2(visibleBench.length)}`} className="lg:py-2.5">
+        <div className="core-team-support min-w-0 flex flex-col gap-5">
+          <RailModule header="Bench" meta={`${visibleBench.length} / ${ROSTER_RULES.squadSize - FORMATION_RULES.startersTotal}`} className="core-surface core-bench">
             {visibleBench.length === 0 ? (
-              <p className="text-xs leading-relaxed text-foreground-secondary">NO BENCH PLAYERS</p>
+              <p className="text-xs leading-relaxed text-foreground-secondary">No bench players</p>
             ) : (
               <div className="divide-y divide-border">
                 {visibleBench.map((player, index) => {
@@ -439,21 +440,22 @@ export function TeamWorkspace({
                 })}
               </div>
             )}
+            {canEdit && Array.from({length: Math.max(0, ROSTER_RULES.squadSize - FORMATION_RULES.startersTotal - visibleBench.length)}, (_, index) => <div key={index} className="core-bench-vacancy">Open bench slot</div>)}
           </RailModule>
 
-          <RailModule header="SQUAD_STATUS" className="lg:py-2.5">
+          <div className="core-surface divide-y divide-border"><RailModule header="Squad availability" className="lg:py-2.5">
             {allPlayers.length === 0 ? (
-              <p className="text-xs leading-relaxed text-foreground-secondary">NO SQUAD</p>
+              <p className="text-xs leading-relaxed text-foreground-secondary">No squad</p>
             ) : (
               <SquadAvailability counts={availabilityCounts} />
             )}
           </RailModule>
 
-          <RailModule header="ROUND_INTELLIGENCE" className="lg:py-2.5">
+          <RailModule header="Round progress" className="lg:py-2.5">
             <RoundIntelligence starters={squad.starters} hasActiveRound={hasActiveRound} />
           </RailModule>
 
-          <RailModule header="NEXT_LOCK" className="lg:py-2.5">
+          <RailModule header="Next lock" className="lg:py-2.5">
             <NextLock
               slot={nextLock(squad.starters)}
               hasStarters={squad.starters.length > 0}
@@ -462,12 +464,12 @@ export function TeamWorkspace({
           </RailModule>
 
           <RailModule
-            header="FIXTURE_FEED"
+            header="Fixtures"
             meta={matchdayNumber !== null ? `MATCHDAY ${pad2(matchdayNumber)}` : "—"}
             className="lg:py-2.5"
           >
-            <p className="text-xs leading-relaxed text-foreground-secondary">NO FIXTURE DATA</p>
-          </RailModule>
+            <p className="text-xs leading-relaxed text-foreground-secondary">No fixture data available</p>
+          </RailModule></div>
         </div>
       </div>
       {readOnly && <PlayerInspector player={inspectedPlayer} variant="overlay" open={inspectorOpen} onOpenChange={setInspectorOpen} />}

@@ -1,6 +1,5 @@
 import { Lock } from "lucide-react";
-import { PlayerAvatar } from "@/components/players/player-avatar";
-import { formatRoundPoints, isPlayerLocked, playerStatusLabel } from "@/lib/team-fixture";
+import { formatRoundPoints, isPlayerLocked, playerStateWord } from "@/lib/team-fixture";
 import { PositionBadge } from "@/components/players/position-badge";
 import type { Player } from "@/lib/types/fantasy";
 import { cn } from "@/lib/utils";
@@ -11,22 +10,10 @@ const toneClass = {
   neutral: "text-foreground-secondary",
 };
 
-/**
- * Pass 12F: the narrow-viewport row for the Matchup page's head-to-head
- * comparison — designed to sit in a HALF-width column on a normal phone
- * (so both teams stay side by side, per the brief's explicit requirement)
- * without horizontal scroll or illegible text. Deliberately sheds detail
- * `BenchRow` shows at full width (club name, full position word, a wider
- * status string) rather than shrinking the same layout until it breaks —
- * a single position letter, a small avatar, the name, and a compact
- * points/status readout. Tapping still opens the exact same
- * `PlayerInspector` every other row uses — nothing here is lost, only
- * deferred one tap away. Reuses `playerStatusLabel` (src/lib/team-fixture.ts)
- * so the status shown is never a second, divergent truth from `BenchRow`'s
- * own full-width row.
- */
+/** Narrow side-by-side contribution row. Points and the existing state word
+ * stay separate; full identity/details are available in the shared Inspector. */
 export function MatchupCompactRow({ player, onSelect }: { player: Player; onSelect: () => void }) {
-  const status = playerStatusLabel(player);
+  const status = playerStateWord(player);
   const isLive = status.tone === "live";
   const isFlagged = player.availability === "injured" || player.availability === "suspended";
   const isDoubtful = player.availability === "doubtful";
@@ -43,28 +30,12 @@ export function MatchupCompactRow({ player, onSelect }: { player: Player; onSele
       type="button"
       onClick={onSelect}
       aria-label={`${player.name}, ${player.position}, ${status.text}, ${compactPoints} points`}
-      className={cn(
-        "flex min-h-11 w-full cursor-pointer items-center gap-1 rounded-md px-1 py-1.5 text-left outline-none transition-colors hover:bg-surface focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset active:bg-muted/60",
-        isLocked && "bg-foreground/2"
-      )}
+      className={cn("core-compact-player outline-none focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset", isLocked && "bg-foreground/2")}
     >
-      <PositionBadge position={player.position} compact />
-      <PlayerAvatar name={player.name} nationality={player.nationality} size="sm" className="size-4.5" />
-      <span className="flex min-w-0 flex-1 items-center gap-1 text-[11px] font-medium text-foreground">
-        <span className="min-w-0 truncate" title={player.name}>{player.name}</span>
-        {isFlagged && <span className="size-1 shrink-0 rounded-full bg-destructive" />}
-        {isDoubtful && <span className="size-1 shrink-0 rounded-full bg-warning" />}
-      </span>
-      <span className={cn("label-system flex shrink-0 items-center gap-0.5 text-[10px] font-semibold tabular-nums", toneClass[status.tone])}>
-        {isLive && (
-          <span className="relative flex size-1">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-live opacity-75" />
-            <span className="relative inline-flex size-1 rounded-full bg-live" />
-          </span>
-        )}
-        {isLocked && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
-        {compactPoints}
-      </span>
+      <span className="flex w-full items-center justify-between gap-1"><PositionBadge position={player.position} /><span className="core-compact-points">{compactPoints}</span></span>
+      <span className="core-compact-name" title={player.name}>{player.name}</span>
+      <span className="core-compact-meta"><span className="truncate">{player.club.shortName}</span><span className={cn("flex items-center gap-1",toneClass[status.tone])}>{isLive && <span className="size-1 rounded-full bg-live" />}{isLocked && <Lock className="size-2.5" aria-hidden="true" />}{status.text === "FT" ? "FT" : status.text.charAt(0) + status.text.slice(1).toLowerCase()}</span></span>
+      {(isFlagged || isDoubtful) && <span className="sr-only">{player.availability}</span>}
     </button>
   );
 }
