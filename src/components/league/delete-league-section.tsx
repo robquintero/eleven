@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-export function DeleteLeagueSection({ leagueId, leagueName }: { leagueId: string; leagueName: string }) {
+export function DeleteLeagueSection({ leagueId, leagueName, v2 = false }: { leagueId: string; leagueName: string; v2?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [confirmation, setConfirmation] = useState("");
@@ -41,13 +41,13 @@ export function DeleteLeagueSection({ leagueId, leagueName }: { leagueId: string
   }
 
   return (
-    <section className="border-t border-border pt-6" aria-label="Danger zone">
-      <p className="label-system text-[11px] text-foreground-secondary">DANGER ZONE</p>
+    <section className={v2 ? "v2-management" : "border-t border-border pt-6"} aria-label="Danger zone">
+      <p className={v2 ? "v2-meta" : "label-system text-[11px] text-foreground-secondary"}>{v2 ? "Danger zone" : "DANGER ZONE"}</p>
       <h2 className="mt-2 text-sm font-medium text-foreground">Delete League</h2>
       <p className="mt-1 text-sm text-foreground-secondary">Permanently delete this league and its fantasy data.</p>
       <Dialog open={open} onOpenChange={changeOpen} disablePointerDismissal={pending}>
         <DialogTrigger render={<Button variant="destructive" className="mt-3 rounded-control" />}>Delete League</DialogTrigger>
-        <DialogContent showCloseButton={false} initialFocus={cancelRef} className="sm:max-w-lg" aria-busy={pending}>
+        <DialogContent showCloseButton={false} initialFocus={cancelRef} className={v2 ? "eleven-v2 v2-dialog sm:max-w-lg" : "sm:max-w-lg"} aria-busy={pending}>
           <DialogTitle className="break-words pr-0 text-sm text-foreground">Delete {leagueName}?</DialogTitle>
           <DialogDescription className="text-foreground-secondary">
             This permanently deletes the league and its fantasy history: teams, rosters, rounds, matchups, results,

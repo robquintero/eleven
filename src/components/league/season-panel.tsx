@@ -37,8 +37,8 @@ export function SeasonPanel({
   if (!season) {
     if (!isCommissioner) return null;
     return (
-      <div className="mt-4 border border-border p-4">
-        <p className="label-system text-[11px] text-foreground-tertiary">SEASON_FORMAT</p>
+      <div className="v2-season-panel mt-4 border border-border p-4">
+        <p className="label-system text-[11px] text-foreground-tertiary">Season format</p>
         <p className="mt-1 text-sm text-foreground-secondary">
           Choose how many times each manager plays every other manager before this league&apos;s first season begins.
         </p>
@@ -50,7 +50,7 @@ export function SeasonPanel({
   if (season.status !== "COMPLETED") return null;
 
   return (
-    <div className="mt-4 border border-border p-4">
+    <div className="v2-season-panel mt-4 border border-border p-4">
       {season.championTeamName ? (
         <div className="flex items-center gap-2">
           <Trophy className="size-4 text-accent" strokeWidth={1.75} />
@@ -62,7 +62,7 @@ export function SeasonPanel({
 
       {isCommissioner && (
         <div className="mt-3 border-t border-border pt-3">
-          <p className="label-system text-[11px] text-foreground-tertiary">START_NEXT_SEASON</p>
+          <p className="label-system text-[11px] text-foreground-tertiary">Start next season</p>
           <StartNextSeasonForm leagueId={leagueId} defaultCycles={season.scheduleCycles} />
         </div>
       )}

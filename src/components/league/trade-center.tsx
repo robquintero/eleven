@@ -42,12 +42,14 @@ export function TradeCenter({
   otherTeams,
   incoming,
   outgoing,
+  v2 = false,
 }: {
   leagueId: string;
   myTeamId: string;
   otherTeams: Team[];
   incoming: TradeView[];
   outgoing: TradeView[];
+  v2?: boolean;
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
@@ -66,23 +68,25 @@ export function TradeCenter({
   }
 
   return (
-    <div className="border border-border p-4">
+    <section className={v2 ? "v2-surface v2-trades" : "border border-border p-4"}>
       <div className="flex items-center justify-between gap-3">
-        <p className="label-system text-[11px] text-foreground-tertiary">TRADES</p>
+        <h2 className={v2 ? "v2-module-title" : "label-system text-[11px] text-foreground-tertiary"}>{v2 ? "Trades" : "TRADES"}</h2>
         <Button
           size="xs"
           variant="outline"
           onClick={() => setProposeOpen(true)}
+          className={v2 ? "v2-secondary-button" : undefined}
           disabled={otherTeams.length === 0}
         >
-          Propose Trade
+          {v2 ? "Propose trade" : "Propose Trade"}
         </Button>
       </div>
 
       {error && <ActionFeedback kind={error.kind} message={error.message} />}
 
-      <div className="mt-3 flex flex-col gap-4">
+      {v2 && !incoming.length && !outgoing.length ? <div className="mt-5"><p className="text-sm font-medium">No active trades</p><p className="v2-secondary mt-1">Incoming and outgoing offers will appear here.</p></div> : <div className="mt-3 flex flex-col gap-4">
         <TradeList
+          v2={v2}
           direction="incoming"
           trades={incoming}
           myTeamId={myTeamId}
@@ -108,6 +112,7 @@ export function TradeCenter({
           )}
         />
         <TradeList
+          v2={v2}
           direction="outgoing"
           trades={outgoing}
           myTeamId={myTeamId}
@@ -123,9 +128,10 @@ export function TradeCenter({
             </Button>
           )}
         />
-      </div>
+      </div>}
 
       <LazyProposeTradeDialog
+        v2={v2}
         open={proposeOpen}
         onOpenChange={setProposeOpen}
         leagueId={leagueId}
@@ -136,7 +142,7 @@ export function TradeCenter({
           // The trade action revalidates /league; Next supplies canonical Flight.
         }}
       />
-    </div>
+    </section>
   );
 }
 
@@ -147,21 +153,23 @@ export function TradeList({
   myTeamId,
   pendingId,
   renderActions,
+  v2 = false,
 }: {
   direction: "incoming" | "outgoing";
+  v2?: boolean;
   trades: TradeView[];
   myTeamId: string;
   pendingId: string | null;
   renderActions: (trade: TradeView) => React.ReactNode;
 }) {
   return (
-    <div>
-      <p className="label-system text-[10px] text-foreground-tertiary">
-        {direction === "incoming" ? "INCOMING" : "OUTGOING"}
+    <div className={v2 ? "v2-trade-list" : undefined}>
+      <p className={v2 ? "v2-meta" : "label-system text-[10px] text-foreground-tertiary"}>
+        {v2 ? direction === "incoming" ? "Incoming" : "Outgoing" : direction === "incoming" ? "INCOMING" : "OUTGOING"}
       </p>
       {trades.length === 0 ? (
         <p className="mt-1 text-sm text-foreground-secondary">
-          {direction === "incoming" ? "NO INCOMING TRADES" : "NO OUTGOING TRADES"}
+          {v2 ? "No offers" : direction === "incoming" ? "NO INCOMING TRADES" : "NO OUTGOING TRADES"}
         </p>
       ) : (
         <div className="mt-1.5 flex flex-col gap-2">
@@ -172,13 +180,13 @@ export function TradeList({
             const youSend = trade.receivingTeamId === myTeamId ? trade.requestedPlayers : trade.offeredPlayers;
 
             return (
-              <div key={trade.id} className="border border-border p-3">
-                <p className="label-system text-[11px] text-foreground-tertiary">
-                  {direction === "incoming" ? "FROM" : "TO"} {counterpartyName.toUpperCase()}
+              <div key={trade.id} className={v2 ? "v2-trade-card" : "border border-border p-3"}>
+                <p className={v2 ? "v2-secondary [overflow-wrap:anywhere]" : "label-system text-[11px] text-foreground-tertiary"}>
+                  {direction === "incoming" ? v2 ? "From" : "FROM" : v2 ? "To" : "TO"} {v2 ? counterpartyName : counterpartyName.toUpperCase()}
                 </p>
                 <div className="mt-1.5 grid grid-cols-2 gap-3">
                   <div>
-                    <p className="label-system text-[10px] text-foreground-tertiary">YOU RECEIVE</p>
+                    <p className={v2 ? "v2-meta" : "label-system text-[10px] text-foreground-tertiary"}>{v2 ? "You receive" : "YOU RECEIVE"}</p>
                     {youReceive.map((p) => (
                       <p key={p.playerId} className="truncate text-xs text-foreground">
                         {p.playerName} <PositionLabel position={p.position} />
@@ -186,7 +194,7 @@ export function TradeList({
                     ))}
                   </div>
                   <div>
-                    <p className="label-system text-[10px] text-foreground-tertiary">YOU SEND</p>
+                    <p className={v2 ? "v2-meta" : "label-system text-[10px] text-foreground-tertiary"}>{v2 ? "You send" : "YOU SEND"}</p>
                     {youSend.map((p) => (
                       <p key={p.playerId} className="truncate text-xs text-foreground">
                         {p.playerName} <PositionLabel position={p.position} />
@@ -219,8 +227,10 @@ export function ProposeTradeDialog({
   otherTeams,
   rostersByTeamId,
   onProposed,
+  v2 = false,
 }: {
   open: boolean;
+  v2?: boolean;
   onOpenChange: (open: boolean) => void;
   leagueId: string;
   myRoster: RosterPlayerOption[];
@@ -272,9 +282,9 @@ export function ProposeTradeDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className={v2 ? "eleven-v2 v2-dialog sm:max-w-md" : "sm:max-w-md"}>
         <DialogHeader>
-          <DialogTitle>PROPOSE TRADE</DialogTitle>
+          <DialogTitle>{v2 ? "Propose trade" : "PROPOSE TRADE"}</DialogTitle>
           <DialogDescription>
             {step === "manager" && "Choose a manager to trade with."}
             {step === "players" && `Select players to send to and receive from ${targetTeam?.name}.`}
@@ -463,6 +473,7 @@ function TradeCountHint({ offeredCount, requestedCount }: { offeredCount: number
 /** Trade composition has no data cost until the manager opens it. */
 export function LazyProposeTradeDialog(props: {
   open: boolean;
+  v2?: boolean;
   onOpenChange: (open: boolean) => void;
   leagueId: string;
   myTeamId: string;
@@ -487,7 +498,7 @@ export function LazyProposeTradeDialog(props: {
   }
   if (!loaded || loaded.leagueId !== props.leagueId) {
     return <Dialog open={props.open} onOpenChange={onOpenChange}>
-      <DialogContent><DialogHeader><DialogTitle>PROPOSE TRADE</DialogTitle>
+      <DialogContent className={props.v2 ? "eleven-v2 v2-dialog" : undefined}><DialogHeader><DialogTitle>{props.v2 ? "Propose trade" : "PROPOSE TRADE"}</DialogTitle>
         <DialogDescription>{loadError ?? "Loading rosters…"}</DialogDescription>
       </DialogHeader></DialogContent>
     </Dialog>;

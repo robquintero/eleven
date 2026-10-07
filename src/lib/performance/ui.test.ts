@@ -22,10 +22,13 @@ function load(file: string, mocks: Record<string, unknown> = {}): Record<string,
   const compiled = { exports: {} };
   const localRequire = (id: string): unknown => {
     if (id in mocks) return mocks[id];
+    if (id.endsWith(".css")) return {};
     if (id === "next/link") return nextLink;
     if (id === "next/navigation") return { notFound: () => { throw new Error("NOT_FOUND"); } };
     if (id.startsWith("@/data-access/")) throw new Error(`Unmocked data access: ${id}`);
-    if (id.startsWith("@/components/") && !id.includes("workspace-loading") && !id.includes("matchup-command") && !id.includes("transition-link") && !id.includes("league-matchups") && !id.includes("matchup-status") && !id.includes("team-name") && !id.includes("matchup-page-view")) {
+    const componentPath = id.startsWith("@/components/") || (id.startsWith(".") && resolve(dirname(filename), id).includes("/components/"));
+    const serverPresenters = ["workspace-loading", "matchup-command", "transition-link", "league-matchups", "matchup-status", "team-name", "matchup-page-view", "league-overview", "league-sections", "/ui/v2"];
+    if (componentPath && !serverPresenters.some(name => id.includes(name))) {
       return new Proxy({}, { get: (_target, name) => name === "__esModule" ? true : ({ children, title }: { children?: ReactNode; title?: string }) => createElement("div", {}, title ?? String(name), children) });
     }
     if (id.startsWith("@/") || id.startsWith(".")) {
@@ -164,7 +167,7 @@ test("League standings and identity stream before competition/history/transactio
     seasons: { getSeasonSummary: null, listSeasons: async (gate: Promise<void>) => { await gate; return []; } },
     transactions: { getRecentActivity: async (gate: Promise<void>) => { await gate; return []; } },
     trades: { getTeamTrades: async (gate: Promise<void>) => { await gate; return { incoming: [], outgoing: [] }; } },
-  }, /STANDINGS/, /LeagueMatchups/);
+  }, /Standings/, /LeagueMatchups/);
 });
 
 test("League pending results render real scores/date range and restrained status, with no official winner or wrong current-matchup link",async()=>{
@@ -181,4 +184,31 @@ test("Home/Matchup command shares closed-week PENDING semantics and shows scores
   const { MatchupCommand }=load("src/components/dashboard/matchup-command.tsx");
   const result=await flight(createElement(MatchupCommand as (props:Record<string,unknown>)=>ReactNode,{matchup:{...matchup,roundStatus:"in_progress",roundStartsAt:"2026-09-29T06:00:00Z",roundEndsAt:"2026-10-06T06:00:00Z",homeLivePoints:150.85,awayLivePoints:137.8},hasLeague:true,now:new Date("2026-10-06T06:30Z")}));
   assert.match(result,/PENDING/);assert.match(result,/150.85/);assert.match(result,/137.8/);assert.doesNotMatch(result,/IN PROGRESS|"children":"FINAL"/);
+});
+
+test("V2 matchup cards preserve real scores, UUID destinations, final-only winners and own-matchup priority", async () => {
+  const { LeagueMatchups } = load("src/components/league/league-matchups.tsx", { "next/link": nextLink });
+  const base = { id:"neutral", roundNumber:2, roundStartsAt:"2026-10-06T06:00:00Z", roundEndsAt:"2026-10-13T06:00:00Z", status:"live", resultState:"pending", homeTeamId:"a", awayTeamId:"b", homeTeamName:"Neutral home", awayTeamName:"Neutral away", homePoints:150.85, awayPoints:137.8 };
+  const render = (matchups: Record<string, unknown>[]) => flight(createElement(LeagueMatchups as (props:Record<string,unknown>)=>ReactNode,{variant:"v2",matchups,myTeamId:"mine",emptyLabel:"No results yet"}));
+  const pending = await render([base, {...base,id:"own",homeTeamId:"mine",homePoints:null}]);
+  assert.ok(pending.indexOf('"href":"/matchup/own"') < pending.indexOf('"href":"/matchup/neutral"'));
+  for(const value of ["150.85", "137.8", "—", "PENDING", "Finalizing result", "Your matchup"]) assert.ok(pending.includes(value),value);
+  assert.doesNotMatch(pending,/Winner|Draw|"href":"\/matchup"/);
+  assert.match(await render([{...base,resultState:"final",status:"final"}]),/Winner · Neutral home/);
+  assert.match(await render([{...base,resultState:"final",status:"final",awayPoints:150.85}]),/Draw/);
+  assert.doesNotMatch(await render([{...base,resultState:"final",status:"final",awayPoints:null}]),/Winner|Draw/);
+  assert.match(await render([]),/No results yet/);
+});
+
+test("V2 tokens remain opt-in and all small-text colors meet AA on every surface state", () => {
+  const css = readFileSync(resolve(root,"src/app/(app)/league/v2.css"),"utf8");
+  const postcss = require("postcss");
+  postcss.parse(css).walkRules((rule: {selectors: string[]}) => { for(const selector of rule.selectors) assert.ok(selector.trim().startsWith(".eleven-v2") || selector.trim().startsWith(".dark .eleven-v2"),selector); });
+  const luminance = (hex:string) => hex.match(/\w\w/g)!.map(v=>parseInt(v,16)/255).map(v=>v<=.04045?v/12.92:((v+.055)/1.055)**2.4).reduce((n,v,i)=>n+v*[.2126,.7152,.0722][i],0);
+  const contrast=(a:string,b:string)=>{const values=[luminance(a),luminance(b)].sort((a,b)=>b-a);return (values[0]+.05)/(values[1]+.05);};
+  for(const block of css.matchAll(/(?:^|\n)(?:\.dark )?\.eleven-v2 \{([^}]+)\}/g)) {
+    const tokens = Object.fromEntries([...block[1].matchAll(/--v2-([\w-]+):\s*(#[\da-f]+)/g)].map(m=>[m[1],m[2]]));
+    for(const text of ["text","secondary","muted","accent","positive","negative"]) for(const background of ["canvas","surface","inset","hover","selected"]) assert.ok(contrast(tokens[text],tokens[background])>=4.5,`${text} on ${background}`);
+    assert.ok(contrast("#ffffff",tokens.action)>=4.5,"primary action contrast");
+  }
 });

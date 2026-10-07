@@ -19,12 +19,15 @@ export function StandingsTable({
   standings,
   myTeamId,
   emptyContext,
+  variant = "default",
 }: {
   standings: StandingsRow[];
+  variant?: "default" | "v2";
   myTeamId: string | null;
   /** Pass 13 (§10): real, specific reason the table is empty (e.g. "ROUND 1 HAS NOT CLOSED YET") in place of a flat "NO RESULTS YET" with no context -- `undefined` falls back to the plain label rather than fabricating a reason when the caller doesn't have one. */
   emptyContext?: string;
 }) {
+  if (variant === "v2") return <V2Standings standings={standings} myTeamId={myTeamId} emptyContext={emptyContext} />;
   if (standings.length === 0) {
     return (
       <div className="p-4 text-center">
@@ -92,4 +95,29 @@ export function StandingsTable({
       </div>
     </div>
   );
+}
+
+/** Semantic table; values, row order and UUID navigation match the original. */
+function V2Standings({ standings, myTeamId, emptyContext }: { standings: StandingsRow[]; myTeamId: string | null; emptyContext?: string }) {
+  if (!standings.length) return <div className="px-5 pb-6"><p className="v2-secondary">No results yet</p>{emptyContext && <p className="v2-meta mt-1">{emptyContext}</p>}</div>;
+  return <div className="overflow-x-auto rounded-b-[var(--v2-radius-module)]" tabIndex={0} role="region" aria-label="League standings; scroll horizontally for all statistics">
+    <table className="v2-table">
+      <caption className="sr-only">League standings, based on official completed results</caption>
+      <thead><tr>{["Rank", "Team", "P", "W", "D", "L", "PF", "PA", "Diff", "Pts"].map((label, i) => <th key={label} scope="col" className={i === 1 ? "v2-team-cell v2-sticky-team" : ""}>{label}</th>)}</tr></thead>
+      <tbody>{standings.map((row, i) => {
+        const own = row.fantasyTeamId === myTeamId;
+        const diff = Math.round((row.pointsFor - row.pointsAgainst) * 100) / 100;
+        return <tr key={row.fantasyTeamId} className={own ? "v2-own-standing" : ""}>
+          <td className={`v2-number ${own ? "border-l-2 border-l-[var(--v2-accent)]" : ""}`}>{i + 1}</td>
+          <th scope="row" className="v2-team-cell v2-sticky-team">
+            <div className="flex min-w-0 items-center gap-2"><TransitionLink href={own ? "/team" : `/team/${row.fantasyTeamId}`} label={row.teamName} className="flex min-h-11 min-w-0 items-center text-[14px] font-medium hover:underline"><TeamName name={row.teamName} /></TransitionLink>{own && <span className="text-[10px] text-[var(--v2-accent)]">You</span>}</div>
+          </th>
+          {[row.played,row.wins,row.draws,row.losses].map((value, j) => <td key={j} className="v2-number">{value}</td>)}
+          <td className="v2-number">{formatRoundPoints(row.pointsFor)}</td><td className="v2-number">{formatRoundPoints(row.pointsAgainst)}</td>
+          <td className={`v2-number font-medium ${diff > 0 ? "v2-positive" : diff < 0 ? "v2-negative" : ""}`}>{diff > 0 ? "+" : ""}{formatRoundPoints(diff)}</td>
+          <td className="v2-number text-[18px] font-semibold">{row.leaguePoints}</td>
+        </tr>;
+      })}</tbody>
+    </table>
+  </div>;
 }

@@ -27,17 +27,53 @@ function MatchupRow({ matchup, myTeamId }: { matchup: LeagueMatchupSummary; myTe
   </TransitionLink>;
 }
 
+/** Score-led sports presentation; the archive's default rows remain unchanged. */
+function MatchupScoreCard({ matchup, myTeamId, compact }: { matchup: LeagueMatchupSummary; myTeamId: string | null; compact: boolean }) {
+  const isMine = myTeamId !== null && (matchup.homeTeamId === myTeamId || matchup.awayTeamId === myTeamId);
+  const final = matchup.resultState === "final" && matchup.homePoints !== null && matchup.awayPoints !== null;
+  const result = final ? matchup.homePoints === matchup.awayPoints ? "Draw"
+    : `Winner · ${matchup.homePoints! > matchup.awayPoints! ? matchup.homeTeamName : matchup.awayTeamName}` : null;
+  return <TransitionLink href={`/matchup/${matchup.id}`} label={`${matchup.homeTeamName} vs ${matchup.awayTeamName}`}
+    className={`v2-matchup ${isMine ? "v2-matchup-own" : ""} ${compact ? "v2-matchup-compact" : ""}`}>
+    <div className="flex items-center justify-between gap-3">
+      <span className={isMine ? "text-[13px] font-medium text-[var(--v2-accent)]" : "v2-meta"}>{isMine ? "Your matchup" : `Round ${matchup.roundNumber}`}</span>
+      <MatchupStatus state={matchup.resultState} />
+    </div>
+    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-5 gap-y-3">
+      <TeamName name={matchup.homeTeamName} className="block text-[15px] font-medium leading-snug" />
+      <TeamName name={matchup.awayTeamName} className="block text-right text-[15px] font-medium leading-snug" />
+      <span className="v2-number v2-score">{matchup.homePoints === null ? "—" : formatRoundPoints(matchup.homePoints)}</span>
+      <span className="v2-number v2-score text-right">{matchup.awayPoints === null ? "—" : formatRoundPoints(matchup.awayPoints)}</span>
+    </div>
+    <div className="v2-matchup-footer">
+      {result ?? (matchup.resultState === "pending" ? "Finalizing result" : matchup.resultState === "upcoming" ? "Awaiting kickoff" : "View matchup →")}
+      {compact && <p className="v2-meta mt-1">{formatRoundWindow(matchup.roundStartsAt, matchup.roundEndsAt)}</p>}
+    </div>
+  </TransitionLink>;
+}
+
 export function LeagueMatchups({
   matchups,
   myTeamId,
   emptyLabel,
+  variant = "default",
+  compact = false,
 }: {
   matchups: LeagueMatchupSummary[];
   myTeamId: string | null;
   emptyLabel: string;
+  variant?: "default" | "v2";
+  compact?: boolean;
 }) {
   if (matchups.length === 0) {
-    return <p className="p-4 text-center text-sm text-foreground-secondary">{emptyLabel}</p>;
+    return <p className={variant === "v2" ? "v2-secondary py-6" : "p-4 text-center text-sm text-foreground-secondary"}>{emptyLabel}</p>;
+  }
+  if (variant === "v2") {
+    const ordered = [...matchups].sort((a, b) => {
+      const mine = (m: LeagueMatchupSummary) => m.homeTeamId === myTeamId || m.awayTeamId === myTeamId;
+      return Number(mine(b)) - Number(mine(a));
+    });
+    return <div className="v2-matchup-grid">{ordered.map(m => <MatchupScoreCard key={m.id} matchup={m} myTeamId={myTeamId} compact={compact} />)}</div>;
   }
   return (
     <div className="divide-y divide-border">

@@ -1232,3 +1232,29 @@ Before shipping any new screen or component, ask:
 
 The target is the middle of all three — never fully satisfied by
 optimizing just one.
+
+## V2 opt-in: League laboratory
+
+League now establishes a deliberately different visual system. Other routes and
+app-shell components retain the system above until a separate product review.
+The League route imports `v2.css`; all its selectors require `.eleven-v2`.
+Portal dialogs explicitly opt in. Do not move these overrides to global CSS.
+
+V2 uses layered canvas/surface/inset/hover/selected tokens in both themes,
+6/10/14px control/module/hero radii, restrained blue action/focus accents,
+and accessible signed-differential colors. Existing position colors remain
+unchanged. Sans labels provide human hierarchy; mono and tabular figures are
+reserved for data. Titles are 30px, module headings 19px, hero scores 28–40px,
+secondary text 13px and operational metadata 11px. Dense data lives inside
+well-separated modules. Existing reduced-motion rules still apply.
+
+`V2Surface`, `V2Heading` and `V2Loading` are the small reusable foundation.
+Shared standings, matchup, round-navigation and trade components keep their
+original default presentation; League explicitly selects V2.
+
+League order: selected identity → stored matchweek and own/league score cards →
+semantic standings table → six official records → recent results → activity and
+trades → managers and draft/archive → collapsed commissioner management.
+Mobile preserves that priority, uses two record columns and local standings
+scrolling. Create/Join mount the existing forms in dialogs. Deletion confirmation,
+all business rules, server actions and shared data promises remain unchanged.
