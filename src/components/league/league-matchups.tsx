@@ -46,10 +46,14 @@ function MatchupScoreCard({ matchup, myTeamId, compact }: { matchup: LeagueMatch
       <MatchupStatus state={matchup.resultState} />
     </div>
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-5 gap-y-3">
-      <TeamName name={matchup.homeTeamName} className="block text-[15px] font-medium leading-snug" />
-      <TeamName name={matchup.awayTeamName} className="block text-right text-[15px] font-medium leading-snug" />
-      <ScoreDisplay points={matchup.homePoints} />
-      <ScoreDisplay points={matchup.awayPoints} alignRight />
+      <div className="v2-team-score">
+        <TeamName name={matchup.homeTeamName} className="block text-[15px] font-medium leading-snug" />
+        <ScoreDisplay points={matchup.homePoints} />
+      </div>
+      <div className="v2-team-score text-right">
+        <TeamName name={matchup.awayTeamName} className="block text-[15px] font-medium leading-snug" />
+        <ScoreDisplay points={matchup.awayPoints} alignRight />
+      </div>
     </div>
     <div className="v2-matchup-footer">
       {result ?? (matchup.resultState === "pending" ? "Finalizing result" : matchup.resultState === "upcoming" ? "Awaiting kickoff" : "View matchup →")}

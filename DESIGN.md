@@ -1241,7 +1241,7 @@ The League route imports `v2.css`; all its selectors require `.eleven-v2`.
 Portal dialogs explicitly opt in. Do not move these overrides to global CSS.
 
 V2 uses layered canvas/surface/inset/hover/selected tokens in both themes,
-10px control and 32px major-module radii, restrained blue action/focus accents,
+10px control and 20–32px module radii, restrained blue action/focus accents,
 and accessible signed-differential colors. Existing position colors remain
 unchanged. Sans labels provide human hierarchy; mono and tabular figures are
 reserved for compact operational data. Major scores, ranks and record values use
@@ -1260,10 +1260,15 @@ Mobile preserves that priority, uses two record columns and local standings
 scrolling. Create/Join mount the existing forms in dialogs. Deletion confirmation,
 all business rules, server actions and shared data promises remain unchanged.
 
-The source-Figma addendum governs V2 geometry: a visibly lighter charcoal canvas
-surrounds near-black elevated modules, with low-opacity strokes and soft shadows.
-Major shells own 32px corners and 24px desktop padding; nested controls stay
-compact. Only the matchweek gets a faint ambient radial blue field. Recent
-results use clean divided rows and records use a compact unboxed grid so neither
-competes with current scores or standings. Existing system sans is retained;
-Nunito's proportional hierarchy is adapted without a new font dependency.
+League V2.1 refines the source-Figma direction: the dark environment is near-black
+(#0d0f12), with black modules (#07090c) and slightly lifted nested surfaces
+(#101419). Matchweek and Standings retain 32px feature corners; ordinary modules
+use 20px corners (24px/16px on mobile). Major padding remains 24px, support
+headings use 20px, and attached information uses 4–8px gaps. The round controls
+form a compact group directly between week identity and scores. Blue selection
+is a subtle tint/edge or atmospheric field rather than an opaque navy panel;
+only the highest-score record receives numerical blue emphasis. Live and signed
+differential semantics remain green/red. Recent results stay divided rows and
+records stay an unboxed six-item grid. Light mode retains its white surfaces.
+Existing system sans is retained; Nunito's proportional hierarchy is adapted
+without a new font dependency. All CSS remains opt-in to League.

@@ -12,7 +12,7 @@ export function LeagueRecordsList({ records }: { records: LeagueRecords }) {
   if (pointsFor) rows.push({ label: "Most points for", value: formatRoundPoints(pointsFor.value), team: pointsFor.teamName });
   if (against) rows.push({ label: "Most points against", value: formatRoundPoints(against.value), team: against.teamName });
   if (!rows.length) return <p className="v2-secondary px-5 pb-6">Records appear after the first official result.</p>;
-  return <div className="v2-records">{rows.map(row => <div key={row.label} className="v2-record">
+  return <div className="v2-records">{rows.map(row => <div key={row.label} className={`v2-record ${row.label === "Highest score" ? "v2-record-highlight" : ""}`}>
     <p className="v2-secondary">{row.label}</p><p className="v2-record-value v2-display">{row.value}</p>
     <p className="text-[13px] font-medium [overflow-wrap:anywhere]">{row.team}</p>{row.detail && <p className="v2-meta mt-1 [overflow-wrap:anywhere]">{row.detail}</p>}
   </div>)}</div>;

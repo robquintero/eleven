@@ -43,7 +43,7 @@ export function LeagueOverview({ league, season, lifecycleLabel, draftStatus, st
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]">
         {managers}
         <div className="min-w-0 space-y-6">
-          <V2Surface><V2Heading title="Draft" meta={<span className="v2-meta">{draftStatus === "completed" ? "Completed" : draftStatus === "in_progress" ? "In progress" : "Not yet available"}</span>} />
+          <V2Surface className="v2-support"><V2Heading title="Draft" meta={<span className="v2-meta">{draftStatus === "completed" ? "Completed" : draftStatus === "in_progress" ? "In progress" : "Not yet available"}</span>} />
             {draftStatus ? <div className="px-5 pb-4"><TransitionLink href="/draft" label="Draft" className="v2-link">{draftStatus === "completed" ? "View draft results →" : "Open draft room →"}</TransitionLink></div> : <p className="v2-secondary px-5 pb-5">Your draft will appear here when it is ready.</p>}
           </V2Surface>
           {archive}

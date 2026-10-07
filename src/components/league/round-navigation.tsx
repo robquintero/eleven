@@ -11,7 +11,7 @@ export function RoundNavigation({ rounds, selectedId, currentId, v2 = false }: {
   const index = rounds.findIndex(r => r.id === selectedId);
   const previous = rounds[index - 1], next = rounds[index + 1];
   const style = v2 ? "v2-link px-1" : "label-system flex min-h-11 items-center px-2 text-[11px] text-accent hover:underline";
-  return <nav aria-label="Matchup rounds" className={v2 ? "flex flex-wrap items-center justify-between gap-2" : "flex flex-wrap items-center justify-between gap-2 border-b border-border px-2 py-2"}>
+  return <nav aria-label="Matchup rounds" className={v2 ? "v2-round-nav" : "flex flex-wrap items-center justify-between gap-2 border-b border-border px-2 py-2"}>
     {previous
       ? <TransitionLink href={`/league?round=${previous.id}`} label="Previous round" className={style}>← Previous</TransitionLink>
       : <span aria-disabled="true" className={v2 ? "v2-meta px-1" : "label-system px-2 text-[11px] text-foreground-tertiary"}>← Previous</span>}
