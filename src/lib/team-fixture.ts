@@ -39,13 +39,13 @@ const roundWindowFormatter = new Intl.DateTimeFormat("en-US", {
 
 /**
  * Pass 14.5: one canonical rendering of a fantasy round's real, stored
- * Tue→Mon window — "SEP 29, 12:00 AM UTC → OCT 6, 12:00 AM UTC" — always
+ * Tue→Mon window — "Sep 29, 6:00 AM UTC → Oct 6, 6:00 AM UTC" — always
  * from `fantasy_rounds.starts_at`/`ends_at`, never inferred from today's
  * date (brief §Phase 3: "do not infer the fantasy week from today's date
  * if an authoritative fantasy_round exists").
  */
 export function formatRoundWindow(startsAt: string, endsAt: string): string {
-  return `${roundWindowFormatter.format(new Date(startsAt)).toUpperCase()} UTC → ${roundWindowFormatter.format(new Date(endsAt)).toUpperCase()} UTC`;
+  return `${roundWindowFormatter.format(new Date(startsAt))} UTC → ${roundWindowFormatter.format(new Date(endsAt))} UTC`;
 }
 
 /**

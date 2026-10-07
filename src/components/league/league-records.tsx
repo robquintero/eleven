@@ -5,8 +5,8 @@ import type { LeagueRecords } from "@/data-access/matchups";
 export function LeagueRecordsList({ records }: { records: LeagueRecords }) {
   const rows: { label: string; value: string; team: string; detail?: string }[] = [];
   const { highestScore: high, lowestScore: low, largestMargin: margin, closestMatchup: close, mostPointsFor: pointsFor, mostPointsAgainst: against } = records;
-  if (high) rows.push({ label: "Highest score", value: formatRoundPoints(high.value), team: high.teamName, detail: `Round ${high.roundNumber} · vs ${high.opponentName}` });
-  if (low) rows.push({ label: "Lowest score", value: formatRoundPoints(low.value), team: low.teamName, detail: `Round ${low.roundNumber} · vs ${low.opponentName}` });
+  if (high) rows.push({ label: "Highest score", value: formatRoundPoints(high.value), team: high.teamName, detail: `Matchweek ${high.roundNumber} · vs ${high.opponentName}` });
+  if (low) rows.push({ label: "Lowest score", value: formatRoundPoints(low.value), team: low.teamName, detail: `Matchweek ${low.roundNumber} · vs ${low.opponentName}` });
   if (margin) rows.push({ label: "Biggest win", value: `+${formatRoundPoints(margin.value)}`, team: margin.teamName, detail: `Over ${margin.opponentName}` });
   if (close) rows.push({ label: "Closest matchup", value: formatRoundPoints(close.value), team: close.teamName, detail: `Margin · vs ${close.opponentName}` });
   if (pointsFor) rows.push({ label: "Most points for", value: formatRoundPoints(pointsFor.value), team: pointsFor.teamName });

@@ -18,16 +18,16 @@ export function RoundIntelligence({
   hasActiveRound: boolean;
 }) {
   if (!hasActiveRound) {
-    return <p className="text-xs text-foreground-tertiary">NO ACTIVE ROUND</p>;
+    return <p className="text-xs text-foreground-secondary">No active matchweek</p>;
   }
 
   const buckets = starterBuckets(starters);
 
   return (
     <div>
-      <OperationalRow label="LIVE" value={buckets.live} />
-      <OperationalRow label="LOCKED" value={buckets.locked + buckets.final} />
-      <OperationalRow label="REMAINING" value={buckets.upcoming} />
+      <OperationalRow label="Live" value={buckets.live} />
+      <OperationalRow label="Locked" value={buckets.locked + buckets.final} />
+      <OperationalRow label="Remaining" value={buckets.upcoming} />
     </div>
   );
 }

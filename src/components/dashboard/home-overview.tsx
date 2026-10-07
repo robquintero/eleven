@@ -19,7 +19,7 @@ export function HomeSection({ title, description, action, children, className = 
 export function HomeIdentity({ teamName, leagueName, matchup }: { teamName: string; leagueName: string; matchup: CurrentMatchup | null }) {
   return <div className="home-identity">
     <div><h1><TeamName name={teamName} /></h1><p className="home-secondary">{matchup ? `Matchweek ${matchup.roundNumber} · ` : ""}{leagueName}</p></div>
-    {matchup && <p className="home-window">{formatRoundWindow(matchup.roundStartsAt, matchup.roundEndsAt)}</p>}
+    {matchup && <p className="v2-round-range home-window">{formatRoundWindow(matchup.roundStartsAt, matchup.roundEndsAt)}</p>}
   </div>;
 }
 
@@ -76,12 +76,13 @@ export function HomeFixtureCard({ fixtureIntel, starters, hasActiveRound, teamId
   const next = fixtureIntel?.nextFixture;
   const involved = countStartersInFixture(starters, next ?? null, teamIdsByPlayerId);
   const buckets = starterBuckets(starters);
-  return <HomeSection title="Next lock" className="home-next-lock" action={<TransitionLink href="/team" label="Team" className="v2-link">Manage lineup →</TransitionLink>}>
+  return <HomeSection title="Next lock" className="home-next-lock">
     {!hasActiveRound ? <p className="home-secondary">No active matchweek. The next lock is not scheduled.</p> : !fixtureIntel?.hasAnyFixtureData ? <p className="home-secondary">Fixture information is not available yet.</p> : next ? <>
       <p className="home-lock-time">{formatKickoff(next.kickoffAt)}</p><p className="home-secondary">{next.homeClubShortName} v {next.awayClubShortName}</p>
       {involved > 0 && <p className="home-involved">{involved} of your starters involved</p>}
     </> : <p className="home-secondary">No more fixtures scheduled this matchweek.</p>}
-    {hasActiveRound && <div className="home-fixture-summary"><span>{buckets.upcoming} starters remaining</span><span>{fixtureIntel?.hasAnyFixtureData ? <><strong className={fixtureIntel.liveFixtureCount > 0 ? "home-positive" : ""}>{fixtureIntel.liveFixtureCount}</strong> fixtures live now</> : "Fixtures unavailable"}</span></div>}
+    {hasActiveRound && <p className="home-fixture-summary"><span>{buckets.upcoming} starter{buckets.upcoming === 1 ? "" : "s"} remaining</span><span aria-hidden="true">·</span><span>{fixtureIntel?.hasAnyFixtureData ? <><strong className={fixtureIntel.liveFixtureCount > 0 ? "home-positive" : ""}>{fixtureIntel.liveFixtureCount}</strong> fixtures live</> : "Fixtures unavailable"}</span></p>}
+    <TransitionLink href="/team" label="Team" className="v2-link mt-3">Manage lineup →</TransitionLink>
   </HomeSection>;
 }
 

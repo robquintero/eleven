@@ -100,27 +100,24 @@ export default async function HomePage() {
           maxTeams={league.maxTeams} isCommissioner={league.role === "commissioner"} inviteCode={league.inviteCode} />
       )}
 
-      <div className="home-intelligence">
-        <HomeFixtureCard fixtureIntel={fixtureIntel} starters={mySquad.starters} teamIdsByPlayerId={teamIdsByPlayerId}
-          hasActiveRound={matchup !== null && matchup.roundStatus !== "completed"} />
-        <Suspense fallback={<V2Loading title="League position" rows={3} />}>
-          <HomeOperations standingsPromise={standingsPromise} teamId={team?.id ?? null} />
-        </Suspense>
-      </div>
-
       {team && vacancies.length > 0 && <section className="home-attention" aria-label="Roster vacancy">
         <div><h2>Your squad has room to fill</h2><p className="home-secondary mt-1">Short on {vacancies.map(v => `${v.short} ${v.position}`).join(", ")}.</p></div>
         <TransitionLink href="/players" label="Players" className="v2-link">Browse players →</TransitionLink>
       </section>}
 
-      <div className="home-support-grid">
-        <div className="home-stack">
+      <div className="home-support-grid home-context-grid">
+        <div className="home-stack home-lineup-stack">
+          <HomeFixtureCard fixtureIntel={fixtureIntel} starters={mySquad.starters} teamIdsByPlayerId={teamIdsByPlayerId}
+            hasActiveRound={matchup !== null && matchup.roundStatus !== "completed"} />
           <StartingXI players={mySquad.starters.map(slot => slot.player)} />
           <Suspense fallback={<V2Loading title="Recent activity" rows={3} />}>
             <HomeActivity activityPromise={activityPromise} />
           </Suspense>
         </div>
-        <div className="home-stack">
+        <div className="home-stack home-league-stack">
+          <Suspense fallback={<V2Loading title="League position" rows={3} />}>
+            <HomeOperations standingsPromise={standingsPromise} teamId={team?.id ?? null} />
+          </Suspense>
           {team && <Suspense fallback={<V2Loading title="Trades" rows={2} />}>
             <HomeTrades leagueId={league.id} teamId={team.id} teamsPromise={teamsPromise} tradesPromise={tradesPromise} />
           </Suspense>}
@@ -157,7 +154,7 @@ async function HomeForm({ agentsPromise, leagueId, canTransact }: {
 
 async function HomeActivity({ activityPromise }: { activityPromise: ReturnType<typeof getRecentActivity> }) {
   const activity = await activityPromise;
-  return <HomeSection title="Recent activity" description={activity.length > 0 ? `${activity.length} recent league events` : undefined} action={<TransitionLink href="/league" label="League" className="v2-link">Open league →</TransitionLink>}>
+  return <HomeSection title="Recent activity" className="home-activity" description={activity.length > 0 ? `${activity.length} recent league events` : undefined} action={<TransitionLink href="/league" label="League" className="v2-link">Open league →</TransitionLink>}>
     <ActivityFeed items={activity} />
   </HomeSection>;
 }

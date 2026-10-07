@@ -1,6 +1,7 @@
 /* League's opt-in V2 foundation. No selectors restyle another route or shell.
    Portal popups explicitly opt in with the same .eleven-v2 root. */
 .eleven-v2.v2-league { background: var(--v2-canvas); padding: 24px; border-radius: 24px; }
+.eleven-v2.v2-league > header { margin-bottom: 16px; }
 .eleven-v2 .v2-focus { border-radius: var(--v2-radius-hero); padding: 24px; background: radial-gradient(ellipse 110% 120% at 0% 0%, var(--v2-atmosphere), transparent 65%), var(--v2-surface); }
 .eleven-v2 .v2-matchup-grid { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 16px; }
 .eleven-v2 .v2-matchup { display: flex; flex-direction: column; gap: 16px; min-width: 0; border: 1px solid var(--v2-divider); border-radius: 16px; padding: 20px; background: var(--v2-surface); transition: background-color 160ms, border-color 160ms; }

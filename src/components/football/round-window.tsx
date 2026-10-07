@@ -1,6 +1,6 @@
 import { matchupResultState } from "@/domain/fantasy/matchup-result-state";
 import { MatchupStatus } from "./matchup-status";
-import { formatRoundWindow, pad2 } from "@/lib/team-fixture";
+import { formatRoundWindow } from "@/lib/team-fixture";
 import { cn } from "@/lib/utils";
 
 export interface RoundWindowInfo {
@@ -21,18 +21,18 @@ export interface RoundWindowInfo {
 export function RoundWindow({ round, className, now = new Date() }: { round: RoundWindowInfo | null; className?: string; now?: Date }) {
   if (!round) {
     return (
-      <span className={cn("label-system text-[10px] text-foreground-tertiary", className)}>
-        SEASON NOT STARTED
+      <span className={cn("text-sm text-foreground-secondary", className)}>
+        Season not started
       </span>
     );
   }
 
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-2 gap-y-0.5", className)}>
-      <span className="label-system text-[10px] font-semibold text-foreground-secondary">
-        MATCHDAY {pad2(round.number)}
+    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1", className)}>
+      <span className="text-sm font-medium text-foreground-secondary">
+        Matchweek {round.number}
       </span>
-      <span className="label-system text-[10px] text-foreground-tertiary">
+      <span className="v2-round-range">
         {formatRoundWindow(round.startsAt, round.endsAt)}
       </span>
       <MatchupStatus state={matchupResultState({ startsAt: round.startsAt, endsAt: round.endsAt, roundStatus: round.status }, now)} />

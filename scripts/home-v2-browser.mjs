@@ -58,6 +58,15 @@ window.mount=async(mode='live')=>{
    if(overflow)console.log(theme,width,state,await page.evaluate(()=>Array.from(document.querySelectorAll('*')).filter(el=>{const r=el.getBoundingClientRect();return r.right>innerWidth+1&&r.width>0;}).slice(0,15).map(el=>({cls:el.className,width:el.getBoundingClientRect().width,text:el.textContent.slice(0,60)}))));
    assert.equal(overflow,false,theme+' '+width+' '+state+' overflow');
    assert.ok(await page.locator('.home-score').evaluateAll(elements=>elements.every(el=>el.scrollWidth<=el.clientWidth+1&&el.clientHeight<=parseFloat(getComputedStyle(el).lineHeight)+1)),'score fits');
+   if(!['setup','no-league','loading'].includes(state)){
+    const geometry=await page.evaluate(()=>{
+     const next=document.querySelector('.home-next-lock').getBoundingClientRect(),lineup=document.querySelector('.home-lineup').getBoundingClientRect(),position=document.querySelector('.home-league-position').getBoundingClientRect();
+     return {nextBottom:next.bottom,nextTop:next.top,lineupTop:lineup.top,positionTop:position.top,positionBottom:position.bottom,dateSize:document.querySelector('.home-window')?parseFloat(getComputedStyle(document.querySelector('.home-window')).fontSize):null};
+    });
+    if(width===1440){assert.ok(Math.abs(geometry.lineupTop-geometry.nextBottom-24)<1,'lineup follows next lock naturally');assert.ok(Math.abs(geometry.nextTop-geometry.positionTop)<1,'context starts aligned');}
+    else {assert.ok(geometry.nextBottom<geometry.positionTop&&geometry.positionBottom<geometry.lineupTop,'mobile context reading order');}
+    if(geometry.dateSize!==null)assert.ok(geometry.dateSize>=14,'round dates legible');
+   }
    const reads=await page.evaluate(()=>window.reads);assert.equal(reads.length,new Set(reads).size,'no duplicated reads');
    if(state==='trade'){assert.equal(await page.getByRole('button',{name:'Accept',exact:true}).count(),1);assert.equal(await page.getByRole('button',{name:'Reject',exact:true}).count(),1);}
    if(state==='pending'){assert.equal(await page.getByText('Week ended · Finalizing result',{exact:true}).count(),1);assert.equal(await page.getByText(/Winner ·/).count(),0);}

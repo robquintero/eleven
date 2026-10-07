@@ -72,7 +72,8 @@ window.mount=async(mode='normal')=>{
  const props={membershipKey:mode==='joined'?'new-membership':'initial',league:mode==='member'?{...league,role:'member'}:league,season,lifecycleLabel:'ACTIVE',draftStatus:'completed',standings:mode==='empty'?[]:standings,myTeamId:id(10),allowDelete:mode!=='member',matchweek,records:await Sections.LeagueRecords({competitionPromise:cp}),results:await Sections.LeagueResults({competitionPromise:cp,myTeamId:id(10)}),activity:await Sections.LeagueTransactions({activityPromise:Promise.resolve(mode==='empty'?[]:[{id:'activity',summary:'Kaka FC added Rúben Dias',createdAt:'2026-10-07T12:00:00Z'}])}),trades:await Sections.LeagueTrades({leagueId:id(1),tradePromise:tp}),managers:await Sections.LeagueManagers({league,myTeam:teams[0],tradePromise:tp}),archive:null};
  let content=<LeagueOverview {...props}/>;
  if(mode==='Home')content=<div className='flex flex-col gap-6'><h1 className='text-3xl font-semibold'>Home</h1><div className='grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_360px]'><div><MatchupCommand matchup={matchup} hasLeague now={new Date('2026-10-07')}/><StartingXI players={squad.starters.map(slot=>slot.player)}/></div><OperationsRail starters={squad.starters} standings={standings} hasActiveRound myTeamId={id(10)} fixtureIntel={null}/></div></div>;
- if(mode.startsWith('Team'))content=<TeamPageView team={mode.includes('Long')?{...teams[0],name:names[3]}:teams[0]} league={league} squad={squad} matchup={viewedMatchup} readOnly={mode.includes('Spectator')||mode.includes('Historical')} managerName='Camden' contextLink={'/matchup/'+id(51)}/>;
+ const teamSquad=mode==='TeamLong'?{...squad,starters:squad.starters.map((slot,i)=>({...slot,player:{...slot.player,name:i===9?'Christopher Alexander Montgomery III':i===10?'JeanPhilippeMatetaFootballPlayerWithoutSpaces':slot.player.name,fantasyPoints:i===9?1234.56:i===10?-100.25:slot.player.fantasyPoints}})),bench:squad.bench.map((p,i)=>({...p,name:i===0?'Aleksandra Wiśniewska-Kowalczyk':p.name,fantasyPoints:i===0?1234.56:p.fantasyPoints}))}:squad;
+ if(mode.startsWith('Team'))content=<TeamPageView team={mode.includes('Long')?{...teams[0],name:names[3]}:teams[0]} league={league} squad={teamSquad} matchup={viewedMatchup} readOnly={mode.includes('Spectator')||mode.includes('Historical')} managerName='Camden' contextLink={'/matchup/'+id(51)}/>;
  if(mode.startsWith('Matchup'))content=await materialize(await MatchupPageView({league,matchup:mode.includes('Empty')?null:viewedMatchup}));
  if(mode.startsWith('Players'))content=<PlayersWorkspace data={mode.includes('Empty')?{...availablePlayers,players:[],total:0}:mode.includes('Long')?{...availablePlayers,players:availablePlayers.players.map(p=>({...p,name:names[3]}))}:availablePlayers} filters={mode.includes('Empty')?{...defaultFilters,query:'no match'}:defaultFilters} page={1} competitions={[{id:'comp',code:'ENG'}]} clubs={[]} hasActiveLeague leagueId={id(1)} fantasyTeamId={id(10)}/>;
  if(mode.startsWith('Draft')){const active={...draft,status:'in_progress',currentRound:2,currentPick:12,currentTeamId:id(mode.includes('Other')?11:10),currentTeamName:mode.includes('Long')?names[3]:'Kaka FC',pickDeadline:new Date(Date.now()+120000).toISOString(),isMyTurn:!mode.includes('Other')};content=mode.includes('Waiting')?<ComingSoon icon={Swords} title='Waiting for managers' description='Invite managers from the League screen.'/>:<><h1 className='v2-page-title mb-6'>Draft</h1><DraftWorkspace draft={mode.includes('Completed')?draft:active} availablePlayers={availablePlayers} onSearch={query=>window.paths.push('draft-search:'+query)} positionFilter={null} onPositionFilterChange={position=>window.paths.push('draft-position:'+position)}/></>;}
@@ -96,11 +97,25 @@ window.mount=async(mode='normal')=>{
    if(mode.startsWith('Matchup')&&!mode.includes('Empty')){
     assert.ok(await page.locator('.core-score').evaluateAll(elements=>elements.every(el=>el.scrollWidth<=el.clientWidth+1)),'score fits '+width+' '+mode);
     assert.equal(await page.locator('.core-team-name a').count(),2);
+    assert.equal(await page.locator('.core-versus').count(),0);
+    assert.equal(await page.getByRole('link',{name:'← League',exact:true}).count(),0);
+    assert.equal(await page.locator('.core-matchup-heading .v2-round-range').count(),1);
+    assert.match(await page.locator('.core-matchup-heading').innerText(),/Matchweek 2/);
+    assert.ok(await page.locator('.core-matchup-heading .v2-round-range').evaluate(el=>parseFloat(getComputedStyle(el).fontSize)>=14));
     if(mode.includes('Pending')){assert.equal(await page.getByText(/Finalizing result/).count(),1);assert.equal(await page.getByText(/Winner ·/).count(),0);}
     if(mode.includes('Final'))assert.equal(await page.getByText('Winner · InternationalFootballCollectiveWithoutSpaces',{exact:true}).count(),1);
     if(mode.includes('Upcoming'))assert.deepEqual(await page.locator('.core-score').allTextContents(),['—','—']);
     if(mode.includes('Away'))assert.equal(await page.locator('.core-team-name').first().textContent(),'InternationalFootballCollectiveWithoutSpaces');
     if(mode.includes('Spectator'))assert.equal(await page.locator('.core-team-name').first().textContent(),'Kaka FC');
+   }
+   if(mode.startsWith('Team')){
+    const alignment=await page.locator('.core-xi,.core-bench').evaluateAll(sections=>sections.map(section=>{
+     const rows=Array.from(section.querySelectorAll('.core-player-row'));
+     const scores=rows.flatMap(row=>Array.from(row.querySelectorAll('.core-player-points')));
+     return {right: scores.map(score=>score.getBoundingClientRect().right),fits:scores.every(score=>score.scrollWidth<=score.clientWidth+1),height:rows.map(row=>row.getBoundingClientRect().height)};
+    }));
+    for(const section of alignment){assert.ok(section.right.length>0);assert.ok(Math.max(...section.right)-Math.min(...section.right)<1,'score column aligned');assert.ok(section.fits,'large player scores fit');if(mode==='Team'){assert.ok(section.height.every(height=>height<=61),'normal rows retain density');}}
+    assert.equal(await page.getByText(/T−|MATCHDAY|NO ACTIVE ROUND/).count(),0);
    }
    if(mode==='TeamSpectator'||mode==='TeamHistorical'){assert.equal(await page.getByText(/Read-only lineup/).count(),1);await page.getByRole('button').filter({has:page.getByText('Player 9',{exact:true})}).click();await page.getByRole('dialog').waitFor();assert.equal(await page.getByRole('dialog').getByRole('button',{name:/Move to|Drop player/}).count(),0);await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});}
    if(mode==='Players'){

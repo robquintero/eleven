@@ -57,7 +57,9 @@ test("standings and round selectors expose canonical destinations and only store
   const rows=[3,4].map(n=>({fantasyTeamId:id(n),teamName:'Team '+n,played:1,wins:0,draws:0,losses:1,pointsFor:0,pointsAgainst:0,points:0}));
   const links=nodes(await StandingsTable({standings:rows,myTeamId:id(3)})).filter(e=>e.type==='a');assert.deepEqual(links.map(e=>e.props.href),['/team',`/team/${id(4)}`]);
   const {RoundNavigation}=load('src/components/league/round-navigation.tsx');const tree=await RoundNavigation({rounds:[{id:id(7),number:1,seasonNumber:1},{id:id(9),number:1,seasonNumber:2}],selectedId:id(7),currentId:id(9)});
-  assert.equal(nodes(tree).filter(e=>e.type==='option').length,2);assert.deepEqual(nodes(tree).filter(e=>e.type==='a').map(e=>e.props.href),[`/league?round=${id(9)}`]);assert.match(text(tree),/S1|S2/);
+  assert.equal(nodes(tree).filter(e=>e.type==='option').length,2);assert.deepEqual(nodes(tree).filter(e=>e.type==='a').map(e=>e.props.href),[`/league?round=${id(9)}`]);assert.match(text(tree),/Matchweek 1 · Season 1/);assert.match(text(tree),/Matchweek 1 · Season 2/);
+  const single=await RoundNavigation({rounds:[{id:id(7),number:1,seasonNumber:1},{id:id(9),number:2,seasonNumber:1}],selectedId:id(9),currentId:id(9),v2:true});
+  assert.deepEqual(nodes(single).filter(e=>e.type==='option').map(e=>text(e)),['Matchweek 1','Matchweek 2']);assert.doesNotMatch(text(single),/Fantasy round|S1|Current/);
 });
 test("team direct route validates before manager reads, redirects owner to editable route and keeps explicit history read-only",async()=>{
   let target:unknown={id:id(3),ownerUserId:id(2),leagueId:id(1),name:'Other'};let context:unknown={user:{id:id(1)},league:{id:id(1),name:'League'},supabase:{from:()=>{reads++;const chain={select:()=>chain,eq:()=>chain,or:()=>chain,maybeSingle:()=>Promise.resolve({data:null})};return chain;}}};let reads=0,roundRead=0;

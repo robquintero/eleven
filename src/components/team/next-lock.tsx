@@ -1,4 +1,3 @@
-import { Countdown } from "@/components/football/countdown";
 import { fixtureOpponentLabel, formatKickoff, playerFixtureParticipantLabel } from "@/lib/team-fixture";
 import type { LineupSlot } from "@/lib/types/fantasy";
 
@@ -25,7 +24,7 @@ export function NextLock({
 }) {
   if (!slot?.player.fixture) {
     if (!hasStarters) {
-      return <p className="text-xs text-foreground-tertiary">NOT SCHEDULED</p>;
+      return <p className="text-xs text-foreground-secondary">Not scheduled</p>;
     }
     if (remainingCount !== undefined && remainingCount > 0) {
       return (
@@ -34,24 +33,20 @@ export function NextLock({
         </p>
       );
     }
-    return <p className="text-xs text-foreground-tertiary">NONE REMAINING — every starter is locked for this matchday.</p>;
+    return <p className="text-xs text-foreground-secondary">No remaining locks. Every starter is locked for this matchweek.</p>;
   }
 
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div>
+      <p className="text-lg font-semibold text-foreground">{formatKickoff(slot.player.fixture.kickoff)}</p>
       <div className="min-w-0">
-        <p className="truncate text-sm font-medium text-foreground">
+        <p className="mt-1 text-sm font-medium text-foreground [overflow-wrap:anywhere]">
           {slot.player.name}
         </p>
-        <p className="label-system truncate text-[11px] text-foreground-tertiary">
-          {playerFixtureParticipantLabel(slot.player)} {fixtureOpponentLabel(slot.player)} ·{" "}
-          {formatKickoff(slot.player.fixture.kickoff)}
+        <p className="mt-1 text-xs text-foreground-secondary [overflow-wrap:anywhere]">
+          {playerFixtureParticipantLabel(slot.player)} {fixtureOpponentLabel(slot.player)}
         </p>
       </div>
-      <Countdown
-        target={slot.player.fixture.kickoff}
-        className="label-system shrink-0 text-sm font-semibold text-accent"
-      />
     </div>
   );
 }

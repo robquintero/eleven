@@ -1,9 +1,8 @@
 import { Suspense } from "react";
-import { TransitionLink } from "@/components/shell/transition-link";
 import { MatchupAnticipation, MatchupCommand } from "@/components/dashboard/matchup-command";
 import { MatchupLineups } from "@/components/matchup/matchup-lineups";
 import { MatchupPlayerCounts } from "@/components/matchup/matchup-player-counts";
-import { RoundWindow } from "@/components/football/round-window";
+import { formatRoundWindow } from "@/lib/team-fixture";
 import { getMatchupFixtureIntelligence, getMatchupSquads, type CurrentMatchup } from "@/data-access/matchups";
 import { teamViewHref } from "@/lib/spectator-navigation";
 
@@ -22,22 +21,16 @@ export async function MatchupPageView({ league, matchup }: { league: {name:strin
   const homeHref = matchup ? !matchup.isSpectator && matchup.isUserHome && current ? "/team" : teamViewHref(matchup.homeFantasyTeamId, matchup.roundId) : undefined;
   const awayHref = matchup ? !matchup.isSpectator && !matchup.isUserHome && current ? "/team" : teamViewHref(matchup.awayFantasyTeamId, matchup.roundId) : undefined;
   return (
-    <div className="core-v2 flex flex-col gap-6">
-      <TransitionLink href={matchup ? `/league?round=${matchup.roundId}` : "/league"} label="League" className="v2-link">← League</TransitionLink>
-      <div>
+    <div className="core-v2 flex flex-col gap-4">
+      <header className="core-matchup-heading">
         <h1 className="v2-page-title">
           Matchup
         </h1>
-        <p className="mt-1.5 text-sm text-foreground-secondary">{league.name}</p>
-      </div>
+        <p className="mt-1.5 text-sm text-foreground-secondary [overflow-wrap:anywhere]">{league.name}{matchup && ` · Matchweek ${matchup.roundNumber}`}</p>
+        {matchup && <p className="v2-round-range mt-2">{formatRoundWindow(matchup.roundStartsAt, matchup.roundEndsAt)}</p>}
+      </header>
 
       {historical && <p className="text-xs text-foreground-secondary">Stored round lineup. Player details and individual points reflect available player analytics; the official result remains fixed. Historical bench records may be incomplete after roster moves.</p>}
-      {matchup && (
-        <RoundWindow
-          round={{ number: matchup.roundNumber, startsAt: matchup.roundStartsAt, endsAt: matchup.roundEndsAt, status: matchup.roundStatus }}
-        />
-      )}
-
       {/* Pass 13 (§5): tighter rhythm (gap-3, not the page's own gap-6)
           between the score module and the XI below it -- proximity is the
           cheapest, safest way to read "these belong to one matchday
@@ -45,7 +38,7 @@ export async function MatchupPageView({ league, matchup }: { league: {name:strin
           sibling components (DESIGN.md §5's hierarchy order puts
           whitespace ahead of borders for exactly this reason). */}
       <div className="flex flex-col gap-5">
-        <MatchupCommand teamLinks={homeHref && awayHref ? { home: homeHref, away: awayHref } : undefined} matchup={matchup} hasLeague now={now} scheduledDetails={<Suspense fallback={<p role="status" className="label-system text-[11px] text-foreground-tertiary">LOADING NEXT KICKOFF</p>}>
+        <MatchupCommand teamLinks={homeHref && awayHref ? { home: homeHref, away: awayHref } : undefined} matchup={matchup} hasLeague now={now} scheduledDetails={<Suspense fallback={<p role="status" className="text-xs text-foreground-secondary">Loading next kickoff…</p>}>
           <FixtureAnticipation fixturePromise={fixturePromise} starters={myStarters} teamIdsByPlayerId={teamIdsByPlayerId} />
         </Suspense>} starters={myStarters} teamIdsByPlayerId={teamIdsByPlayerId} />
 

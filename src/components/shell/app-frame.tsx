@@ -18,7 +18,7 @@ export function AppFrame({ children, profile, leagues, activeLeagueId, rules, st
   activeLeagueId: string | null; rules: ReactNode; status: ReactNode;
 }) {
   return <NavigationTransitionProvider>
-    <div className="eleven-v2 app-v2 mx-auto min-h-dvh max-w-[1920px] lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
+    <div className="eleven-v2 app-v2 min-h-dvh max-w-[1920px] lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="v2-sidebar hidden lg:sticky lg:top-0 lg:z-30 lg:flex lg:h-dvh lg:flex-col">
         <Wordmark authenticated />
         <DesktopNav />

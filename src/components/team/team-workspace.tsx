@@ -14,7 +14,7 @@ import { RailModule } from "@/components/ui/rail-module";
 import { swapLineupAction, fillEmptySlotsAction } from "@/app/(app)/team/actions";
 import { FORMATION_RULES, ROSTER_RULES } from "@/domain/fantasy/constants";
 import { assignToSlots, formationSlots, type FormationSlot } from "@/lib/selectors/pitch-layout";
-import { benchSwapRowState, isPlayerLocked, nextLock, pad2, starterBuckets } from "@/lib/team-fixture";
+import { benchSwapRowState, isPlayerLocked, nextLock, starterBuckets } from "@/lib/team-fixture";
 import type { LineupSlot, Player, PlayerAvailability, PlayerPosition, Squad } from "@/lib/types/fantasy";
 
 import { createLineupMutationGuard, optimisticLineupSwap, queueLineupFill, reconcileSquadOrder, type LineupSwap } from "@/lib/selectors/optimistic-lineup";
@@ -451,7 +451,7 @@ export function TeamWorkspace({
             )}
           </RailModule>
 
-          <RailModule header="Round progress" className="lg:py-2.5">
+          <RailModule header="Matchweek progress" className="lg:py-2.5">
             <RoundIntelligence starters={squad.starters} hasActiveRound={hasActiveRound} />
           </RailModule>
 
@@ -465,7 +465,7 @@ export function TeamWorkspace({
 
           <RailModule
             header="Fixtures"
-            meta={matchdayNumber !== null ? `MATCHDAY ${pad2(matchdayNumber)}` : "—"}
+            meta={matchdayNumber !== null ? `Matchweek ${matchdayNumber}` : "—"}
             className="lg:py-2.5"
           >
             <p className="text-xs leading-relaxed text-foreground-secondary">No fixture data available</p>

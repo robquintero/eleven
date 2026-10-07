@@ -176,7 +176,7 @@ test("League pending results render real scores/date range and restrained status
   const matchup={id:"old",roundNumber:1,roundStartsAt:"2026-09-29T06:00:00Z",roundEndsAt:"2026-10-06T06:00:00Z",resultState:"pending",status:"scheduled",homeTeamId:"mine",homeTeamName:"Kaka FC",homePoints:150.85,awayTeamId:"other",awayTeamName:"Los Duros FC",awayPoints:137.8};
   const render=(m: typeof matchup)=>flight(createElement(LeagueMatchups as (props:Record<string,unknown>)=>ReactNode,{matchups:[m],myTeamId:"mine",emptyLabel:"NO RESULTS"}));
   const output=await render(matchup);
-  for(const value of ["Kaka FC","Los Duros FC","150.85","137.8","PENDING","Finalizing result","SEP 29","OCT 6","UTC"])assert.ok(output.includes(value),value);
+  for(const value of ["Kaka FC","Los Duros FC","150.85","137.8","PENDING","Finalizing result","Sep 29","Oct 6","UTC"])assert.ok(output.includes(value),value);
   assert.doesNotMatch(output,/WINNER|WON|UPCOMING|"href":"\/matchup"/);
   assert.match(await render({...matchup,awayPoints:null as unknown as number}),/—/);
 });
@@ -225,12 +225,12 @@ test("authenticated frame streams before the same gated lineup status reads with
   }, /main-content/, /2," live/);
 });
 
-test("shell status preserves authoritative values, result states, null state and next-lock formatting", async () => {
+test("shell status preserves authoritative values across result states, null state and next-lock formatting", async () => {
   const { StatusBar } = load("src/components/shell/status-bar.tsx");
   const render = (data: unknown) => flight(createElement(StatusBar as (props: {data: unknown}) => ReactNode, {data}));
   for (const state of ["upcoming", "active", "live", "pending", "final"]) {
     const result = await render({ roundNumber: 2, resultState: state, liveCount: 3, lockedCount: 4, remainingCount: 5, nextLockKickoff: null });
-    for (const value of ["Matchweek ", "2", state, "3", " live · ", "4", " locked · ", "5", " remaining", "No remaining locks"]) assert.ok(result.includes(value), value);
+    for (const value of ["Matchweek ", "2", "3", " live · ", "4", " locked · ", "5", " remaining", "No remaining locks"]) assert.ok(result.includes(value), value);
     assert.doesNotMatch(result, /MATCHDAY|NEXT_LOCK/);
   }
   const empty = await render(null);assert.match(empty, /No active matchweek/);assert.match(empty, /Next lock not scheduled/);

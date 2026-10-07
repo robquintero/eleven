@@ -12,7 +12,7 @@ import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { standingsEmptyContext } from "@/domain/fantasy/season";
 
 /** Presentation only: streams are supplied by the existing server page loaders. */
-export function LeagueOverview({ league, season, lifecycleLabel, draftStatus, standings, myTeamId, allowDelete, membershipKey,
+export function LeagueOverview({ league, season, draftStatus, standings, myTeamId, allowDelete, membershipKey,
   matchweek, records, results, activity, trades, managers, archive }: {
   league: LeagueDetail | null; season: SeasonSummary | null; lifecycleLabel: string | null;
   draftStatus: string | null; standings: StandingsRow[]; myTeamId: string | null; allowDelete: boolean;
@@ -20,15 +20,12 @@ export function LeagueOverview({ league, season, lifecycleLabel, draftStatus, st
   trades: ReactNode; managers: ReactNode; archive: ReactNode;
 }) {
   if (!league) return <NoLeagueOnboarding />;
-  const commissioner = league?.members.find(member => member.userId === league.createdByUserId);
   return <div className="eleven-v2 v2-league space-y-6">
     <header className="flex flex-col items-start justify-between gap-5 sm:flex-row">
       <div className="min-w-0 w-full flex-1 sm:w-auto">
-        <div className="mb-2 flex flex-wrap items-center gap-2"><span className="v2-meta">Your league</span>{lifecycleLabel && <span className="v2-status">· {lifecycleLabel.toLowerCase()}</span>}</div>
         <h1 className="v2-page-title">{league?.name ?? "Start your league"}</h1>
         {league ? <>
-          <p className="v2-secondary mt-2">{season ? `Season ${season.seasonNumber} · ` : ""}{league.memberCount} / {league.maxTeams} managers{season?.currentRoundNumber !== null && season?.currentRoundNumber !== undefined ? ` · Round ${season.currentRoundNumber}${season.totalRounds ? ` of ${season.totalRounds}` : ""}` : ""}</p>
-          {commissioner && <p className="v2-meta mt-1">Commissioner: {commissioner.displayName}</p>}
+          <p className="v2-secondary mt-2">{league.memberCount} manager{league.memberCount === 1 ? "" : "s"}{season ? ` · Season ${season.seasonNumber}` : ""}</p>
         </> : <p className="v2-secondary mt-2">Create a league or join your friends with an invite code.</p>}
       </div>
       <LeagueFormActions key={`${league?.id ?? "none"}:${membershipKey ?? ""}`} />

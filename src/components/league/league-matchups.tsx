@@ -22,7 +22,7 @@ function MatchupRow({ matchup, myTeamId }: { matchup: LeagueMatchupSummary; myTe
       <MatchupStatus state={matchup.resultState} />
     </div>
     {(winner || matchup.resultState === "pending") && <p className="label-system px-3 pb-2.5 text-[9px] leading-relaxed text-foreground-tertiary [overflow-wrap:anywhere] sm:px-4">
-      {formatRoundWindow(matchup.roundStartsAt, matchup.roundEndsAt)} · {winner ?? "Finalizing result"}
+      <span className="v2-round-range">{formatRoundWindow(matchup.roundStartsAt, matchup.roundEndsAt)}</span> · {winner ?? "Finalizing result"}
     </p>}
   </TransitionLink>;
 }
@@ -42,7 +42,7 @@ function MatchupScoreCard({ matchup, myTeamId, compact }: { matchup: LeagueMatch
   return <TransitionLink href={`/matchup/${matchup.id}`} label={`${matchup.homeTeamName} vs ${matchup.awayTeamName}`}
     className={`v2-matchup ${isMine ? "v2-matchup-own" : ""} ${compact ? "v2-matchup-compact" : ""}`}>
     <div className="flex items-center justify-between gap-3">
-      <span className={isMine ? "text-[13px] font-medium text-[var(--v2-accent)]" : "v2-meta"}>{isMine ? "Your matchup" : `Round ${matchup.roundNumber}`}</span>
+      <span className={isMine ? "text-[13px] font-medium text-[var(--v2-accent)]" : "v2-meta"}>{compact ? `${isMine ? "Your matchup · " : ""}Matchweek ${matchup.roundNumber}` : isMine ? "Your matchup" : "League matchup"}</span>
       <MatchupStatus state={matchup.resultState} />
     </div>
     <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-x-5 gap-y-3">
@@ -57,7 +57,7 @@ function MatchupScoreCard({ matchup, myTeamId, compact }: { matchup: LeagueMatch
     </div>
     <div className="v2-matchup-footer">
       {result ?? (matchup.resultState === "pending" ? "Finalizing result" : matchup.resultState === "upcoming" ? "Awaiting kickoff" : "View matchup →")}
-      {compact && <p className="v2-meta mt-1">{formatRoundWindow(matchup.roundStartsAt, matchup.roundEndsAt)}</p>}
+      {compact && <p className="v2-round-range mt-1">{formatRoundWindow(matchup.roundStartsAt, matchup.roundEndsAt)}</p>}
     </div>
   </TransitionLink>;
 }

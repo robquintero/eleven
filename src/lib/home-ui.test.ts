@@ -75,7 +75,7 @@ test("Home next-lock fixture participation uses national-team IDs and authoritat
   const starters=[{player:{id:'p',club:{id:'club'},fixture:{state:'upcoming'}}},{player:{id:'q',club:{id:'club'},fixture:{state:'final'}}}];
   const fixtureIntel={hasAnyFixtureData:true,liveFixtureCount:2,nextFixture:{homeClubId:'national',awayClubId:'other',homeClubShortName:'FRA',awayClubShortName:'GER',kickoffAt:'2026-10-10T13:30:00Z'}};
   const result=HomeFixtureCard({fixtureIntel,starters,hasActiveRound:true,teamIdsByPlayerId:new Map([['p',['club','national']]])});
-  assert.match(text(result),/FRA v GER/);assert.match(text(result),/1 of your starters involved/);assert.match(text(result),/1 starters remaining/);assert.match(text(result),/2 fixtures live now/);
+  assert.match(text(result),/FRA v GER/);assert.match(text(result),/1 of your starters involved/);assert.match(text(result),/1 starter remaining/);assert.match(text(result),/2 fixtures live/);
   assert.ok(nodes(result).some(n=>n.props.href==='/team'));
 });
 test("Home standings retain actual ordering, record, league points and own row outside top six", () => {
@@ -91,5 +91,5 @@ test("Home truthful empty/loading states invent no matchup and use persisted UTC
   assert.match(text(HomeFixtureCard({fixtureIntel:null,starters:[],hasActiveRound:true})),/not available yet/);
   assert.match(text(HomeFixtureCard({fixtureIntel:null,starters:[],hasActiveRound:false})),/No active matchweek/);
   const loading=HomeLoading({});assert.match(text(loading),/Loading your matchweek/);assert.equal(String(loading.props['aria-busy']),'true');assert.doesNotMatch(text(loading),/TBD|Kaka/);
-  const identity=text(HomeIdentity({teamName:'Kaka FC',leagueName:'Fantastic 4',matchup:base}));assert.match(identity,/Matchweek 2 · Fantastic 4/);assert.match(identity,/OCT 6, 6:00 AM UTC/);assert.match(identity,/OCT 13, 6:00 AM UTC/);
+  const identity=text(HomeIdentity({teamName:'Kaka FC',leagueName:'Fantastic 4',matchup:base}));assert.match(identity,/Matchweek 2 · Fantastic 4/);assert.match(identity,/Oct 6, 6:00 AM UTC/);assert.match(identity,/Oct 13, 6:00 AM UTC/);
 });

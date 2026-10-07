@@ -136,7 +136,7 @@ test("scoreboard keeps user's full identity and exact score on the left in home 
       const titles = nodes(tree).filter(node => node.props.title).map(node => node.props.title);
       assert.ok(titles.includes(mine)); assert.ok(titles.includes(opponent));
       const upcoming = text(MatchupCommand({ matchup: { ...matchup, roundStatus: "upcoming" }, hasLeague: true, now: new Date() }));
-      assert.match(upcoming, /vs/i); assert.doesNotMatch(upcoming, /152.1|141.15/);
+      assert.doesNotMatch(upcoming, /\bvs\b/i); assert.doesNotMatch(upcoming, /152.1|141.15/);
     }
   }
 });

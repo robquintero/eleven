@@ -134,10 +134,11 @@ test("formatRoundPoints: supports decimals and aggregates (multi-fixture sums) c
 // fantasy_round starts_at/ends_at, never inferred from today's date.
 test("formatRoundWindow: renders the real stored Tue-Mon window in UTC, independent of today's date", () => {
   const text = formatRoundWindow("2026-09-29T00:00:00Z", "2026-10-06T00:00:00Z");
-  assert.match(text, /SEP 29/);
-  assert.match(text, /OCT 6/);
+  assert.match(text, /Sep 29/);
+  assert.match(text, /Oct 6/);
   assert.match(text, /UTC/);
   assert.match(text, /→/);
+  assert.equal(formatRoundWindow("2026-10-06T06:00:00Z", "2026-10-13T06:00:00Z"), "Oct 6, 6:00 AM UTC → Oct 13, 6:00 AM UTC");
 });
 
 test("formatRoundWindow: a manually-shifted (non-canonical) window renders exactly as stored -- no realignment to a 'default' Tue-Mon boundary", () => {

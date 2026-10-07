@@ -28,7 +28,6 @@ export async function LeagueMatchweek({ competitionPromise, myTeamId, requestedR
   if (requestedRound && !selected) notFound();
   const matchups = selected ? (competition?.allRoundMatchups ?? []).filter(m => m.roundId === selected.id) : competition?.currentRoundMatchups ?? [];
   const byes = selected ? eligibleByeTeams(competition?.teams ?? [], matchups) : [];
-  const date = (value: string) => new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(new Date(value));
   return <V2Surface className="v2-focus" label="Matchweek">
     <div className="v2-week-identity">
       <div>
@@ -36,14 +35,13 @@ export async function LeagueMatchweek({ competitionPromise, myTeamId, requestedR
           {selected && <MatchupStatus state={matchupResultState({ startsAt: selected.startsAt, endsAt: selected.endsAt, roundStatus: selected.status }, new Date())} />}
         </div>
         <h2 className="v2-week-title">{selected ? `Matchweek ${selected.number}` : "Matchweek"}</h2>
-        {selected && <><p className="v2-secondary mt-2">{date(selected.startsAt)} — {date(selected.endsAt)}</p><p className="v2-meta mt-1">{formatRoundWindow(selected.startsAt, selected.endsAt)}</p></>}
+        {selected && <p className="v2-round-range mt-2">{formatRoundWindow(selected.startsAt, selected.endsAt)}</p>}
       </div>
     </div>
     <div className="v2-week-controls">
       {selected && <RoundNavigation rounds={rounds} selectedId={selected.id} currentId={currentId} v2 />}
-      {myTeamId && <TransitionLink href="/matchup" label="My Matchup" className="v2-link">My matchup →</TransitionLink>}
     </div>
-    <LeagueMatchups variant="v2" matchups={matchups} myTeamId={myTeamId} emptyLabel="No matchups for this round" />
+    <LeagueMatchups variant="v2" matchups={matchups} myTeamId={myTeamId} emptyLabel="No matchups for this matchweek" />
     {byes.map(team => <TransitionLink key={team.id} href={`/team/${team.id}?round=${selected!.id}`} label={team.name} className="v2-bye mt-3"><span className="min-w-0 text-sm font-medium [overflow-wrap:anywhere]">{team.name}</span><span className="v2-meta shrink-0">BYE</span></TransitionLink>)}
   </V2Surface>;
 }

@@ -109,7 +109,7 @@ export function MatchupCommand({
   return (
     <section aria-label="Matchup score" className="core-v2 core-hero core-matchup">
       <div className="core-hero-top">
-        <span className="core-kicker">Round {matchup.roundNumber} · {matchup.isSpectator ? "League matchup" : "Your matchup"}</span>
+        <span className="core-kicker">{matchup.isSpectator ? "League matchup" : "Your matchup"}</span>
         <span className="core-state" data-state={resultState}><MatchupStatus state={resultState} /></span>
       </div>
       <div className="core-scoreboard">
@@ -118,7 +118,6 @@ export function MatchupCommand({
           <div className="core-team-name">{leftHref ? <TransitionLink href={leftHref} label={leftTeamName} className="hover:underline"><TeamName name={leftTeamName} /></TransitionLink> : <TeamName name={leftTeamName} />}</div>
           <p className="core-score" data-own={!matchup.isSpectator}>{isScheduled || displayedLeft === null ? "—" : displayedLeft}</p>
         </div>
-        <span className="core-versus">{isScheduled ? "vs" : "–"}</span>
         <div className="core-score-side">
           <span className="core-kicker">{matchup.isSpectator ? "Away" : "Opponent"}</span>
           <div className="core-team-name">{rightHref ? <TransitionLink href={rightHref} label={rightTeamName} className="hover:underline"><TeamName name={rightTeamName} /></TransitionLink> : <TeamName name={rightTeamName} />}</div>

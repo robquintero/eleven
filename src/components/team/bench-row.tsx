@@ -75,7 +75,7 @@ export function BenchRow({
               : undefined
         }
         className={cn(
-          "core-player-row grid min-h-11 w-full grid-cols-[1rem_1.5rem_2.25rem_minmax(0,1fr)_auto] items-center gap-2 border-l-2 border-l-transparent py-2 pr-2 pl-1 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset @min-[28rem]:grid-cols-[1rem_1.5rem_2.25rem_minmax(0,1fr)_2.25rem_4.75rem]",
+          "core-player-row w-full border-l-2 border-l-transparent text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
           // Pass 14.7 Phase 1: this row is ALWAYS genuinely clickable (opens
           // the player record, or drives Team's swap flow) regardless of
           // `editing` -- `cursor-pointer` must not be gated on it. Only
@@ -130,8 +130,8 @@ export function BenchRow({
         <PositionBadge position={player.position} />
 
         <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-            <span className="min-w-0 truncate" title={player.name}>{player.name}</span>
+          <p className="flex items-center gap-1.5 text-sm font-medium leading-snug text-foreground">
+            <span className="min-w-0 line-clamp-2 [overflow-wrap:anywhere]" title={player.name}>{player.name}</span>
             {isFlagged && (
               <span className="size-1.5 shrink-0 rounded-full bg-destructive" />
             )}
@@ -139,12 +139,12 @@ export function BenchRow({
               <span className="size-1.5 shrink-0 rounded-full bg-warning" />
             )}
           </p>
-          <p className="label-system truncate text-[11px] text-foreground-tertiary @min-[28rem]:hidden">
+          <p className="core-player-fixture truncate text-[11px] text-foreground-tertiary">
             {playerFixtureParticipantLabel(player)} · {playerFixtureCode(player)}
           </p>
         </div>
 
-        <span className="label-system hidden truncate text-xs text-foreground-tertiary @min-[28rem]:block">
+        <span className="core-lineup-club truncate text-xs text-foreground-tertiary">
           {player.club.shortName}
         </span>
 
@@ -158,33 +158,31 @@ export function BenchRow({
             button. Only shown where a swap is genuinely possible right now:
             editing, not wrong-position, not already mid-swap-selection as a
             locked target. */}
-        <div className="flex shrink-0 items-center gap-1.5">
-          {editing && !disabled && !lockedForEditing && (
-            <ArrowLeftRight className="size-3.5 shrink-0 text-foreground-tertiary/70" strokeWidth={2} aria-hidden="true" />
-          )}
-          <div className="flex flex-col items-end gap-0.5">
-            <span className="core-player-points label-system tabular-nums text-xs font-semibold text-foreground">
-              {formatRoundPoints(player.fantasyPoints)}
-            </span>
-            <span className={cn("label-system flex items-center gap-1 text-[10px]", toneClass[state.tone])}>
-              {isLive && (
-                <span className="relative flex size-1.5">
-                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-live opacity-75" />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-live" />
-                </span>
-              )}
-              {locked && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
-              {state.text === "FT" ? "FT" : state.text.charAt(0) + state.text.slice(1).toLowerCase()}
-            </span>
-            {Boolean(player.preAcquisitionPoints) && (
-              <span
-                className="label-system text-[9px] text-warning"
-                title="Points earned before this player joined your squad do not count toward your matchup."
-              >
-                +{formatRoundPoints(player.preAcquisitionPoints!)} before acquisition
+        <div className="core-player-result min-w-0">
+          <span className="core-player-points label-system tabular-nums text-xs font-semibold text-foreground">
+            {formatRoundPoints(player.fantasyPoints)}
+          </span>
+          <span className={cn("core-player-state flex items-center gap-1 text-[10px]", toneClass[state.tone])}>
+            {editing && !disabled && !lockedForEditing && (
+              <ArrowLeftRight className="mr-auto size-3 shrink-0 text-foreground-tertiary/70" strokeWidth={2} aria-hidden="true" />
+            )}
+            {isLive && (
+              <span className="relative flex size-1.5">
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-live opacity-75" />
+                <span className="relative inline-flex size-1.5 rounded-full bg-live" />
               </span>
             )}
-          </div>
+            {locked && <Lock className="size-2.5" strokeWidth={2} aria-hidden="true" />}
+            {state.text === "FT" ? "FT" : state.text.charAt(0) + state.text.slice(1).toLowerCase()}
+          </span>
+          {Boolean(player.preAcquisitionPoints) && (
+            <span
+              className="text-[9px] leading-snug text-warning [overflow-wrap:anywhere]"
+              title="Points earned before this player joined your squad do not count toward your matchup."
+            >
+              +{formatRoundPoints(player.preAcquisitionPoints!)} before acquisition
+            </span>
+          )}
         </div>
       </button>
     </div>
@@ -220,7 +218,7 @@ export function EmptySlotRow({
         aria-pressed={editing ? selected : undefined}
         aria-label={`Empty ${position} slot`}
         className={cn(
-          "grid min-h-11 w-full grid-cols-[1rem_1.5rem_2.25rem_minmax(0,1fr)_auto] items-center gap-2 border-l-2 border-l-transparent py-2 pr-2 pl-1 text-left outline-none transition-colors @min-[28rem]:grid-cols-[1rem_1.5rem_2.25rem_minmax(0,1fr)_2.25rem_4.75rem]",
+          "core-player-row w-full border-l-2 border-l-transparent text-left outline-none transition-colors",
           editing && "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:ring-inset",
           selected && "border-l-accent bg-accent/10",
           fillTarget && !selected && "border-l-accent/30 bg-accent/5"

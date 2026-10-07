@@ -50,6 +50,7 @@
 .eleven-v2 .v2-module-title { font-size: 22px; line-height: 1.3; font-weight: 650; letter-spacing: 0; }
 .eleven-v2 .v2-secondary { color: var(--v2-secondary); font-size: 13px; line-height: 1.55; }
 .eleven-v2 .v2-meta { color: var(--v2-muted); font-size: 11px; line-height: 1.5; }
+.eleven-v2 .v2-round-range { color: var(--v2-secondary); font-family: var(--font-sans); font-size: 14px; line-height: 1.6; letter-spacing: normal; text-transform: none; overflow-wrap: anywhere; }
 .eleven-v2 .v2-number { font-family: var(--font-mono); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .eleven-v2 .v2-link { color: var(--v2-accent); font-size: 13px; font-weight: 550; display: inline-flex; align-items: center; min-height: 44px; }
 @media (hover: hover) and (pointer: fine) { .eleven-v2 .v2-link:hover { text-decoration: underline; text-underline-offset: 4px; } }
@@ -147,7 +148,7 @@
 .eleven-v2 .v2-desktop-nav { display: flex; flex-direction: column; gap: 6px; }
 .eleven-v2 .v2-nav-link { display: flex; align-items: center; min-height: 44px; gap: 12px; padding: 10px 12px; border-radius: var(--v2-radius-control); color: var(--v2-secondary); font-size: 14px; font-weight: 500; transition: color 160ms, background-color 160ms; }
 @media (hover: hover) and (pointer: fine) { .eleven-v2 .v2-nav-link:hover { color: var(--v2-text); background: var(--v2-inset); } }
-.eleven-v2 .v2-nav-link[aria-current="page"] { color: var(--v2-accent); background: var(--v2-selected); box-shadow: inset 2px 0 var(--v2-accent-edge); }
+.eleven-v2 .v2-nav-link[aria-current="page"] { color: var(--v2-accent); background: var(--v2-selected); }
 .eleven-v2 .v2-shell-header { background: var(--v2-canvas); border-bottom: 1px solid var(--v2-line); }
 .eleven-v2 .v2-shell-toolbar { display: flex; align-items: center; justify-content: space-between; min-height: 72px; gap: 12px; padding: 12px 32px; }
 .eleven-v2 .v2-shell-identity { display: flex; align-items: center; min-width: 0; gap: 8px; }
@@ -159,6 +160,8 @@
 .eleven-v2 .v2-shell-menu [aria-selected="true"] { background: var(--v2-selected); }
 @media (hover: hover) and (pointer: fine) { .eleven-v2 .v2-shell-menu [role="option"]:hover { background: var(--v2-hover); } }
 .eleven-v2 .v2-status-bar { display: none; align-items: center; gap: 20px; border-top: 1px solid var(--v2-divider); padding: 8px 32px; color: var(--v2-muted); font-size: 12px; line-height: 1.4; }
+.eleven-v2 .v2-status-summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; }
+.eleven-v2 .v2-status-summary strong { color: var(--v2-text); font-size: 13px; font-weight: 550; }
 .eleven-v2 .v2-status-bar .v2-live { color: var(--v2-positive); }
 .eleven-v2 .v2-shell-content { padding: 24px 32px 48px; }
 .eleven-v2 .v2-mobile-nav { background: var(--v2-surface); }

@@ -72,7 +72,7 @@ window.mount=async(mode='normal')=>{
  const {css}=await require('postcss')([require('@tailwindcss/postcss')({base:root})]).process(await readFile(join(root,'src/app/globals.css'),'utf8'),{from:join(root,'src/app/globals.css')});
  const v2=await readFile(join(root,'src/app/(app)/league/v2.css'),'utf8')+'\n'+await readFile(join(root,'src/components/ui/core-v2.css'),'utf8');
  browser=await chromium.launch({headless:true,...(process.env.ELEVEN_CHROMIUM_EXECUTABLE?{executablePath:process.env.ELEVEN_CHROMIUM_EXECUTABLE}:{})});const results=[];
- for(const theme of ['dark','light'])for(const width of [1440,375,320]) {
+ for(const theme of ['dark','light'])for(const width of [1440,375,320,2200]) {
   const page=await browser.newPage({viewport:{width,height:1000},reducedMotion:'reduce'}),errors=[],requests=[];
   page.on('pageerror',e=>errors.push(e.message));await page.route('**/*',route=>{requests.push(route.request().url());return route.abort();});
   await page.setContent('<style>:root{--font-jetbrains-mono:Menlo;}'+css+'\n'+v2+'</style><div id="root"></div>');await page.evaluate(t=>document.documentElement.classList.toggle('dark',t==='dark'),theme);await page.addScriptTag({path:join(directory,'bundle.js')});await page.getByRole('heading',{name:'FANTASTIC 4',exact:true}).waitFor();
@@ -81,12 +81,17 @@ window.mount=async(mode='normal')=>{
    const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth);if(overflow)console.log(theme,width,route,await page.evaluate(()=>Array.from(document.querySelectorAll('*')).filter(el=>{const r=el.getBoundingClientRect();return r.right>innerWidth+1&&r.width>0;}).slice(0,20).map(el=>({tag:el.tagName,cls:el.className,width:el.getBoundingClientRect().width,right:el.getBoundingClientRect().right,text:el.textContent.slice(0,55)}))));
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true,theme+' '+width+' '+route+' page overflow');
    if(!route.startsWith('Loading')&&route!=='none'){
-    const nav=width===1440?page.locator('.v2-desktop-nav'):page.locator('.v2-mobile-nav');
+    const nav=width>=1024?page.locator('.v2-desktop-nav'):page.locator('.v2-mobile-nav');
     assert.equal(await nav.locator('a[aria-current="page"]').getAttribute('href'),'/'+route.toLowerCase());
     assert.equal(await nav.locator('a').count(),6);await page.keyboard.press('Tab');await nav.locator('a[aria-current="page"]').focus();
     assert.ok(await nav.locator('a[aria-current="page"]').evaluate(el=>getComputedStyle(el).outlineStyle!=='none'),'focus indication');
    }
    const fits=await page.locator('.v2-shell-toolbar :is(button,a)').evaluateAll(elements=>elements.every(el=>{const r=el.getBoundingClientRect();return r.width===0&&r.height===0||r.width>=44&&r.height>=44&&r.left>=0&&r.right<=innerWidth;}));if(!fits)console.log(theme,width,route,await page.locator('.v2-shell-toolbar :is(button,a)').evaluateAll(els=>els.map(el=>({text:el.textContent,label:el.getAttribute('aria-label'),width:el.getBoundingClientRect().width,height:el.getBoundingClientRect().height,left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right}))));assert.ok(fits,'unclipped 44px shell targets');
+   if(width>=1024){
+    const sidebar=await page.locator('.v2-sidebar').evaluate(el=>({left:el.getBoundingClientRect().left,width:el.getBoundingClientRect().width,bg:getComputedStyle(el).backgroundColor}));assert.equal(sidebar.left,0);assert.equal(sidebar.width,240);
+    if(!route.startsWith('Loading')&&route!=='none')assert.equal(await page.locator('.v2-nav-link[aria-current="page"]').evaluate(el=>getComputedStyle(el).boxShadow),'none');
+    if(await page.locator('.v2-status-summary').count()){const summary=await page.locator('.v2-status-summary').innerText();assert.match(summary,/Matchweek 2/);assert.equal((summary.match(/live/g)||[]).length,1);}
+   }
    await page.screenshot({path:'/tmp/eleven-shell-'+route.toLowerCase()+'-'+theme+'-'+width+'.png',fullPage:true});
    if(route==='Players'){await page.getByRole('button',{name:'Inspect Player 0',exact:true}).click();await page.waitForTimeout(80);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);await page.screenshot({path:'/tmp/eleven-inspector-'+theme+'-'+width+'.png',fullPage:true});if(width<1280){await page.keyboard.press('Escape');await page.getByRole('dialog').waitFor({state:'hidden'});}}
   }
