@@ -5,6 +5,8 @@
  * on — same pattern as src/lib/errors/draft-action-error.ts.
  */
 export type MarketActionErrorCode =
+  | "DRAFT_NOT_COMPLETED"
+  | "LEAGUE_NOT_ACTIVE"
   | "NOT_AUTHENTICATED"
   | "NOT_LEAGUE_MEMBER"
   | "PLAYER_NOT_FOUND"
@@ -18,6 +20,8 @@ export type MarketActionErrorCode =
   | "UNKNOWN";
 
 const KNOWN_CODES: readonly MarketActionErrorCode[] = [
+  "DRAFT_NOT_COMPLETED",
+  "LEAGUE_NOT_ACTIVE",
   "NOT_AUTHENTICATED",
   "NOT_LEAGUE_MEMBER",
   "PLAYER_NOT_FOUND",

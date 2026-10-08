@@ -5,6 +5,8 @@ import type { TradeActionErrorCode } from "./trade-action-error.ts";
 import { TRADE_ACTION_ERROR_COPY, TRADE_ACTION_ERROR_KIND } from "./trade-action-error-copy.ts";
 
 const ALL_CODES = [
+  "DRAFT_NOT_COMPLETED",
+  "LEAGUE_NOT_ACTIVE",
   "NOT_AUTHENTICATED",
   "NOT_LEAGUE_MEMBER",
   "RECEIVING_TEAM_NOT_FOUND",
@@ -80,6 +82,8 @@ test("TRADE_ACTION_ERROR_KIND: genuine unexpected failures are classified 'error
 
 test("TRADE_ACTION_ERROR_KIND: every TradeActionErrorCode (including UNEVEN_TRADE and UNKNOWN) has exactly one classification", () => {
   const allCodes: TradeActionErrorCode[] = [
+    "DRAFT_NOT_COMPLETED",
+    "LEAGUE_NOT_ACTIVE",
     "NOT_AUTHENTICATED",
     "NOT_LEAGUE_MEMBER",
     "RECEIVING_TEAM_NOT_FOUND",

@@ -70,9 +70,9 @@ export async function LeagueTransactions({ activityPromise }: { activityPromise:
     </div></div>) : <p className="v2-secondary">No transactions yet. Draft picks and roster moves will appear here.</p>}</div>
   </V2Surface>;
 }
-export async function LeagueTrades({ leagueId, tradePromise }: { leagueId: string; tradePromise: TradePromise }) {
+export async function LeagueTrades({ leagueId, tradePromise, canAcquire = false }: { leagueId: string; tradePromise: TradePromise; canAcquire?: boolean }) {
   const props = await tradePromise;
-  return props ? <TradeCenter leagueId={leagueId} {...props} v2 /> : null;
+  return props ? <TradeCenter canAcquire={canAcquire} leagueId={leagueId} {...props} v2 /> : null;
 }
 export async function LeagueManagers({ league, myTeam, tradePromise }: { league: Awaited<ReturnType<typeof getLeagueDetail>>; myTeam: Awaited<ReturnType<typeof getUserTeamInLeague>>; tradePromise: TradePromise }) {
   const props = await tradePromise;

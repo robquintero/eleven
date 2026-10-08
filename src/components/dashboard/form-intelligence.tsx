@@ -9,6 +9,7 @@ import { FormSparkline } from "@/components/football/form-sparkline";
 import { MarketAction } from "@/components/players/market-action";
 import { PlayerAvatar } from "@/components/players/player-avatar";
 import { PlayerInspector } from "@/components/players/player-inspector";
+import type { PlayerAcquisitionState } from "@/domain/fantasy/player-acquisition";
 import { ActionFeedback, type ActionFeedbackKind } from "@/components/ui/action-feedback";
 import type { HotFreeAgent } from "@/data-access/intelligence";
 import { formatRoundPoints } from "@/lib/team-fixture";
@@ -31,10 +32,12 @@ export function FormIntelligence({
   agents,
   leagueId,
   canTransact,
+  acquisitionState = "unavailable",
 }: {
   agents: HotFreeAgent[];
   leagueId: string | null;
   canTransact: boolean;
+  acquisitionState?: PlayerAcquisitionState;
 }) {
   const [selected, setSelected] = useState<Player | null>(null);
   const [open, setOpen] = useState(false);
@@ -42,7 +45,7 @@ export function FormIntelligence({
   const [error, setError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
 
   async function handleAdd(player: Player) {
-    if (!leagueId) return;
+    if (!leagueId || !canTransact || pendingId) return;
     setError(null);
     setPendingId(player.id);
     const result = await signPlayerAction(leagueId, player.id);
@@ -108,7 +111,7 @@ export function FormIntelligence({
         ))}
       </div>
 
-      <PlayerInspector player={selected} variant="overlay" open={open} onOpenChange={setOpen} />
+      <PlayerInspector acquisitionState={acquisitionState} player={selected} variant="overlay" open={open} onOpenChange={setOpen} />
     </HomeSection>
   );
 }

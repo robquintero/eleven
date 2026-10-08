@@ -4,6 +4,8 @@ import { MarketActionError, toMarketActionError } from "./market-action-error.ts
 import { MARKET_ACTION_ERROR_COPY, MARKET_ACTION_ERROR_KIND } from "./market-action-error-copy.ts";
 
 const ALL_CODES = [
+  "DRAFT_NOT_COMPLETED",
+  "LEAGUE_NOT_ACTIVE",
   "NOT_AUTHENTICATED",
   "NOT_LEAGUE_MEMBER",
   "PLAYER_NOT_FOUND",

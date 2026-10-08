@@ -18,6 +18,8 @@ import { getSeasonSummary, listSeasons } from "@/data-access/seasons";
 import { getLeagueTeams, getUserTeamInLeague } from "@/data-access/teams";
 import { getRecentActivity } from "@/data-access/transactions";
 import { getTeamTrades } from "@/data-access/trades";
+import { playerAcquisitionState } from "@/domain/fantasy/player-acquisition";
+import { PlayerAcquisitionNotice } from "@/components/players/player-acquisition-notice";
 import { deriveLeagueLifecycle, LEAGUE_LIFECYCLE_LABEL } from "@/domain/fantasy/league-lifecycle";
 
 export const metadata: Metadata = { title: "League" };
@@ -83,6 +85,8 @@ export default async function LeaguePage({ searchParams }: { searchParams?: Prom
       })
     : null;
 
+  const acquisitionState = playerAcquisitionState(activeDetail?.status, draftStatus);
+
   return <LeagueOverview
     league={activeDetail} season={season} lifecycleLabel={lifecycle ? LEAGUE_LIFECYCLE_LABEL[lifecycle] : null}
     membershipKey={leagues.map(league => league.id).join(":")}
@@ -92,7 +96,7 @@ export default async function LeaguePage({ searchParams }: { searchParams?: Prom
     records={<Suspense fallback={<V2Loading title="League records" />}><LeagueRecords competitionPromise={competitionPromise} /></Suspense>}
     results={<Suspense fallback={null}><LeagueResults competitionPromise={competitionPromise} myTeamId={myTeam?.id ?? null} /></Suspense>}
     activity={<Suspense fallback={<V2Loading title="League activity" rows={3} />}><LeagueTransactions activityPromise={activityPromise} /></Suspense>}
-    trades={myTeam ? <Suspense fallback={<V2Loading title="Trades" />}><LeagueTrades leagueId={activeLeagueId!} tradePromise={tradePromise} /></Suspense> : null}
+    trades={myTeam ? <Suspense fallback={<V2Loading title="Trades" />}><PlayerAcquisitionNotice state={acquisitionState} /><LeagueTrades canAcquire={acquisitionState === "allowed"} leagueId={activeLeagueId!} tradePromise={tradePromise} /></Suspense> : null}
     managers={<Suspense fallback={<V2Loading title="Managers" rows={3} />}><LeagueManagers league={activeDetail} myTeam={myTeam} tradePromise={tradePromise} /></Suspense>}
     archive={<Suspense fallback={null}><LeagueArchive archivePromise={archivePromise} /></Suspense>}
   />;

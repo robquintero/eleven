@@ -5,6 +5,8 @@
  * switch on — same pattern as src/lib/errors/draft-action-error.ts.
  */
 export type TradeActionErrorCode =
+  | "DRAFT_NOT_COMPLETED"
+  | "LEAGUE_NOT_ACTIVE"
   | "NOT_AUTHENTICATED"
   | "NOT_LEAGUE_MEMBER"
   | "RECEIVING_TEAM_NOT_FOUND"
@@ -21,6 +23,8 @@ export type TradeActionErrorCode =
   | "UNKNOWN";
 
 const KNOWN_CODES: readonly TradeActionErrorCode[] = [
+  "DRAFT_NOT_COMPLETED",
+  "LEAGUE_NOT_ACTIVE",
   "NOT_AUTHENTICATED",
   "NOT_LEAGUE_MEMBER",
   "RECEIVING_TEAM_NOT_FOUND",

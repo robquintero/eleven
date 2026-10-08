@@ -22,6 +22,8 @@ import { getLeagueTeams, getUserTeamInLeague } from "@/data-access/teams";
 import { getRecentActivity } from "@/data-access/transactions";
 import { getTeamTrades } from "@/data-access/trades";
 import { deriveLeagueLifecycle } from "@/domain/fantasy/league-lifecycle";
+import { playerAcquisitionState, type PlayerAcquisitionState } from "@/domain/fantasy/player-acquisition";
+import { PlayerAcquisitionNotice } from "@/components/players/player-acquisition-notice";
 import { rosterVacancies, type RosterCounts } from "@/domain/fantasy/roster-rules";
 
 export const metadata: Metadata = { title: "Home" };
@@ -40,6 +42,9 @@ export default async function HomePage() {
     getUserTeamInLeague(league.id),
     getDraftStatus(league.id),
   ]);
+
+  const acquisitionState = playerAcquisitionState(league.status, draftStatus);
+  const canAcquire = acquisitionState === "allowed";
 
   const lifecycle = deriveLeagueLifecycle({
     leagueStatus: league.status,
@@ -100,7 +105,9 @@ export default async function HomePage() {
           maxTeams={league.maxTeams} isCommissioner={league.role === "commissioner"} inviteCode={league.inviteCode} />
       )}
 
-      {team && vacancies.length > 0 && <section className="home-attention" aria-label="Roster vacancy">
+      <PlayerAcquisitionNotice state={acquisitionState} />
+
+      {team && canAcquire && vacancies.length > 0 && <section className="home-attention" aria-label="Roster vacancy">
         <div><h2>Your squad has room to fill</h2><p className="home-secondary mt-1">Short on {vacancies.map(v => `${v.short} ${v.position}`).join(", ")}.</p></div>
         <TransitionLink href="/players" label="Players" className="v2-link">Browse players →</TransitionLink>
       </section>}
@@ -119,10 +126,10 @@ export default async function HomePage() {
             <HomeOperations standingsPromise={standingsPromise} teamId={team?.id ?? null} />
           </Suspense>
           {team && <Suspense fallback={<V2Loading title="Trades" rows={2} />}>
-            <HomeTrades leagueId={league.id} teamId={team.id} teamsPromise={teamsPromise} tradesPromise={tradesPromise} />
+            <HomeTrades canAcquire={canAcquire} leagueId={league.id} teamId={team.id} teamsPromise={teamsPromise} tradesPromise={tradesPromise} />
           </Suspense>}
           <Suspense fallback={<V2Loading title="Free agents in form" rows={3} />}>
-            <HomeForm agentsPromise={agentsPromise} leagueId={league.id} canTransact={Boolean(team)} />
+            <HomeForm acquisitionState={acquisitionState} agentsPromise={agentsPromise} leagueId={league.id} canTransact={Boolean(team) && canAcquire} />
           </Suspense>
         </div>
       </div>
@@ -136,20 +143,20 @@ async function HomeOperations({ standingsPromise, teamId }: {
   return <HomeLeaguePosition standings={await standingsPromise} myTeamId={teamId} />;
 }
 
-async function HomeTrades({ leagueId, teamId, teamsPromise, tradesPromise }: {
-  leagueId: string; teamId: string; teamsPromise: ReturnType<typeof getLeagueTeams>; tradesPromise: ReturnType<typeof getTeamTrades>;
+async function HomeTrades({ leagueId, teamId, teamsPromise, tradesPromise, canAcquire }: {
+  canAcquire: boolean; leagueId: string; teamId: string; teamsPromise: ReturnType<typeof getLeagueTeams>; tradesPromise: ReturnType<typeof getTeamTrades>;
 }) {
   const [allTeams, trades] = await Promise.all([teamsPromise, tradesPromise]);
   return <HomeSection title="Trades" description="Your league's transfer conversations.">
-    <TradeDesk leagueId={leagueId} myTeamId={teamId} otherTeams={allTeams.filter(team => team.id !== teamId)}
+    <TradeDesk canAcquire={canAcquire} leagueId={leagueId} myTeamId={teamId} otherTeams={allTeams.filter(team => team.id !== teamId)}
       incoming={trades.incoming} outgoing={trades.outgoing} />
   </HomeSection>;
 }
 
-async function HomeForm({ agentsPromise, leagueId, canTransact }: {
-  agentsPromise: ReturnType<typeof getHotFreeAgents>; leagueId: string; canTransact: boolean;
+async function HomeForm({ agentsPromise, leagueId, canTransact, acquisitionState }: {
+  acquisitionState: PlayerAcquisitionState; agentsPromise: ReturnType<typeof getHotFreeAgents>; leagueId: string; canTransact: boolean;
 }) {
-  return <FormIntelligence agents={await agentsPromise} leagueId={leagueId} canTransact={canTransact} />;
+  return <FormIntelligence acquisitionState={acquisitionState} agents={await agentsPromise} leagueId={leagueId} canTransact={canTransact} />;
 }
 
 async function HomeActivity({ activityPromise }: { activityPromise: ReturnType<typeof getRecentActivity> }) {

@@ -1,3 +1,5 @@
+import { PlayerAcquisitionNotice } from "@/components/players/player-acquisition-notice";
+import type { PlayerAcquisitionState } from "@/domain/fantasy/player-acquisition";
 import { CoreSurface } from "@/components/ui/core-v2";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { RoundWindow } from "@/components/football/round-window";
@@ -10,9 +12,10 @@ import type { Team } from "@/data-access/teams";
 import type { LeagueSummary } from "@/data-access/leagues";
 import type { CurrentMatchup } from "@/data-access/matchups";
 
-export function TeamPageView({ team, league, squad, matchup, readOnly = false, managerName, contextLink }: {
+export function TeamPageView({ team, league, squad, matchup, readOnly = false, managerName, contextLink, acquisitionState = "unavailable" }: {
   team: Team | null; league: Pick<LeagueSummary, "id" | "name">; squad: Squad;
   matchup: Pick<CurrentMatchup, "roundId" | "roundNumber" | "roundStatus" | "roundStartsAt" | "roundEndsAt"> | null;
+  acquisitionState?: PlayerAcquisitionState;
   readOnly?: boolean; managerName?: string; contextLink?: string;
 }) {
   const squadSize = squad.starters.length + squad.bench.length;
@@ -66,7 +69,10 @@ export function TeamPageView({ team, league, squad, matchup, readOnly = false, m
         </p>
       )}
 
-      {team && !readOnly && vacancies.length > 0 && (
+      {team && !readOnly && <PlayerAcquisitionNotice state={acquisitionState} />}
+      {team && !readOnly && acquisitionState === "draft_pending" && squadSize === 0 && <p className="mt-2 text-sm text-foreground-secondary">Your 16-player squad will be assembled through the draft.</p>}
+
+      {team && !readOnly && acquisitionState === "allowed" && vacancies.length > 0 && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border border-accent/30 bg-accent/5 px-4 py-3">
           <div>
             <p className="label-system text-[11px] text-accent">Roster vacancy</p>

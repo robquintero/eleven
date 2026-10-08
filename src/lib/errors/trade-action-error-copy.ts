@@ -1,7 +1,10 @@
+import { PRE_DRAFT_ACQUISITION_COPY } from "../../domain/fantasy/player-acquisition.ts";
 import type { TradeActionErrorCode } from "@/lib/errors/trade-action-error";
 
 /** User-facing copy for every TradeActionErrorCode. */
 export const TRADE_ACTION_ERROR_COPY: Record<TradeActionErrorCode, string> = {
+  DRAFT_NOT_COMPLETED: PRE_DRAFT_ACQUISITION_COPY,
+  LEAGUE_NOT_ACTIVE: "Player acquisitions are unavailable for this league.",
   NOT_AUTHENTICATED: "Sign in to do that.",
   NOT_LEAGUE_MEMBER: "You don't have a team in this league.",
   RECEIVING_TEAM_NOT_FOUND: "That team doesn't exist in this league.",
@@ -33,6 +36,8 @@ export const TRADE_ACTION_ERROR_COPY: Record<TradeActionErrorCode, string> = {
  * thought).
  */
 export const TRADE_ACTION_ERROR_KIND: Record<TradeActionErrorCode, "rule" | "error"> = {
+  DRAFT_NOT_COMPLETED: "rule",
+  LEAGUE_NOT_ACTIVE: "rule",
   NOT_AUTHENTICATED: "error",
   NOT_LEAGUE_MEMBER: "error",
   RECEIVING_TEAM_NOT_FOUND: "error",

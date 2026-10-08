@@ -42,6 +42,7 @@ export function TradeCenter({
   otherTeams,
   incoming,
   outgoing,
+  canAcquire = false,
   v2 = false,
 }: {
   leagueId: string;
@@ -49,6 +50,7 @@ export function TradeCenter({
   otherTeams: Team[];
   incoming: TradeView[];
   outgoing: TradeView[];
+  canAcquire?: boolean;
   v2?: boolean;
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export function TradeCenter({
   const [proposeOpen, setProposeOpen] = useState(false);
 
   async function respond(action: TradeResponder, tradeId: string) {
+    if (action === acceptTradeAction && !canAcquire) return;
     setError(null);
     setPendingId(tradeId);
     const result = await action(tradeId);
@@ -74,9 +77,9 @@ export function TradeCenter({
         <Button
           size="xs"
           variant="outline"
-          onClick={() => setProposeOpen(true)}
+          onClick={() => { if (canAcquire) setProposeOpen(true); }}
           className={v2 ? "v2-secondary-button" : undefined}
-          disabled={otherTeams.length === 0}
+          disabled={!canAcquire || otherTeams.length === 0}
         >
           {v2 ? "Propose trade" : "Propose Trade"}
         </Button>
@@ -95,7 +98,7 @@ export function TradeCenter({
             <>
               <Button
                 size="xs"
-                disabled={pendingId === trade.id}
+                disabled={!canAcquire || pendingId === trade.id}
                 onClick={() => respond(acceptTradeAction, trade.id)}
               >
                 Accept

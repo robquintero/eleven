@@ -6,6 +6,8 @@ import { useEffect, useOptimistic, useRef, useState, useTransition } from "react
 import { useRouter } from "next/navigation";
 import { useMediaQuery } from "@base-ui/react/unstable-use-media-query";
 import { dropPlayerAction, signPlayerAction } from "@/app/(app)/players/actions";
+import { PlayerAcquisitionNotice } from "./player-acquisition-notice";
+import type { PlayerAcquisitionState } from "@/domain/fantasy/player-acquisition";
 import { PlayerDatabaseToolbar } from "@/components/players/player-database-toolbar";
 import { PlayerInspector } from "@/components/players/player-inspector";
 import { PlayerListMobile } from "@/components/players/player-list-mobile";
@@ -52,6 +54,7 @@ export function PlayersWorkspace({
   hasActiveLeague,
   leagueId,
   fantasyTeamId,
+  acquisitionState = "unavailable",
 }: {
   data: PlayerDatabasePage;
   filters: PlayerFilters;
@@ -61,6 +64,7 @@ export function PlayersWorkspace({
   hasActiveLeague: boolean;
   leagueId: string | null;
   fantasyTeamId: string | null;
+  acquisitionState?: PlayerAcquisitionState;
 }) {
   const router = useRouter();
   const [isNavigating, startNavigation] = useTransition();
@@ -88,9 +92,10 @@ export function PlayersWorkspace({
   }, []);
 
   const canTransact = Boolean(leagueId && fantasyTeamId);
+  const canAcquire = canTransact && acquisitionState === "allowed";
 
   function persistMarketAction(player: Player, action: typeof signPlayerAction, dropping = false) {
-    if (!leagueId || mutationInFlight.current || isMutating) return;
+    if (!leagueId || (!dropping && !canAcquire) || mutationInFlight.current || isMutating) return;
     mutationInFlight.current = true;
     setActionError(null);
     setPendingPlayerId(player.id);
@@ -221,6 +226,7 @@ export function PlayersWorkspace({
     return (
       <div className="core-v2">
         <Header total={0} />
+        <PlayerAcquisitionNotice state={acquisitionState} />
         <div className="flex flex-col items-center justify-center gap-2 py-24 text-center">
           <p className="label-system text-sm text-foreground-secondary">No player data available</p>
           <p className="max-w-sm text-xs text-foreground-tertiary">
@@ -234,6 +240,7 @@ export function PlayersWorkspace({
   return (
     <div className="core-v2">
       <Header total={data.total} />
+      <PlayerAcquisitionNotice state={acquisitionState} />
 
       <div className="mt-4">
         <PlayerDatabaseToolbar
@@ -284,7 +291,7 @@ export function PlayersWorkspace({
                 sort={visibleFilters.sort}
                 onSort={(sort) => updateFilters({ sort })}
                 onSelect={selectPlayer}
-                onAdd={canTransact ? handleAdd : undefined}
+                onAdd={canAcquire ? handleAdd : undefined}
                 onDrop={canTransact ? requestDrop : undefined}
                 pendingPlayerId={pendingPlayerId}
               />
@@ -293,7 +300,7 @@ export function PlayersWorkspace({
                 players={players}
                 selectedId={selectedId}
                 onSelect={selectPlayer}
-                onAdd={canTransact ? handleAdd : undefined}
+                onAdd={canAcquire ? handleAdd : undefined}
                 onDrop={canTransact ? requestDrop : undefined}
                 pendingPlayerId={pendingPlayerId}
               />
@@ -341,6 +348,7 @@ export function PlayersWorkspace({
 
         {isInlineInspector && selectedPlayer && (
           <PlayerInspector
+            acquisitionState={acquisitionState}
             player={selectedPlayer}
             index={selectedIndex}
             variant="inline"
@@ -352,6 +360,7 @@ export function PlayersWorkspace({
 
       {!isInlineInspector && (
         <PlayerInspector
+          acquisitionState={acquisitionState}
           player={selectedPlayer}
           index={selectedIndex}
           variant="overlay"

@@ -1,7 +1,10 @@
+import { PRE_DRAFT_ACQUISITION_COPY } from "../../domain/fantasy/player-acquisition.ts";
 import type { MarketActionErrorCode } from "@/lib/errors/market-action-error";
 
 /** User-facing copy for every MarketActionErrorCode. PLAYER_ALREADY_OWNED is the exact "two managers clicked ADD at once" race outcome — phrased as the brief's own wording, not the draft's "already drafted" copy. */
 export const MARKET_ACTION_ERROR_COPY: Record<MarketActionErrorCode, string> = {
+  DRAFT_NOT_COMPLETED: PRE_DRAFT_ACQUISITION_COPY,
+  LEAGUE_NOT_ACTIVE: "Player acquisitions are unavailable for this league.",
   NOT_AUTHENTICATED: "Sign in to do that.",
   NOT_LEAGUE_MEMBER: "You don't have a team in this league.",
   PLAYER_NOT_FOUND: "That player doesn't exist.",
@@ -26,6 +29,8 @@ export const MARKET_ACTION_ERROR_COPY: Record<MarketActionErrorCode, string> = {
  * thought) rather than the engine correctly enforcing a rule.
  */
 export const MARKET_ACTION_ERROR_KIND: Record<MarketActionErrorCode, "rule" | "error"> = {
+  DRAFT_NOT_COMPLETED: "rule",
+  LEAGUE_NOT_ACTIVE: "rule",
   NOT_AUTHENTICATED: "error",
   NOT_LEAGUE_MEMBER: "error",
   PLAYER_NOT_FOUND: "error",

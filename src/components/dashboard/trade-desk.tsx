@@ -29,18 +29,21 @@ export function TradeDesk({
   otherTeams,
   incoming,
   outgoing,
+  canAcquire = false,
 }: {
   leagueId: string;
   myTeamId: string;
   otherTeams: Team[];
   incoming: TradeView[];
   outgoing: TradeView[];
+  canAcquire?: boolean;
 }) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [proposeOpen, setProposeOpen] = useState(false);
 
   async function respond(action: TradeResponder, tradeId: string) {
+    if (action === acceptTradeAction && !canAcquire) return;
     setError(null);
     setPendingId(tradeId);
     const result = await action(tradeId);
@@ -60,7 +63,7 @@ export function TradeDesk({
         <span className="home-trades-summary">
           {totalPending > 0 ? `${totalPending} pending` : "No pending trades"}
         </span>
-        <Button size="xs" variant="outline" onClick={() => setProposeOpen(true)} disabled={otherTeams.length === 0}>
+        <Button size="xs" variant="outline" onClick={() => { if (canAcquire) setProposeOpen(true); }} disabled={!canAcquire || otherTeams.length === 0}>
           Propose trade
         </Button>
       </div>
@@ -81,7 +84,7 @@ export function TradeDesk({
             pendingId={pendingId}
             renderActions={(trade) => (
               <>
-                <Button size="xs" disabled={pendingId === trade.id} onClick={() => respond(acceptTradeAction, trade.id)}>
+                <Button size="xs" disabled={!canAcquire || pendingId === trade.id} onClick={() => respond(acceptTradeAction, trade.id)}>
                   Accept
                 </Button>
                 <Button

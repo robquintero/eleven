@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/sheet";
 import type { PlayerScoreBreakdown, RecentMatchRow } from "@/data-access/players";
 import type { Player } from "@/lib/types/fantasy";
+import type { PlayerAcquisitionState } from "@/domain/fantasy/player-acquisition";
 
 export function PlayerInspector({
   player,
@@ -25,6 +26,7 @@ export function PlayerInspector({
   onOpenChange,
   lineupContext,
   onRequestDrop,
+  acquisitionState = "unavailable",
 }: {
   player: Player | null;
   index?: number;
@@ -33,6 +35,7 @@ export function PlayerInspector({
   onOpenChange: (open: boolean) => void;
   lineupContext?: LineupInspectorContext;
   onRequestDrop?: () => void;
+  acquisitionState?: PlayerAcquisitionState;
 }) {
   const isLgDesktop = useMediaQuery("(min-width: 1024px)", {
     defaultMatches: true,
@@ -80,6 +83,7 @@ export function PlayerInspector({
         <PlayerInspectorContent
           key={player.id}
           player={player}
+          acquisitionState={acquisitionState}
           index={index}
           recentMatches={recentMatches}
           scoreBreakdown={scoreBreakdown}
@@ -113,6 +117,7 @@ export function PlayerInspector({
             <PlayerInspectorContent
               key={player.id}
               player={player}
+              acquisitionState={acquisitionState}
               index={index}
               recentMatches={recentMatches}
               scoreBreakdown={scoreBreakdown}

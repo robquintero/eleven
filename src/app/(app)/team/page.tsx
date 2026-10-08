@@ -5,6 +5,8 @@ import { ensureFirstRoundOpenedAction } from "@/app/(app)/team/actions";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getCurrentMatchup } from "@/data-access/matchups";
 import { getUserLeagues } from "@/data-access/leagues";
+import { getDraftStatus } from "@/data-access/drafts";
+import { playerAcquisitionState } from "@/domain/fantasy/player-acquisition";
 import { getUserSquad } from "@/data-access/roster";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import type { Squad } from "@/lib/types/fantasy";
@@ -19,7 +21,8 @@ export default async function TeamPage() {
 
   const activeLeagueId = await getActiveLeagueId(leagues);
   const league = leagues.find((l) => l.id === activeLeagueId) ?? leagues[0];
-  const team = await getUserTeamInLeague(league.id);
+  const [team, draftStatus] = await Promise.all([getUserTeamInLeague(league.id), getDraftStatus(league.id)]);
+  const acquisitionState = playerAcquisitionState(league.status, draftStatus);
 
   // Pass 10.5C: self-heals a completed draft whose round 1 never got
   // opened (see ensureFirstRoundOpenedAction's own doc comment) --
@@ -30,5 +33,5 @@ export default async function TeamPage() {
     ? await Promise.all([getUserSquad(league.id, team.id), getCurrentMatchup(league.id, team.id)])
     : [{ formation: "—", starters: [], bench: [] }, null];
 
-  return <TeamPageView team={team} league={league} squad={squad} matchup={matchup} />;
+  return <TeamPageView acquisitionState={acquisitionState} team={team} league={league} squad={squad} matchup={matchup} />;
 }

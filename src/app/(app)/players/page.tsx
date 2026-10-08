@@ -3,6 +3,8 @@ import { PlayersWorkspace } from "@/components/players/players-workspace";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getUserLeagues } from "@/data-access/leagues";
 import { getClubFilters, getCompetitionFilters, getPlayerDatabase } from "@/data-access/players";
+import { getDraftStatus } from "@/data-access/drafts";
+import { playerAcquisitionState } from "@/domain/fantasy/player-acquisition";
 import { getUserTeamInLeague } from "@/data-access/teams";
 import { parseFiltersFromSearchParams } from "@/lib/players-filters";
 
@@ -18,7 +20,8 @@ export default async function PlayersPage({ searchParams }: PageProps<"/players"
   // ever render when the caller actually has a team in the active league
   // (see PlayersWorkspace/MarketAction's own "never expose an action that
   // can't succeed" rule).
-  const team = activeLeagueId ? await getUserTeamInLeague(activeLeagueId) : null;
+  const [team, draftStatus] = activeLeagueId ? await Promise.all([getUserTeamInLeague(activeLeagueId), getDraftStatus(activeLeagueId)]) : [null, null];
+  const acquisitionState = playerAcquisitionState(leagues.find(league => league.id === activeLeagueId)?.status, draftStatus);
 
   const [competitions, clubs, data] = await Promise.all([
     getCompetitionFilters(),
@@ -47,6 +50,7 @@ export default async function PlayersPage({ searchParams }: PageProps<"/players"
       hasActiveLeague={Boolean(activeLeagueId)}
       leagueId={activeLeagueId}
       fantasyTeamId={team?.id ?? null}
+      acquisitionState={acquisitionState}
     />
   );
 }

@@ -3,6 +3,8 @@
 import "@/components/ui/core-v2.css";
 
 import { PositionBadge } from "@/components/players/position-badge";
+import { PlayerAcquisitionNotice } from "@/components/players/player-acquisition-notice";
+import type { PlayerAcquisitionState } from "@/domain/fantasy/player-acquisition";
 
 import { useState, type ReactNode } from "react";
 import { TransitionLink } from "@/components/shell/transition-link";
@@ -93,8 +95,10 @@ export function PlayerInspectorContent({
   onRequestDrop,
   onClose,
   stickyHeader = false,
+  acquisitionState = "unavailable",
 }: {
   player: Player;
+  acquisitionState?: PlayerAcquisitionState;
   index?: number;
   /** `null` while loading, `[]` for Not enough match data, real rows otherwise — see src/data-access/players.ts. */
   recentMatches?: RecentMatchRow[] | null;
@@ -321,6 +325,8 @@ export function PlayerInspectorContent({
               </>
             )}
           </div>
+        ) : ownership && acquisitionState !== "allowed" ? (
+          <PlayerAcquisitionNotice state={acquisitionState} />
         ) : ownership === "owned" ? (
           <>
             <Button className="w-full rounded-control" onClick={() => setShowNote(true)}>
