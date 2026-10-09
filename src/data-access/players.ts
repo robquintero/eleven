@@ -286,11 +286,24 @@ export async function queryPlayerDatabase(
     // active players, the exact points-sort bug this comment replaces),
     // compute the real sort key in JS, sort+paginate, then fetch the full
     // rows for just that page's ids.
-    const [idRows, globalScores] = await Promise.all([fetchAllRows<{ id: string; name: string; club_id: string }>((from, to) =>
+    //
+    // Autonomous stabilization pass, Phase E1: `idRows` must resolve
+    // BEFORE the score aggregation starts (sequential, not
+    // `Promise.all` alongside it) so a search/position/competition
+    // filter that already narrowed the candidate set gets to narrow the
+    // aggregation too -- this used to pass `undefined` unconditionally,
+    // meaning every keystroke in the draft board (which hardcodes this
+    // sort) scored the ENTIRE active catalog regardless of how few
+    // players the search term actually matched. An unfiltered "browse
+    // everyone by points" view still legitimately needs every active
+    // player's score either way, so this costs nothing in that case and
+    // only pays off exactly when there's something to narrow by.
+    const idRows = await fetchAllRows<{ id: string; name: string; club_id: string }>((from, to) =>
       applyCommonFilters(supabase.from("players").select("id, name, club_id").eq("active", true))
         .order("id", { ascending: true })
         .range(from, to)
-    ), query.sort === "points" ? getFantasyScoreAggregates(supabase, undefined, catalogVersion) : Promise.resolve(undefined)]);
+    );
+    const globalScores = query.sort === "points" ? await getFantasyScoreAggregates(supabase, idRows.map((r) => r.id), catalogVersion) : undefined;
 
     count = idRows.length;
     if (count === 0) return { players: [], total: 0, page, pageSize };
