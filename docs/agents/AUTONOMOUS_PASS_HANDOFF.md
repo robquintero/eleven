@@ -6,7 +6,7 @@ Last updated: 2026-10-09T16:10Z by Claude Code, immediately after Phase B comple
 
 ## 1. Current objective
 
-Executing the "ELEVEN — AUTONOMOUS STABILIZATION & PRODUCTION RECOVERY" brief, Phases A–H, in order. Phase B is **done and verified in production**. Starting Phase C (permanent Starting XI initialization fix + live league repair) next.
+Executing the "ELEVEN — AUTONOMOUS STABILIZATION & PRODUCTION RECOVERY" brief, Phases A–H, in order. Phases B and C are **done and verified in production**. Starting Phase D (PLAYER_NOT_FOUND diagnostics) next.
 
 ## 2. Completed phases
 
@@ -21,6 +21,12 @@ Executing the "ELEVEN — AUTONOMOUS STABILIZATION & PRODUCTION RECOVERY" brief,
   - **Ran the guarded one-off override script** (`npx supabase db query --linked --file scripts/one-off/position-overrides-2026-10-09.sql`) — succeeded, drift guard passed. Verified via read-only query: all 4 overrides are live (`A. Amaimouni MID→FWD`, `M. Guéhi MID→DEF`, `M. Rogers FWD→MID`, `Pedro Porro MID→DEF`); `players.position` unchanged for all 4 (still raw provider values).
   - **Verified all 5 "5 Men of Class" teams are 4-3-3 feasible in real production data** (not just the snapshot): 2 Goals 1 Cup GK2/DEF6/MID5/FWD3, 75Hard GK2/DEF6/MID5/FWD3, Expected Toulouse FC GK2/DEF5/MID6/FWD3, Phantom FC GK2/DEF4/MID6/FWD4, Pressure FC GK2/DEF5/MID5/FWD4 — every team has ≥1 GK, ≥4 DEF, ≥3 MID, ≥3 FWD.
   - **Not yet done**: the app code change (constants.ts 4-3-3 + all the canonical_position TS wiring) has NOT been deployed to Vercel yet — only the DB side is live. This is safe right now because of the dual-shape transition, but it means the production UI is still presenting/enforcing 4-4-2 until the deploy happens (Phase H). Do not narrow the dual-shape migration to 4-3-3-only until that deploy is confirmed live.
+- **Autonomous pass, Phase C — DONE, VERIFIED IN PRODUCTION** (commit `d6221d0` + a live data repair, no new migration needed):
+  - Root cause confirmed: the post-draft lineup self-heal (`repairIncompleteRoundOne`, rounds.ts) only ever acted on a team with literally ZERO `lineup_slots` rows; any team with even one existing slot (all 5 "5 Men of Class" teams had exactly 1, from a manager clicking a starter mid-draft) was skipped forever, leaving the other 15 roster entries slot-free.
+  - Fix: `provisionMissingLineupSlots` (lineup.ts) + pure decision function `planPartialLineupProvisioning` (auto-lineup.ts) — fills ONLY the missing roster entries for a team, computing remaining formation need from whatever's already a starter, never touching an existing slot. Wired into `repairIncompleteRoundOne` for every team with any gap (zero or partial). Genuine conflicts (insufficient depth, inconsistent existing selection) are recorded as a `LINEUP_PROVISIONING_FAILED` domain event, not silently swallowed. 14 new tests (7 pure-function, 7 against the real self-heal flow with the actual "1 existing starter, 15 missing" shape).
+  - **Repaired the live league**: ran `provisionMissingLineupSlots` (the real, tested function, not a one-off reimplementation) against "5 Men of Class"'s current round (`ab75c6e1-7bc7-4f95-8ee7-42001b3be79d`) for all 5 teams. All 5 returned `{status: "provisioned", createdCount: 15}`.
+  - **Verified in production**: every team now has exactly 16 roster / 11 starters / 5 bench, a valid 4-3-3 composition (GK1/DEF4/MID3/FWD3), zero duplicate roster assignments, and — critically — the pre-existing manual starter slot for each team was confirmed byte-for-byte unchanged (same roster_entry_id, still `starter: true`). `draft_picks` still 80/80, `league_player_ownership` still 80 rows, both unchanged.
+  - No further live-league action needed for Phase C. The architectural fix is also now live for every OTHER league in production (any future draft completion benefits from the same fix).
 
 ## 3. Remaining phases (at time of writing)
 
