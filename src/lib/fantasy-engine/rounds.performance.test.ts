@@ -9,11 +9,20 @@ const positions = ["GK", ...Array(4).fill("DEF"), ...Array(4).fill("MID"), "FWD"
 function roster(team: string) {
   return positions.map((position, i) => ({ id: `${team}-${i}`, player_id: `${team}-p${i}`, players: { position, canonical_position: position, club_id: "club" } }));
 }
+/**
+ * `partial` teams get exactly one existing slot, on roster entry index 0
+ * (a GK, `starter: true`) -- modeling the real "5 Men of Class" incident
+ * this fixture is named after: a manager clicked one starter mid-draft,
+ * leaving every other roster entry with no slot at all. The autonomous
+ * stabilization pass's fix (`provisionMissingLineupSlots`) must repair
+ * exactly the missing 15, preserving that one existing slot untouched.
+ */
 function fixture(options: { teams?: number; missing?: string[]; partial?: string[]; round?: number; completed?: boolean; failedCheck?: boolean; many?: boolean } = {}) {
   const teams = Array.from({ length: options.teams ?? 10 }, (_, i) => `team${i}`);
   const missing = new Set(options.missing ?? []);
+  const partial = new Set(options.partial ?? []);
   const batched = teams.flatMap((team) => roster(team).map((r, i) => ({ id: r.id, fantasy_team_id: team,
-    lineup_slots: missing.has(team) || (options.partial?.includes(team) && i > 0) ? [] : [{ id: `${r.id}-slot` }],
+    lineup_slots: missing.has(team) || (partial.has(team) && i > 0) ? [] : [{ id: `${r.id}-slot` }],
   })));
   if (options.many) for (let i = batched.length; i < 1100; i++) batched.push({ id: `extra${i}`, fantasy_team_id: "team0", lineup_slots: [{ id: `s${i}` }] });
   return testClient((q: RecordedQuery) => {
@@ -28,6 +37,13 @@ function fixture(options: { teams?: number; missing?: string[]; partial?: string
       return result(batched.slice(q.range![0], q.range![1] + 1));
     }
     if (q.table === "roster_entries") return result(roster(String(filter(q, "fantasy_team_id"))));
+    // provisionMissingLineupSlots' own existing-slots check -- the team's
+    // index-0 entry has a slot (starter GK) when it's in `partial`, else none.
+    if (q.table === "lineup_slots" && q.operation === "select") {
+      const ids = filter(q, "roster_entry_id") as string[] | undefined;
+      const team = String(ids?.[0] ?? "").split("-")[0];
+      return result(partial.has(team) ? [{ roster_entry_id: `${team}-0`, starter: true }] : []);
+    }
     if (q.table === "players") return result(teams.flatMap((t) => roster(t).map((r) => ({ id: r.player_id, club_id: "club" }))));
     if (q.table === "player_national_teams" || q.table === "fixtures") return result([]);
     if (q.table === "lineup_slots" && q.operation === "upsert") return result(null);
@@ -54,11 +70,24 @@ test("incomplete Round 1 initializes only the missing teams with unchanged autom
     assert.deepEqual(["GK", "DEF", "MID", "FWD"].map((p) => rows.filter((r) => r.starter && r.slot === p).length), [1, 4, 3, 3]);
   }
 });
-test("missing lineup initialization recovers; even one existing slot protects manager edits", async () => {
+test("a partially-initialized team (one existing manual slot, 15 missing) is now repaired, not skipped -- the actual production bug this pass fixes", async () => {
   const { client, calls } = fixture({ teams: 2, missing: ["team1"], partial: ["team0"] });
   await ensureFirstRoundOpened(client, "league");
-  assert.equal(calls.filter((q) => q.operation === "upsert").length, 1);
-  assert.ok(!(calls.filter((q) => q.table === "roster_entries" && !q.selection?.includes("!left"))).some((q) => filter(q, "fantasy_team_id") === "team0"));
+  const writes = calls.filter((q) => q.operation === "upsert");
+  // Both team0 (partial) and team1 (fully missing) get a write now --
+  // team0 is NO LONGER silently skipped just because it had one slot.
+  assert.equal(writes.length, 2);
+  const team0Write = writes.find((w) => (w.payload as Array<{ roster_entry_id: string }>).every((r) => r.roster_entry_id.startsWith("team0")));
+  assert.ok(team0Write, "team0 must receive a repair write for its 15 missing roster entries");
+  const rows = team0Write!.payload as Array<{ roster_entry_id: string; starter: boolean; slot: string }>;
+  assert.equal(rows.length, 15, "exactly the 15 missing entries -- the pre-existing GK starter slot (index 0) is never re-written");
+  assert.ok(!rows.some((r) => r.roster_entry_id === "team0-0"), "the existing slot's own roster entry must never appear in the repair write");
+  assert.equal(rows.filter((r) => r.starter).length, 10, "11 total starters minus the 1 pre-existing GK starter");
+  assert.deepEqual(
+    ["GK", "DEF", "MID", "FWD"].map((p) => rows.filter((r) => r.starter && r.slot === p).length),
+    [0, 4, 3, 3],
+    "GK's remaining need is 0 (already satisfied by the pre-existing starter); DEF/MID/FWD fill their full formation need from the missing pool"
+  );
 });
 test("progressed season skips historical Round 1 entirely; completed season never opens another", async () => {
   for (const options of [{ round: 2 }, { completed: true }]) {

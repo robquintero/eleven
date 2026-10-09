@@ -2,17 +2,25 @@
 
 Agent-neutral. Either Claude Code or Codex should be able to resume from this file plus the repository state alone — do not assume anything from a chat transcript.
 
-Last updated: 2026-10-09T15:40Z by Claude Code, at the start of the autonomous pass (immediately after Phase A baseline, before any Phase B mutation).
+Last updated: 2026-10-09T16:10Z by Claude Code, immediately after Phase B completed and verified in production.
 
 ## 1. Current objective
 
-Executing the "ELEVEN — AUTONOMOUS STABILIZATION & PRODUCTION RECOVERY" brief, Phases A–H, in order. Currently starting Phase B (activate the four position overrides + 4-3-3 formation).
+Executing the "ELEVEN — AUTONOMOUS STABILIZATION & PRODUCTION RECOVERY" brief, Phases A–H, in order. Phase B is **done and verified in production**. Starting Phase C (permanent Starting XI initialization fix + live league repair) next.
 
 ## 2. Completed phases
 
-- **Pass 1** (investigation): root-caused the draft-lag/search, Starting-XI-never-initialized, and PLAYER_NOT_FOUND symptoms in "5 Men of Class". See `docs/audits/` is empty of a Pass-1-specific file — findings were delivered in-chat only; summarized in section 8 below since they're not otherwise persisted.
-- **Pass 2**: preserved the authoritative draft snapshot (`docs/audits/5-men-of-class-draft-snapshot-2026-10-09.json`, SHA-256 `0fdbd65851c15c48c72753130c9ea5bbcba801910881df9b2b9332737b71e2b9` — verify this before trusting the file), cross-checked all 80 players' positions against real match-appearance data, and produced `docs/audits/5-men-of-class-position-accuracy-audit.md`.
-- **Pass 3**: implemented (but did not apply/deploy) the full canonical-position system — `player_position_overrides` table, `players.canonical_position` trigger-maintained column, every gameplay RPC and data-access read site wired to it, the 4-3-3 `update_team_lineup` migration, and the guarded one-off override-insertion script. All verified with real PGlite tests (not mocks) against the actual migration files. Full report: `docs/audits/5-men-of-class-pass3-position-overrides-and-formation-impact.md`. **As of last update, none of this was applied to production or deployed.**
+- **Pass 1** (investigation): root-caused the draft-lag/search, Starting-XI-never-initialized, and PLAYER_NOT_FOUND symptoms in "5 Men of Class". Findings were delivered in-chat only (no file); summarized in section 8 below.
+- **Pass 2**: preserved the authoritative draft snapshot (`docs/audits/5-men-of-class-draft-snapshot-2026-10-09.json`, SHA-256 `0fdbd65851c15c48c72753130c9ea5bbcba801910881df9b2b9332737b71e2b9` — verify this before trusting the file), cross-checked all 80 players' positions against real match-appearance data, produced `docs/audits/5-men-of-class-position-accuracy-audit.md`.
+- **Pass 3**: implemented the full canonical-position system (`player_position_overrides` table, `players.canonical_position` trigger-maintained column, every gameplay RPC and data-access site wired to it) and the 4-3-3 `update_team_lineup` migration. Verified with real PGlite tests against the actual migration files. Report: `docs/audits/5-men-of-class-pass3-position-overrides-and-formation-impact.md`.
+- **Autonomous pass, Phase A**: baseline confirmed (git clean, build/tsc/lint/tests all green), committed Pass 2/3 work as commit `3a0ce93`.
+- **Autonomous pass, Phase B — DONE, VERIFIED IN PRODUCTION** (commit `2e93483` + production migrations/data):
+  - Added a transitional migration (`20261015000200_formation_dual_shape_transition.sql`) so `update_team_lineup` accepts EITHER the old 4-4-2 or new 4-3-3 shape, specifically to make the migration-then-deploy ordering safe in either direction (no incompatible client/server window). Added a matching test proving both shapes are accepted and a truly-invalid shape is still rejected.
+  - Activated `FORMATION_RULES` to 4-3-3 in `src/domain/fantasy/constants.ts` and fixed every place that assumed 4-4-2 (Team-page loading skeleton, landing-page preview copy, pitch-layout coordinate presets, and ~6 test files) — full suite re-verified green (756 passing) before touching production.
+  - **Applied to production** (`npx supabase db push`, confirmed via `supabase migration list`): `20261014000000_position_classification_overrides.sql`, `20261015000000_canonical_position_resolution.sql`, `20261015000100_formation_4_3_3_and_canonical_position_lineup.sql`, `20261015000200_formation_dual_shape_transition.sql`. Verified read-only afterward: all 2767 players got `canonical_position` backfilled correctly (sample-checked, matches `position` for everyone not yet overridden).
+  - **Ran the guarded one-off override script** (`npx supabase db query --linked --file scripts/one-off/position-overrides-2026-10-09.sql`) — succeeded, drift guard passed. Verified via read-only query: all 4 overrides are live (`A. Amaimouni MID→FWD`, `M. Guéhi MID→DEF`, `M. Rogers FWD→MID`, `Pedro Porro MID→DEF`); `players.position` unchanged for all 4 (still raw provider values).
+  - **Verified all 5 "5 Men of Class" teams are 4-3-3 feasible in real production data** (not just the snapshot): 2 Goals 1 Cup GK2/DEF6/MID5/FWD3, 75Hard GK2/DEF6/MID5/FWD3, Expected Toulouse FC GK2/DEF5/MID6/FWD3, Phantom FC GK2/DEF4/MID6/FWD4, Pressure FC GK2/DEF5/MID5/FWD4 — every team has ≥1 GK, ≥4 DEF, ≥3 MID, ≥3 FWD.
+  - **Not yet done**: the app code change (constants.ts 4-3-3 + all the canonical_position TS wiring) has NOT been deployed to Vercel yet — only the DB side is live. This is safe right now because of the dual-shape transition, but it means the production UI is still presenting/enforcing 4-4-2 until the deploy happens (Phase H). Do not narrow the dual-shape migration to 4-3-3-only until that deploy is confirmed live.
 
 ## 3. Remaining phases (at time of writing)
 
@@ -26,17 +34,19 @@ B (activate positions/4-3-3) → C (permanent lineup-init fix + live league repa
 
 ## 5. Production state
 
-- Supabase project ref: `oknhqdiinaxofrzxphxf`. Migration state as of Pass 1: all 38 pre-Pass-2 migrations applied; the 3 new migrations from Pass 2/3 (`20261014000000`, `20261015000000`, `20261015000100`) are **NOT applied**.
-- Vercel: no linked CLI session in this environment (not logged in). Production deployment commit SHA is **not independently verifiable** from here — do not assume it matches `origin/main`. Last known fact (Pass 1): production had been temporarily rolled back to commit `2a4c5a7` after a live-draft incident, with intent to restore later — whether that restoration happened is unconfirmed.
+- Supabase project ref: `oknhqdiinaxofrzxphxf`. **All migrations through `20261015000200` are applied** (confirmed via `supabase migration list` — every row shows matching local/remote timestamps). Use `npx supabase migration list` to re-verify; do not trust this file blindly if much time has passed.
+- The 4 approved position overrides are live in the `player_position_overrides` table (verified via read-only query, see Phase B section above).
+- Vercel: no linked CLI session in this environment (not logged in), and **the app code deploy for Phase B (constants.ts 4-3-3 + canonical_position TS wiring) has not shipped yet** — `origin/main` is still at the pre-this-session commit as of this update (nothing has been pushed). Production is almost certainly still serving the OLD app code. Production deployment commit SHA is otherwise **not independently verifiable** from here (no Vercel CLI session) — do not assume it matches `origin/main`. Last known fact (Pass 1 history, unconfirmed since): production had been temporarily rolled back to commit `2a4c5a7` after a live-draft incident, with intent to restore later.
 
 ## 6. Database changes
 
-Applied: everything through `20261013000000_pre_draft_acquisition_guard.sql`.
-Unapplied (prepared, dry-run tested in PGlite, not yet run against the real Supabase project):
+**Applied** (through `20261015000200_formation_dual_shape_transition.sql`, confirmed in production):
 - `20261014000000_position_classification_overrides.sql`
 - `20261015000000_canonical_position_resolution.sql`
 - `20261015000100_formation_4_3_3_and_canonical_position_lineup.sql`
-Unapplied data (not a migration — a guarded one-off script): `scripts/one-off/position-overrides-2026-10-09.sql`.
+- `20261015000200_formation_dual_shape_transition.sql` (the dual-shape compatibility shim — update_team_lineup currently accepts EITHER 4-4-2 or 4-3-3; narrow this to 4-3-3-only in a follow-up migration only after the app deploy below is confirmed live)
+**Applied data** (one-off, not a migration): `scripts/one-off/position-overrides-2026-10-09.sql` — ran successfully, all 4 overrides live.
+**Not yet deployed** (app code, local commits only as of this update): the `constants.ts` FORMATION_RULES 4-3-3 change and all canonical_position TS data-access wiring, committed locally (`2e93483` and `3a0ce93`) but not pushed to `origin/main` / not deployed to Vercel.
 
 ## 7. Test results (as of last full run, Pass 3)
 

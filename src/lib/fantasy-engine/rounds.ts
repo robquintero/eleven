@@ -3,7 +3,7 @@ import type { ApiFootballFixturePlayersItem } from "../football-providers/api-fo
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { findNextEligibleWindow, getEligibleFixtureIds } from "./round-eligibility.ts";
-import { createRoundLineupSlots } from "./lineup.ts";
+import { createRoundLineupSlots, provisionMissingLineupSlots } from "./lineup.ts";
 import { generateRoundRobinCycle, pairingsForSeasonRound } from "../../domain/fantasy/schedule.ts";
 import { scoreStoredPerformance, scoringVersion, type StoredScoringStats } from "../scoring/versions.ts";
 import { computeTotalRounds, DEFAULT_SCHEDULE_CYCLES, type ScheduleCycles } from "../../domain/fantasy/season.ts";
@@ -378,27 +378,39 @@ async function ensureRoundOneOpenedForSeason(
 }
 
 /**
- * Finds every team in the league whose active roster has ZERO
- * `lineup_slots` rows for round 1 (meaning `createRoundLineupSlots` never
- * ran for them at all — a prior `openNextRound` attempt that created the
- * round itself but then failed partway through its per-team loop) and
- * initializes exactly those teams' slots, via the SAME
- * `createRoundLineupSlots` round 1 always uses (`previousRoundId: null`,
- * so it gets the normal auto-generated starting XI, not a carried-forward
- * one — correct for round 1 specifically). A team with even one existing
- * lineup_slots row is never touched here, whether or not its count looks
- * complete — once `createRoundLineupSlots` has run for a team, a manager
- * may have already edited that lineup, and this must never overwrite
- * that. Only ever called while round 1 is the latest opened week (see
+ * Repairs round 1's `lineup_slots` for EVERY team in the league whose
+ * active roster has at least one roster entry missing a slot — not just
+ * the teams with literally ZERO slots.
+ *
+ * Autonomous stabilization pass, Phase C: this used to only ever touch a
+ * team with zero existing rows, skipping any team with even one --
+ * which was the actual production bug (see docs/agents/
+ * AUTONOMOUS_PASS_HANDOFF.md and docs/audits/): a team that had exactly
+ * one manually-set slot (e.g. a manager clicking around mid-draft) was
+ * permanently skipped, leaving its other 15 roster entries bench-free
+ * and slot-free forever. `provisionMissingLineupSlots` (lineup.ts) is
+ * the actual fix -- it fills in ONLY the missing roster entries for a
+ * team, computing the remaining formation need from whatever's already
+ * a starter, and never touches an existing slot. This function's job is
+ * just finding every team that has any gap at all and calling it, for a
+ * team with zero slots (the old case, still handled identically) or a
+ * partial one (the new case).
+ *
+ * A genuine repair failure (the formation can't be completed from what's
+ * missing -- e.g. a position's real depth doesn't support the fixed
+ * shape) is recorded as a `LINEUP_PROVISIONING_FAILED` domain event
+ * rather than thrown-and-swallowed, so it is observable (query
+ * domain_events) instead of looking identical to "nothing to do." Only
+ * ever called while round 1 is the latest opened week (see
  * `ensureFirstRoundOpened`). After calendar rollover, never backfill an
  * earlier week's lineup; its existing slots remain its scoring evidence
  * while settlement finishes. New weeks carry the current roster normally.
  */
 async function repairIncompleteRoundOne(admin: SupabaseClient<Database>, leagueId: string, roundId: string, window: RoundWindow): Promise<void> {
-  // A left embed keeps roster entries with NO slots. As before, even one
-  // existing slot protects the team's manager-edited lineup from repair.
+  // A left embed keeps roster entries with NO slots, so any row back for
+  // a team at all (regardless of how many) marks it as needing a look.
   // Page the batched read so PostgREST's row cap cannot hide a team.
-  const initializedByTeam = new Map<string, boolean>();
+  const teamsWithAnyGap = new Set<string>();
   for (let from = 0; ; from += 1000) {
     const { data: entries, error } = await admin
       .from("roster_entries")
@@ -410,13 +422,22 @@ async function repairIncompleteRoundOne(admin: SupabaseClient<Database>, leagueI
       .range(from, from + 999);
     if (error) throw new Error(`Failed to check round-one initialization: ${error.message}`);
     for (const entry of entries ?? []) {
-      initializedByTeam.set(entry.fantasy_team_id,
-        (initializedByTeam.get(entry.fantasy_team_id) ?? false) || entry.lineup_slots.length > 0);
+      if (entry.lineup_slots.length === 0) teamsWithAnyGap.add(entry.fantasy_team_id);
     }
     if (!entries || entries.length < 1000) break;
   }
-  for (const [teamId, initialized] of initializedByTeam) {
-    if (!initialized) await createRoundLineupSlots(admin, teamId, roundId, window, null);
+  for (const teamId of teamsWithAnyGap) {
+    const result = await provisionMissingLineupSlots(admin, teamId, roundId, window);
+    if (result.status === "exception") {
+      console.error(`repairIncompleteRoundOne: team ${teamId} could not be fully provisioned: ${result.reason}`);
+      await admin.from("domain_events").insert({
+        event_type: "LINEUP_PROVISIONING_FAILED",
+        league_id: leagueId,
+        entity_type: "fantasy_team",
+        entity_id: teamId,
+        payload: { roundId, reason: result.reason },
+      });
+    }
   }
 }
 

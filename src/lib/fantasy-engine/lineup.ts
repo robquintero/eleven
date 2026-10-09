@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { computeLockInstant } from "../../domain/fantasy/lineup-lock.ts";
-import { chooseAutomaticStartingXi } from "../../domain/fantasy/auto-lineup.ts";
+import { chooseAutomaticStartingXi, planPartialLineupProvisioning } from "../../domain/fantasy/auto-lineup.ts";
 import { getKickoffsByPlayer } from "./player-fixture-participation.ts";
 import type { PlayerPosition } from "../../domain/football/types.ts";
 import type { RoundWindow } from "../../domain/fantasy/round-calendar.ts";
@@ -102,6 +102,108 @@ export async function createRoundLineupSlots(
   // retry it later rather than treating "a round row exists" as proof
   // every team's slots were actually created.
   if (error) throw new Error(`Failed to create lineup_slots for team's roster entries: ${error.message}`);
+}
+
+export type ProvisionResult =
+  | { status: "already_complete" }
+  | { status: "provisioned"; createdCount: number }
+  | { status: "exception"; reason: string };
+
+/**
+ * Autonomous stabilization pass, Phase C: the general-purpose repair for
+ * a team's CURRENT round whose `lineup_slots` are missing for SOME or
+ * ALL of its active roster entries — the gap `createRoundLineupSlots`
+ * itself cannot safely close on a retry (it always recomputes the WHOLE
+ * team via `chooseAutomaticStartingXi` and upserts every row, which would
+ * silently overwrite a slot a manager already set deliberately) and the
+ * old `repairIncompleteRoundOne` could not either (it only ever touched
+ * a team with literally ZERO existing slots, skipping any team with even
+ * one — which was the actual bug: a team with 1 real slot and 15 missing
+ * ones stayed 15-short forever, see docs/audits/ and the handoff doc for
+ * the concrete "5 Men of Class" incident this fixes).
+ *
+ * Every EXISTING slot (whatever it is — a manager's deliberate choice, or
+ * a prior partial auto-init attempt) is preserved byte-for-byte; this
+ * function only ever INSERTs rows for roster entries that have NO slot
+ * at all for this round, and only once it has verified a complete, valid
+ * formation is actually reachable from what's missing. Never upserts,
+ * never touches an existing row.
+ *
+ * Because Eleven's formation is a fixed point (min === max per position,
+ * see `FORMATION_RULES`), "how many more of each position are needed" is
+ * fully determined by what's already a starter — there is no "fill extra
+ * capacity" ambiguity the way `chooseAutomaticStartingXi` has to handle
+ * for a from-scratch roster.
+ */
+export async function provisionMissingLineupSlots(
+  admin: SupabaseClient<Database>,
+  fantasyTeamId: string,
+  roundId: string,
+  window: RoundWindow
+): Promise<ProvisionResult> {
+  const { data: rosterEntries, error: rosterError } = await admin
+    .from("roster_entries")
+    .select("id, player_id, players(club_id, canonical_position)")
+    .eq("fantasy_team_id", fantasyTeamId)
+    .eq("status", "active");
+  if (rosterError) return { status: "exception", reason: `Could not load roster: ${rosterError.message}` };
+  if (!rosterEntries || rosterEntries.length === 0) return { status: "already_complete" };
+
+  const { data: existingSlots, error: slotsError } = await admin
+    .from("lineup_slots")
+    .select("roster_entry_id, starter")
+    .eq("fantasy_round_id", roundId)
+    .in("roster_entry_id", rosterEntries.map((r) => r.id));
+  if (slotsError) return { status: "exception", reason: `Could not load existing lineup_slots: ${slotsError.message}` };
+
+  const existingByEntry = new Map((existingSlots ?? []).map((s) => [s.roster_entry_id, s]));
+  const missingEntries = rosterEntries.filter((r) => !existingByEntry.has(r.id));
+  if (missingEntries.length === 0) return { status: "already_complete" };
+
+  const existingStarterPositions: PlayerPosition[] = [];
+  for (const entry of rosterEntries) {
+    const existing = existingByEntry.get(entry.id);
+    if (!existing?.starter) continue;
+    const position = (entry.players as { canonical_position: string } | null)?.canonical_position as PlayerPosition | undefined;
+    if (position) existingStarterPositions.push(position);
+  }
+
+  const missingRosterPlayers = missingEntries
+    .map((entry) => ({
+      rosterEntryId: entry.id,
+      position: (entry.players as { canonical_position: string } | null)?.canonical_position as PlayerPosition | undefined,
+    }))
+    .filter((entry): entry is { rosterEntryId: string; position: PlayerPosition } => Boolean(entry.position));
+
+  const plan = planPartialLineupProvisioning(missingRosterPlayers, existingStarterPositions);
+  if (!plan.ok) return { status: "exception", reason: plan.reason };
+  const newStarterIds = plan.newStarterIds;
+
+  const kickoffsByPlayerId = await getKickoffsByPlayer(admin, missingEntries.map((r) => r.player_id), window);
+
+  const rows = missingEntries.map((entry) => {
+    const player = entry.players as { club_id: string; canonical_position: string } | null;
+    const starter = newStarterIds.has(entry.id);
+    const slot = starter ? (player?.canonical_position ?? "BENCH") : "BENCH";
+    const kickoffs = kickoffsByPlayerId.get(entry.player_id) ?? [];
+    const lockedAt = computeLockInstant(kickoffs);
+    return {
+      roster_entry_id: entry.id,
+      fantasy_round_id: roundId,
+      slot,
+      starter,
+      locked_at: lockedAt ? lockedAt.toISOString() : null,
+    };
+  });
+
+  // Insert-only (never upsert) -- an existing row for any of these
+  // roster entries would mean a race inserted it between the read above
+  // and here; `on conflict do nothing` makes that safely idempotent
+  // rather than erroring the whole batch or overwriting that row.
+  const { error: insertError } = await admin.from("lineup_slots").upsert(rows, { onConflict: "roster_entry_id,fantasy_round_id", ignoreDuplicates: true });
+  if (insertError) return { status: "exception", reason: `Write failed: ${insertError.message}` };
+
+  return { status: "provisioned", createdCount: rows.length };
 }
 
 export interface LineupChangeRequest {

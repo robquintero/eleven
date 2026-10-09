@@ -22,7 +22,8 @@ export type DomainEventType =
   | "MATCHUP_STARTED"
   | "PLAYER_POINTS_UPDATED"
   | "MATCHUP_FINAL"
-  | "ROUND_FINALIZED";
+  | "ROUND_FINALIZED"
+  | "LINEUP_PROVISIONING_FAILED";
 
 export interface DomainEvent<TPayload = Record<string, unknown>> {
   id: string;

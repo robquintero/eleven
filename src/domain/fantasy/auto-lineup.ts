@@ -82,3 +82,80 @@ export function chooseAutomaticStartingXi(roster: RosterPlayer[]): AutoLineupRes
 
   return { starters: chosen, bench };
 }
+
+export type PartialLineupProvisioningPlan =
+  | { ok: true; newStarterIds: Set<string> }
+  | { ok: false; reason: string };
+
+/**
+ * Autonomous stabilization pass, Phase C: pure decision logic for
+ * repairing a team whose lineup_slots are only PARTLY initialized for a
+ * round (some roster entries already have a slot — a manager's
+ * deliberate choice, or a prior partial attempt — most don't). Unlike
+ * `chooseAutomaticStartingXi` (which picks a whole fresh XI from
+ * scratch), this only ever decides which of the STILL-MISSING roster
+ * entries become new starters, and never reconsiders an existing one.
+ *
+ * Because `FORMATION_RULES` is a fixed point (min === max per position),
+ * "how many more of each position are needed" is fully determined by
+ * what's already a starter — there is no "fill extra capacity"
+ * round-robin step the way the from-scratch picker needs.
+ *
+ * Returns `{ ok: false }` rather than guessing whenever the formation
+ * genuinely cannot be completed from what's available — either the
+ * existing starters already conflict with the current formation, or the
+ * missing pool doesn't have enough depth at some position. The caller
+ * (lineup.ts's `provisionMissingLineupSlots`) is responsible for
+ * reporting that as an observable failure, never silently leaving a
+ * team incomplete and never guessing which existing selection to
+ * override.
+ */
+export function planPartialLineupProvisioning(
+  missingRosterEntries: RosterPlayer[],
+  existingStarterPositions: PlayerPosition[]
+): PartialLineupProvisioningPlan {
+  const existingStarterCountByPosition: Partial<Record<PlayerPosition, number>> = {};
+  for (const position of existingStarterPositions) {
+    existingStarterCountByPosition[position] = (existingStarterCountByPosition[position] ?? 0) + 1;
+  }
+
+  for (const position of POSITION_ORDER) {
+    const target = FORMATION_RULES.positionRange[position];
+    const existingCount = existingStarterCountByPosition[position] ?? 0;
+    if (existingCount > target.max) {
+      return { ok: false, reason: `Existing starters already include ${existingCount} ${position}, more than the formation's ${target.max} -- cannot repair without overriding an existing selection.` };
+    }
+  }
+
+  const remainingNeedByPosition: Partial<Record<PlayerPosition, number>> = {};
+  let remainingStartersNeeded = 0;
+  for (const position of POSITION_ORDER) {
+    const need = Math.max(0, FORMATION_RULES.positionRange[position].min - (existingStarterCountByPosition[position] ?? 0));
+    remainingNeedByPosition[position] = need;
+    remainingStartersNeeded += need;
+  }
+  if (existingStarterPositions.length + remainingStartersNeeded > FORMATION_RULES.startersTotal) {
+    return { ok: false, reason: "Existing starters are already inconsistent with the current formation's total -- cannot repair automatically." };
+  }
+
+  const missingByPosition = new Map<PlayerPosition, RosterPlayer[]>();
+  for (const entry of missingRosterEntries) {
+    missingByPosition.set(entry.position, [...(missingByPosition.get(entry.position) ?? []), entry]);
+  }
+  // Deterministic selection order -- stable by rosterEntryId, never
+  // rating/projection-based, matching chooseAutomaticStartingXi's own
+  // "no sophisticated recommendations" rule.
+  for (const pool of missingByPosition.values()) pool.sort((a, b) => a.rosterEntryId.localeCompare(b.rosterEntryId));
+
+  const newStarterIds = new Set<string>();
+  for (const position of POSITION_ORDER) {
+    const need = remainingNeedByPosition[position] ?? 0;
+    const pool = missingByPosition.get(position) ?? [];
+    if (pool.length < need) {
+      return { ok: false, reason: `Need ${need} more ${position} starter(s) to complete the formation, but only ${pool.length} unassigned ${position} player(s) exist on the roster.` };
+    }
+    for (const entry of pool.slice(0, need)) newStarterIds.add(entry.rosterEntryId);
+  }
+
+  return { ok: true, newStarterIds };
+}
