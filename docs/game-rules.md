@@ -59,11 +59,11 @@ and later via free agency/waivers/trades) — `ROSTER_RULES`,
   positions that remain legal under the same completability check.
 
 **Starting XI** (which 11 of those 16 are active for a round) —
-`FORMATION_RULES`, `src/domain/fantasy/constants.ts` (pre-existing,
-unchanged this pass):
+`FORMATION_RULES`, `src/domain/fantasy/constants.ts`:
 
 - Starting XI: exactly 11.
-- Formation: GK exactly 1, DEF 3–5, MID 3–5, FWD 1–3. Enforced by
+- Formation: 4-3-3 — GK exactly 1, DEF exactly 4, MID exactly 3,
+  FWD exactly 3. Enforced by
   `isStarterCompositionValid()` (pre-existing) — validated server-side on
   every lineup write, never trusted from the client.
 - Bench: every remaining roster player not in the starting XI (5 of the
@@ -72,12 +72,13 @@ unchanged this pass):
   completes, Eleven automatically opens the league's first fantasy round
   and picks that team's first starting XI deterministically
   (`chooseAutomaticStartingXi()`, `src/domain/fantasy/auto-lineup.ts` —
-  fills each position's minimum first, then rounds through DEF/MID/FWD
-  depth; no ratings, projections, or provider-form input of any kind)
-  rather than leaving the whole squad on the bench. Since every legally
-  drafted squad already has at least 2 GK / 4 DEF / 4 MID / 2 FWD —
-  exceeding `FORMATION_RULES`' own starting-XI minimums — this always
-  succeeds. A manager can freely rearrange this initial XI afterward
+  fills the required positions; no ratings, projections, or provider-form
+  input of any kind) rather than leaving a feasible squad on the bench.
+  Roster limits remain 2 GK / 4–6 DEF / 4–6 MID / 2–4 FWD. A manually
+  assembled squad with only two forwards meets roster limits but cannot
+  supply a 4-3-3 XI; initialization reports that conflict rather than
+  inventing a forward or changing an existing selection. Autopick secures
+  a third forward before adding spare depth. A manager can freely rearrange this initial XI afterward
   through the existing Team lineup-editing UI, exactly as if they'd set
   it themselves; the auto-selection only ever runs once, at that
   starting point.
@@ -299,7 +300,9 @@ naturally produces a deterministic bye for whichever team draws the
   most under-filled canonical roster minimum first (see "Roster rules"
   above), among only the positions that remain legal under the same
   mathematical-completability check `_perform_draft_pick` itself
-  enforces — it can never construct an invalid squad. No queue system
+  enforces. After GK/DEF/MID minimums, it prioritizes a third forward
+  before spare depth so an all-autopick squad can field 4-3-3. Manual
+  roster minimums and maximums are unchanged. No queue system
   this pass — explicitly deferred, noted as a follow-up (brief §Draft
   timer allows this).
 - **Completion**: a draft transitions `in_progress → completed` only once

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { createRequire } from "node:module";
 import { testClient, result, filter, type RecordedQuery } from "../lib/performance/test-client.ts";
-import { getFantasyScoreAggregates, queryPlayerDatabase, queryPlayerIdentityMatches } from "./players.ts";
+import { getFantasyScoreAggregates, queryPlayerDatabase, queryPlayerIdentityMatches, queryCompetitionFilters } from "./players.ts";
 import { getRoundPlayerState, queryMatchupSquads, queryMatchupStatusStarters, type CurrentMatchup } from "./matchups.ts";
 import { querySquad, queryLeagueRosterPlayersByTeam } from "./roster.ts";
 import { queryDraftUpdate } from "./drafts.ts";
@@ -146,7 +146,7 @@ test("command identity search uses two compact reads, normalized club/name match
 });
 test("draft polling reads only changing state, keeps timer/turn, isolates league ownership and rejects stale snapshots", async () => {
   const { client, calls } = testClient((q) => {
-    if (q.table === "drafts") return result({ id: "draft", status: "in_progress", current_round: 1, current_pick: 1, current_pick_started_at: start });
+    if (q.table === "get_draft_clock") return result({ id: "draft", status: "in_progress", current_round: 1, current_pick: 1, current_pick_started_at: start });
     if (q.table === "fantasy_leagues") return result({ settings: { squadSize: 16, pickTimerSeconds: 30 } });
     if (q.table === "draft_orders") return result([{ position: 1, fantasy_teams: { id: "mine", name: "Mine", abbreviation: "M" } }, { position: 2, fantasy_teams: { id: "other", name: "Other", abbreviation: "O" } }]);
     if (q.table === "draft_picks") return result([]);
@@ -163,10 +163,10 @@ test("draft polling reads only changing state, keeps timer/turn, isolates league
   assert.equal(currentDraftUpdate({ ...update.draft!, draftId: "new-draft" }, update), null);
   assert.equal(currentDraftUpdate({ ...update.draft!, status: "completed" }, update), null);
   assert.equal(currentDraftUpdate(update.draft!, { ...update, draft: { ...update.draft!, status: "scheduled" } }), null);
-  const failed = testClient((q) => q.table === "drafts" ? result(null) : { data: null, error: { message: "ownership failed" } });
+  const failed = testClient((q) => q.table === "get_draft_clock" ? result(null) : { data: null, error: { message: "ownership failed" } });
   await assert.rejects(queryDraftUpdate(failed.client, "league", null), /ownership failed/);
   const incomplete = testClient((q) => {
-    if (q.table === "drafts") return result({ id: "draft", status: "in_progress", current_round: 1, current_pick: 2 });
+    if (q.table === "get_draft_clock") return result({ id: "draft", status: "in_progress", current_round: 1, current_pick: 2 });
     if (q.table === "draft_picks") return { data: null, error: { message: "picks unavailable" } };
     return result(q.table === "fantasy_leagues" ? { settings: {} } : []);
   });
@@ -216,4 +216,29 @@ test("actual React server rendering deduplicates aggregate reads only within a r
   }
   assert.equal(first.calls.length, 4);
   assert.equal(other.calls.length, 4);
+});
+
+
+test("competition filters include active players beyond the first 1000 rows and omit empty competitions", async () => {
+  const rows=Array.from({length:1001},(_,i)=>({competition_id:i<1000?'first':'last'}));
+  const {client,calls}=testClient(q=>{
+    if(q.table==='competitions')return result([{id:'first',code:'A',name:'First'},{id:'last',code:'B',name:'Last'},{id:'empty',code:'C',name:'Empty'}]);
+    assert.equal(q.table,'players');assert.equal(filter(q,'active'),true);
+    return result(rows.slice(q.range![0],q.range![1]+1));
+  });
+  assert.deepEqual((await queryCompetitionFilters(client)).map(c=>c.id),['first','last']);
+  assert.equal(calls.filter(q=>q.table==='players').length,2);
+});
+test("draft snapshot retries a straddled pick and overlays confirmed ownership", async () => {
+  let clocks=0;
+  const {client}=testClient(q=>{
+    if(q.table==='get_draft_clock')return result({id:'draft',status:'in_progress',current_round:1,current_pick:++clocks===1?1:2,current_pick_started_at:start,server_now:start});
+    if(q.table==='fantasy_leagues')return result({settings:{squadSize:16,pickTimerSeconds:30}});
+    if(q.table==='draft_orders')return result([{position:1,fantasy_teams:{id:'mine',name:'Mine'}},{position:2,fantasy_teams:{id:'other',name:'Other'}}]);
+    if(q.table==='draft_picks')return result([{pick_number:1,round:1,fantasy_team_id:'mine',picked_at:start,players:{id:'player',name:'Player',canonical_position:'FWD'},fantasy_teams:{name:'Mine'}}]);
+    if(q.table==='league_player_ownership')return result([]);
+    throw Error('unexpected '+q.table);
+  });
+  const update=await queryDraftUpdate(client,'league',null);
+  assert.equal(clocks,2);assert.equal(update.draft?.currentPick,2);assert.equal(update.ownership.player,'mine');
 });

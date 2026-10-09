@@ -2,6 +2,7 @@ import type { DraftActionErrorCode } from "@/lib/errors/draft-action-error";
 
 /** User-facing copy for every DraftActionErrorCode — see DESIGN.md's status-vocabulary conventions. */
 export const DRAFT_ACTION_ERROR_COPY: Record<DraftActionErrorCode, string> = {
+  STALE_DRAFT_TURN: "That turn has already finished. Updating the draft; your selection was not retried.",
   NOT_AUTHENTICATED: "Sign in to do that.",
   LEAGUE_NOT_FOUND: "DRAFT / LEAGUE_NOT_FOUND — this league doesn't exist.",
   NOT_COMMISSIONER: "DRAFT / NOT_COMMISSIONER — only the commissioner can start the draft.",
@@ -11,7 +12,7 @@ export const DRAFT_ACTION_ERROR_COPY: Record<DraftActionErrorCode, string> = {
   DRAFT_NOT_FOUND: "DRAFT / NOT_FOUND — this draft doesn't exist.",
   DRAFT_NOT_ACTIVE: "DRAFT / NOT_ACTIVE — this draft isn't in progress.",
   NOT_LEAGUE_MEMBER: "DRAFT / NOT_A_MEMBER — you don't have a team in this league.",
-  NOT_YOUR_TURN: "DRAFT / NOT_YOUR_TURN — it isn't your pick yet.",
+  NOT_YOUR_TURN: "The draft has moved on or it is another manager's turn. Updating the draft; your selection was not retried.",
   PLAYER_NOT_FOUND: "DRAFT / PLAYER_NOT_FOUND — that player doesn't exist.",
   PLAYER_NOT_ACTIVE: "DRAFT / PLAYER_NOT_ACTIVE — that player isn't currently eligible.",
   PLAYER_ALREADY_OWNED: "DRAFT / ALREADY_TAKEN — another team already drafted that player.",
@@ -32,6 +33,7 @@ export const DRAFT_ACTION_ERROR_COPY: Record<DraftActionErrorCode, string> = {
  * boundaries, or a reference to something that doesn't exist).
  */
 export const DRAFT_ACTION_ERROR_KIND: Record<DraftActionErrorCode, "rule" | "error"> = {
+  STALE_DRAFT_TURN: "rule",
   NOT_AUTHENTICATED: "error",
   LEAGUE_NOT_FOUND: "error",
   NOT_COMMISSIONER: "error",

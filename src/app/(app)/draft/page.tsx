@@ -5,6 +5,7 @@ import { NoLeagueOnboarding } from "@/components/shell/no-league-onboarding";
 import { TransitionLink } from "@/components/shell/transition-link";
 import { StartDraftButton } from "@/components/draft/start-draft-button";
 import { DraftPageClient } from "@/components/draft/draft-page-client";
+import { DraftLobbySync } from "@/components/draft/draft-lobby-sync";
 import { getActiveLeagueId } from "@/data-access/active-league";
 import { getDraftStatus, getDraftState } from "@/data-access/drafts";
 import { getUserLeagues } from "@/data-access/leagues";
@@ -38,7 +39,7 @@ export default async function DraftPage() {
         icon={Swords}
         title="Waiting for managers"
         description={`This league needs at least ${MIN_MANAGERS_TO_START_DRAFT} managers before the draft can begin (${league.memberCount} so far — the commissioner doesn't have to wait for all ${league.maxTeams}). Invite more managers from the League screen.`}
-      ><TransitionLink href="/league" label="League" className="v2-link">Open league →</TransitionLink></ComingSoon>
+      ><DraftLobbySync leagueId={league.id} /><TransitionLink href="/league" label="League" className="v2-link">Open league →</TransitionLink></ComingSoon>
     );
   }
 
@@ -53,6 +54,7 @@ export default async function DraftPage() {
             : `${league.memberCount} of ${league.maxTeams} managers have joined. Waiting for the commissioner to start the draft.`
         }
       >
+        <DraftLobbySync leagueId={league.id} />
         {league.role === "commissioner" ? <StartDraftButton leagueId={league.id} /> : <TransitionLink href="/league" label="League" className="v2-link">Open league →</TransitionLink>}
       </ComingSoon>
     );
@@ -61,7 +63,9 @@ export default async function DraftPage() {
   const draft = await getDraftState(league.id);
   if (!draft) {
     return (
-      <ComingSoon icon={Swords} title="Draft not available" description="This league doesn't have a draft yet." />
+      <ComingSoon icon={Swords} title="Draft not available" description="This league doesn't have a draft yet.">
+        <DraftLobbySync leagueId={league.id} />
+      </ComingSoon>
     );
   }
 

@@ -45,6 +45,7 @@ test("DraftActionError carries the raw message alongside its code", () => {
 
 test("every DraftActionErrorCode has user-facing copy", () => {
   const codes: (keyof typeof DRAFT_ACTION_ERROR_COPY)[] = [
+    "STALE_DRAFT_TURN",
     "NOT_AUTHENTICATED",
     "LEAGUE_NOT_FOUND",
     "NOT_COMMISSIONER",
@@ -75,6 +76,7 @@ test("every DraftActionErrorCode has user-facing copy", () => {
 
 test("DRAFT_ACTION_ERROR_KIND: expected game-rule/lifecycle outcomes are classified 'rule', never 'error'", () => {
   const ruleCodes: DraftActionErrorCode[] = [
+    "STALE_DRAFT_TURN",
     "LEAGUE_CLOSED",
     "DRAFT_ALREADY_EXISTS",
     "LEAGUE_NOT_FULL",
@@ -106,6 +108,7 @@ test("DRAFT_ACTION_ERROR_KIND: genuine unexpected failures are classified 'error
 
 test("DRAFT_ACTION_ERROR_KIND: every DraftActionErrorCode has exactly one classification", () => {
   const allCodes: DraftActionErrorCode[] = [
+    "STALE_DRAFT_TURN",
     "NOT_AUTHENTICATED",
     "LEAGUE_NOT_FOUND",
     "NOT_COMMISSIONER",

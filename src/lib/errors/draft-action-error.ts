@@ -6,6 +6,7 @@
  * so it's plain, directly testable TypeScript.
  */
 export type DraftActionErrorCode =
+  | "STALE_DRAFT_TURN"
   | "NOT_AUTHENTICATED"
   | "LEAGUE_NOT_FOUND"
   | "NOT_COMMISSIONER"
@@ -23,6 +24,7 @@ export type DraftActionErrorCode =
   | "UNKNOWN";
 
 const KNOWN_CODES: readonly DraftActionErrorCode[] = [
+  "STALE_DRAFT_TURN",
   "NOT_AUTHENTICATED",
   "LEAGUE_NOT_FOUND",
   "NOT_COMMISSIONER",

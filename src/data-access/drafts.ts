@@ -70,6 +70,8 @@ export interface DraftPickRecord {
 }
 
 export interface DraftState {
+  /** Database clock sampled with the turn read; optional for older fixtures. */
+  serverNow?: string;
   draftId: string;
   status: DraftStatus;
   currentRound: number;
@@ -127,6 +129,9 @@ export async function queryDraftUpdate(
       return result;
     })(),
   ]);
+  // Ownership may finish before a just-committed pick read. Confirmed picks
+  // must never be shown as free on that snapshot.
+  for (const pick of draft?.picks ?? []) ownership[pick.playerId] = pick.fantasyTeamId;
   return { draft, ownership };
 }
 
@@ -140,13 +145,9 @@ export async function queryDraftUpdate(
  * state this function already handles — `myFantasyTeamId`/`isMyTurn`
  * just come back `null`/`false`).
  */
-export async function queryDraftState(supabase: Awaited<ReturnType<typeof createClient>>, leagueId: string, requestUser?: { id: string } | null, requestTeamId?: string | null, requireComplete = false): Promise<DraftState | null> {
+export async function queryDraftState(supabase: Awaited<ReturnType<typeof createClient>>, leagueId: string, requestUser?: { id: string } | null, requestTeamId?: string | null, requireComplete = false, attempt = 0): Promise<DraftState | null> {
   const { data: draftRow, error: draftError } = await supabase
-    .from("drafts")
-    .select("id, status, current_round, current_pick, current_pick_started_at")
-    .eq("league_id", leagueId)
-    .order("created_at", { ascending: false })
-    .limit(1)
+    .rpc("get_draft_clock", { p_league_id: leagueId })
     .maybeSingle();
   if (requireComplete && draftError) throw new Error(`Failed to load draft: ${draftError.message}`);
   if (!draftRow) return null;
@@ -210,6 +211,12 @@ export async function queryDraftState(supabase: Awaited<ReturnType<typeof create
 
   const teamCount = order.length;
   const isComplete = draftRow.status === "completed";
+  // Separate reads may straddle a pick. Never publish mismatched turn/history.
+  const expectedPicks = isComplete ? teamCount * totalRounds : (draftRow.current_round - 1) * teamCount + draftRow.current_pick - 1;
+  if (requireComplete && picks.length !== expectedPicks) {
+    if (attempt < 2) return queryDraftState(supabase, leagueId, requestUser, myFantasyTeamId, true, attempt + 1);
+    throw new Error("Draft advanced during synchronization; retrying on the next update.");
+  }
   const expectedPosition = isComplete
     ? null
     : teamPositionForPick((draftRow.current_round - 1) * teamCount + draftRow.current_pick, teamCount);
@@ -221,6 +228,7 @@ export async function queryDraftState(supabase: Awaited<ReturnType<typeof create
       : null;
 
   return {
+    serverNow: draftRow.server_now,
     draftId: draftRow.id,
     status: draftRow.status as DraftStatus,
     currentRound: draftRow.current_round,

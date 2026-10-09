@@ -575,11 +575,18 @@ export interface CompetitionFilterOption {
 export async function getCompetitionFilters(): Promise<CompetitionFilterOption[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await resolveClient();
-  const [{ data: competitions }, { data: playerCompetitionRows }] = await Promise.all([
+  return queryCompetitionFilters(supabase);
+}
+
+/** Page active players: PostgREST's first 1000 rows cannot define which
+ * competitions are offered for a catalog larger than that row cap. */
+export async function queryCompetitionFilters(supabase: SupabaseClientType): Promise<CompetitionFilterOption[]> {
+  const [{ data: competitions }, playerCompetitionRows] = await Promise.all([
     supabase.from("competitions").select("id, code, name").order("name", { ascending: true }),
-    supabase.from("players").select("competition_id"),
+    fetchAllRows<{ competition_id: string }>((from, to) => supabase.from("players")
+      .select("competition_id").eq("active", true).order("id", { ascending: true }).range(from, to)),
   ]);
-  const competitionIdsWithPlayers = new Set((playerCompetitionRows ?? []).map((p) => p.competition_id));
+  const competitionIdsWithPlayers = new Set(playerCompetitionRows.map((p) => p.competition_id));
   return (competitions ?? []).filter((c) => competitionIdsWithPlayers.has(c.id));
 }
 

@@ -27,12 +27,13 @@ import { ensureFirstRoundOpened } from "./rounds.ts";
  * `src/app/(app)/team/actions.ts`) instead of leaving it permanently
  * bench-only.
  */
-export async function maybeOpenFirstRound(draftId: string): Promise<void> {
-  if (!isSupabaseAdminConfigured()) return;
+export async function maybeOpenFirstRound(draftId: string): Promise<boolean> {
+  if (!isSupabaseAdminConfigured()) return false;
   const admin = createAdminClient();
 
-  const { data: draft } = await admin.from("drafts").select("league_id").eq("id", draftId).maybeSingle();
-  if (!draft) return;
+  const { data: draft } = await admin.from("drafts").select("league_id,status").eq("id", draftId).maybeSingle();
+  if (!draft || draft.status !== "completed") return false;
 
   await ensureFirstRoundOpened(admin, draft.league_id);
+  return true;
 }

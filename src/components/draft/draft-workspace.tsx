@@ -14,6 +14,7 @@ import { PlayerIdentity } from "@/components/players/player-identity";
 import { RailModule } from "@/components/ui/rail-module";
 import { submitDraftPickAction, resolveExpiredPickAction } from "@/app/(app)/draft/actions";
 import type { DraftPickRecord, DraftState } from "@/data-access/drafts";
+import { draftTimeRemaining, type DraftClock } from "@/lib/draft-sync";
 import { pad2 } from "@/lib/team-fixture";
 import type { PlayerDatabasePage } from "@/data-access/players";
 import type { Player, PlayerPosition } from "@/lib/types/fantasy";
@@ -30,17 +31,16 @@ const POSITION_FILTER_OPTIONS = ["ALL", "GK", "DEF", "MID", "FWD"] as const;
  * so the first render (server + initial client) stays "—" until the
  * first real tick.
  */
-function useCountdown(deadline: string | null) {
-  const [remainingMs, setRemainingMs] = useState<number | null>(null);
+function useCountdown(deadline: string | null, clock: DraftClock | null) {
+  const [tick, setTick] = useState<{ deadline: string; remainingMs: number | null } | null>(null);
 
   useEffect(() => {
     if (!deadline) return;
-    const target = new Date(deadline).getTime();
-    const id = setInterval(() => setRemainingMs(Math.max(0, target - Date.now())), 1000);
+    const id = setInterval(() => setTick({ deadline, remainingMs: clock ? draftTimeRemaining(deadline, clock, performance.now()) : null }), 250);
     return () => clearInterval(id);
-  }, [deadline]);
+  }, [deadline, clock]);
 
-  return remainingMs;
+  return tick?.deadline === deadline ? tick.remainingMs : null;
 }
 
 function formatCountdown(ms: number): string {
@@ -56,8 +56,12 @@ export function DraftWorkspace({
   onSearch,
   positionFilter,
   onPositionFilterChange,
+  clock = null,
+  onReconcile,
 }: {
   draft: DraftState;
+  clock?: DraftClock | null;
+  onReconcile?: () => Promise<void>;
   availablePlayers: PlayerDatabasePage;
   onSearch: (query: string) => void;
   positionFilter: PlayerPosition | null;
@@ -67,21 +71,40 @@ export function DraftWorkspace({
   const [selected, setSelected] = useState<Player | null>(null);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [submittedPlayerId, setSubmittedPlayerId] = useState<string | null>(null);
+  const [expiryRetry, setExpiryRetry] = useState(0);
   const [error, setError] = useState<{ message: string; kind: ActionFeedbackKind } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
-  const remainingMs = useCountdown(draft.status === "in_progress" ? draft.pickDeadline : null);
-  const expiredCalledRef = useRef(false);
+  const remainingMs = useCountdown(draft.status === "in_progress" ? draft.pickDeadline : null, clock);
+  const expectedPick = (draft.currentRound - 1) * draft.teamCount + draft.currentPick;
+  const turnKey = `${draft.draftId}:${expectedPick}:${draft.pickDeadline}`;
+  const expiredCalledRef = useRef<string | null>(null);
+  const pickInFlightRef = useRef(false);
+  const latestTurnRef = useRef(turnKey);
+  useEffect(() => { latestTurnRef.current = turnKey; }, [turnKey]);
 
+  const hasClock = Boolean(clock);
   useEffect(() => {
-    if (remainingMs === 0 && !expiredCalledRef.current) {
-      expiredCalledRef.current = true;
-      resolveExpiredPickAction(draft.draftId).then(() => {
-        router.refresh();
-      });
-    }
-    if (remainingMs !== null && remainingMs > 0) expiredCalledRef.current = false;
-  }, [remainingMs, draft.draftId, router]);
+    if (remainingMs !== null && remainingMs > 0) expiredCalledRef.current = null;
+    if (remainingMs !== 0 || !hasClock || draft.status !== "in_progress" || expiredCalledRef.current === turnKey) return;
+    expiredCalledRef.current = turnKey;
+    let cancelled = false;
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    void resolveExpiredPickAction(draft.draftId, expectedPick).then(async result => {
+      if (cancelled) return;
+      if (result?.error && !["STALE_DRAFT_TURN", "DRAFT_NOT_ACTIVE"].includes(result.code ?? "")) setError({ message: result.error, kind: result.kind });
+      await (onReconcile ? onReconcile() : Promise.resolve(router.refresh()));
+      // Clock/RTT uncertainty or a transient failure can leave this SAME turn
+      // alive. Retry only its expected counter, never the next turn.
+      if (!cancelled) retry = setTimeout(() => { if (latestTurnRef.current === turnKey) { expiredCalledRef.current = null; setExpiryRetry(value => value + 1); } }, 2000);
+    }).catch(() => {
+      if (!cancelled) {
+        setError({ message: "Could not confirm the expired turn. Reconnecting to the draft.", kind: "error" });
+        retry = setTimeout(() => { expiredCalledRef.current = null; setExpiryRetry(value => value + 1); }, 2000);
+      }
+    });
+    return () => { cancelled = true; clearTimeout(retry); };
+  }, [remainingMs, expiryRetry, hasClock, draft.status, draft.draftId, expectedPick, turnKey, onReconcile, router]);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -112,7 +135,7 @@ export function DraftWorkspace({
    * `pending` is DERIVED, not synced via an effect: `submittedPlayerId` is
    * "the player we most recently tried to draft," and it counts as still
    * pending only while the authoritative `draft.picks` doesn't contain it
-   * yet. The moment `router.refresh()`'s new props land and this player
+   * yet. The moment an authoritative synchronization lands and this player
    * appears in `draft.picks`, this recomputes to `null` on that same
    * render — no separate effect watching for the transition, and no
    * moment where "PROCESSING PICK" clears before the pick is genuinely
@@ -129,20 +152,26 @@ export function DraftWorkspace({
    * truly never arrives, is otherwise never cleared any other way).
    */
   async function handleDraft(playerId: string) {
-    if (!draft.isMyTurn || pending) return;
-    setSubmittedPlayerId(playerId);
-    setError(null);
-    const result = await submitDraftPickAction(draft.draftId, playerId);
-    if (result?.error) {
-      setSubmittedPlayerId(null);
-      setError({ message: result.error, kind: result.kind });
-      return;
-    }
-    router.refresh();
+    if (!draft.isMyTurn || pending || pickInFlightRef.current) return;
+    pickInFlightRef.current = true;
+    setSubmittedPlayerId(playerId); setError(null);
     clearReconciliationTimeout();
-    reconciliationTimeoutRef.current = setTimeout(() => {
-      setSubmittedPlayerId((current) => (current === playerId ? null : current));
-    }, 10000);
+    try {
+      const result = await submitDraftPickAction(draft.draftId, playerId, expectedPick);
+      if (result?.error) {
+        setSubmittedPlayerId(null);
+        setError({ message: result.error, kind: result.kind });
+      }
+      await (onReconcile ? onReconcile() : Promise.resolve(router.refresh()));
+      // No automatic manual-pick retry, even if this manager has the next turn.
+      if (!result?.error) reconciliationTimeoutRef.current = setTimeout(() => {
+        setSubmittedPlayerId(current => current === playerId ? null : current);
+      }, 10000);
+    } catch {
+      setSubmittedPlayerId(null);
+      setError({ message: "Pick confirmation was interrupted. Check the updated draft before selecting again.", kind: "error" });
+      if (onReconcile) await onReconcile();
+    } finally { pickInFlightRef.current = false; }
   }
 
   useEffect(() => clearReconciliationTimeout, []);

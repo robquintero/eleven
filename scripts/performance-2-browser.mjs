@@ -50,8 +50,8 @@ if(kind==='swap')window.optimisticPaint=new Promise(done=>{const observer=new Mu
 window.settle=resolve;window.rejectAction=()=>reject(new Error('network'));});
 const club={id:'club',name:'Club',shortName:'CLB',league:'premier-league',crestColor:'#000'};
 const player=(id,position)=>({id,externalId:id,name:id,position,club,fantasyPoints:0,ownership:'free',availability:'available'});
-const positions=['GK','DEF','DEF','DEF','DEF','MID','MID','MID','MID','FWD','FWD'];
-const initial={formation:'4-4-2',starters:positions.map((position,i)=>({id:'entry'+i,position,x:0,y:0,locked:false,player:player('STARTER'+i,position)})),bench:[player('BENCH_DEF','DEF'),player('BENCH_MID','MID'),player('BENCH_GK','GK'),player('BENCH_FWD','FWD'),player('BENCH_DEF2','DEF')]};
+const positions=['GK','DEF','DEF','DEF','DEF','MID','MID','MID','FWD','FWD','FWD'];
+const initial={formation:'4-3-3',starters:positions.map((position,i)=>({id:'entry'+i,position,x:0,y:0,locked:false,player:player('STARTER'+i,position)})),bench:[player('BENCH_DEF','DEF'),player('BENCH_MID','MID'),player('BENCH_GK','GK'),player('BENCH_FWD','FWD'),player('BENCH_DEF2','DEF')]};
 const matchup={id:'matchup',isUserHome:false,homeTeamName:'OPPONENT',awayTeamName:'MY TEAM',homeLivePoints:7,awayLivePoints:19,homeFinalPoints:null,awayFinalPoints:null,roundNumber:1,roundStatus:'in_progress',status:'scheduled',scoresUpdatedAt:null};
 function Harness(){
  const [squad,setSquad]=useState(initial); const [mode,setMode]=useState('Team'); const [revision,setRevision]=useState(0);

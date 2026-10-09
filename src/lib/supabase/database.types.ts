@@ -1511,6 +1511,18 @@ export type Database = {
           league_id: string
         }[]
       }
+      get_draft_clock: {
+        Args: { p_league_id: string };
+        Returns: { id: string; status: string; current_round: number; current_pick: number; current_pick_started_at: string | null; server_now: string }[];
+      }
+      submit_draft_turn: {
+        Args: { p_draft_id: string; p_player_id: string; p_expected_pick: number };
+        Returns: { pick_number: number; round: number; fantasy_team_id: string }[];
+      }
+      resolve_draft_turn: {
+        Args: { p_draft_id: string; p_expected_pick: number };
+        Returns: { pick_number: number; round: number; fantasy_team_id: string; player_id: string; auto_picked: boolean }[];
+      }
       make_draft_pick: {
         Args: { p_draft_id: string; p_player_id: string }
         Returns: {

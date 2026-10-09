@@ -10,7 +10,7 @@ import { logUnexpectedActionError } from "@/lib/errors/action-error-diagnostics"
 import { getPlayerDatabase, type PlayerDatabasePage } from "@/data-access/players";
 import type { PlayerPosition } from "@/lib/types/fantasy";
 
-export type DraftActionState = { error: string; kind: "rule" | "error" } | undefined;
+export type DraftActionState = { error: string; kind: "rule" | "error"; code?: string } | undefined;
 
 /**
  * Both pick-submitting actions here call SECURITY DEFINER RPCs
@@ -44,18 +44,21 @@ export async function startDraftAction(leagueId: string): Promise<DraftActionSta
   return undefined;
 }
 
-export async function submitDraftPickAction(draftId: string, playerId: string): Promise<DraftActionState> {
+export async function submitDraftPickAction(draftId: string, playerId: string, expectedPick: number): Promise<DraftActionState> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("make_draft_pick", { p_draft_id: draftId, p_player_id: playerId });
+  const { error } = await supabase.rpc("submit_draft_turn", { p_draft_id: draftId, p_player_id: playerId, p_expected_pick: expectedPick });
   if (error) {
     const code = toDraftActionError(error.message).code;
     const kind = DRAFT_ACTION_ERROR_KIND[code];
     if (kind === "error") logUnexpectedActionError({ action: "submitDraftPickAction", code, ids: { draftId, playerId } });
-    return { error: DRAFT_ACTION_ERROR_COPY[code], kind };
+    return { error: DRAFT_ACTION_ERROR_COPY[code], kind, code };
   }
-  await maybeOpenFirstRound(draftId);
-  revalidatePath("/draft");
-  revalidatePath("/team");
+  // Next invalidates the current Flight tree even for another named path.
+  // Keep active picks narrow; only completion needs route/cache invalidation.
+  if (await maybeOpenFirstRound(draftId)) {
+    revalidatePath("/draft");
+    revalidatePath("/team");
+  }
   return undefined;
 }
 
@@ -88,19 +91,20 @@ export async function getAvailablePlayersAction(
  * and simply no-ops (TIMER_NOT_EXPIRED) if it's wrong. Never a client-side
  * countdown deciding to advance the draft on its own.
  */
-export async function resolveExpiredPickAction(draftId: string): Promise<DraftActionState> {
+export async function resolveExpiredPickAction(draftId: string, expectedPick: number): Promise<DraftActionState> {
   const supabase = await createClient();
-  const { error } = await supabase.rpc("resolve_expired_pick", { p_draft_id: draftId });
+  const { error } = await supabase.rpc("resolve_draft_turn", { p_draft_id: draftId, p_expected_pick: expectedPick });
   if (error && error.message !== "TIMER_NOT_EXPIRED") {
     const code = toDraftActionError(error.message).code;
     const kind = DRAFT_ACTION_ERROR_KIND[code];
     if (kind === "error") logUnexpectedActionError({ action: "resolveExpiredPickAction", code, ids: { draftId } });
-    return { error: DRAFT_ACTION_ERROR_COPY[code], kind };
+    return { error: DRAFT_ACTION_ERROR_COPY[code], kind, code };
   }
   if (!error) {
-    await maybeOpenFirstRound(draftId);
-    revalidatePath("/draft");
-    revalidatePath("/team");
+    if (await maybeOpenFirstRound(draftId)) {
+      revalidatePath("/draft");
+      revalidatePath("/team");
+    }
   }
   return undefined;
 }
@@ -109,4 +113,12 @@ export async function resolveExpiredPickAction(draftId: string): Promise<DraftAc
 export async function getDraftUpdateAction(leagueId: string) {
   const supabase = await createClient();
   return queryDraftUpdate(supabase, leagueId);
+}
+
+/** Lobby wake-up read: no player ranking, history or ownership fetch. */
+export async function getDraftStatusAction(leagueId: string): Promise<string | null> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_draft_clock", { p_league_id: leagueId }).maybeSingle();
+  if (error) throw new Error(`Failed to read draft status: ${error.message}`);
+  return data?.status ?? null;
 }
