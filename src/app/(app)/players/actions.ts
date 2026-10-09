@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getPlayerIdentityMatches, getPlayerRecentMatches, getPlayerLatestScoreBreakdown, type RecentMatchRow, type PlayerScoreBreakdown } from "@/data-access/players";
 import { toMarketActionError } from "@/lib/errors/market-action-error";
 import { MARKET_ACTION_ERROR_COPY, MARKET_ACTION_ERROR_KIND } from "@/lib/errors/market-action-error-copy";
+import { logUnexpectedActionError } from "@/lib/errors/action-error-diagnostics";
 import { shouldSearchPlayers } from "@/lib/search/player-search";
 
 export type MarketActionState = { error: string; kind: "rule" | "error" } | undefined;
@@ -57,7 +58,9 @@ export async function dropPlayerAction(leagueId: string, playerId: string): Prom
   const { error } = await supabase.rpc("drop_player", { p_league_id: leagueId, p_player_id: playerId });
   if (error) {
     const code = toMarketActionError(error.message).code;
-    return { error: MARKET_ACTION_ERROR_COPY[code], kind: MARKET_ACTION_ERROR_KIND[code] };
+    const kind = MARKET_ACTION_ERROR_KIND[code];
+    if (kind === "error") logUnexpectedActionError({ action: "dropPlayerAction", code, ids: { leagueId, playerId } });
+    return { error: MARKET_ACTION_ERROR_COPY[code], kind };
   }
   revalidatePath("/players");
   revalidatePath("/team");
@@ -70,7 +73,9 @@ export async function signPlayerAction(leagueId: string, playerId: string): Prom
   const { error } = await supabase.rpc("sign_player", { p_league_id: leagueId, p_player_id: playerId });
   if (error) {
     const code = toMarketActionError(error.message).code;
-    return { error: MARKET_ACTION_ERROR_COPY[code], kind: MARKET_ACTION_ERROR_KIND[code] };
+    const kind = MARKET_ACTION_ERROR_KIND[code];
+    if (kind === "error") logUnexpectedActionError({ action: "signPlayerAction", code, ids: { leagueId, playerId } });
+    return { error: MARKET_ACTION_ERROR_COPY[code], kind };
   }
   revalidatePath("/players");
   revalidatePath("/team");

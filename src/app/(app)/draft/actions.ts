@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { maybeOpenFirstRound } from "@/lib/fantasy-engine/draft-completion";
 import { toDraftActionError } from "@/lib/errors/draft-action-error";
 import { DRAFT_ACTION_ERROR_COPY, DRAFT_ACTION_ERROR_KIND } from "@/lib/errors/draft-action-error-copy";
+import { logUnexpectedActionError } from "@/lib/errors/action-error-diagnostics";
 import { getPlayerDatabase, type PlayerDatabasePage } from "@/data-access/players";
 import type { PlayerPosition } from "@/lib/types/fantasy";
 
@@ -48,7 +49,9 @@ export async function submitDraftPickAction(draftId: string, playerId: string): 
   const { error } = await supabase.rpc("make_draft_pick", { p_draft_id: draftId, p_player_id: playerId });
   if (error) {
     const code = toDraftActionError(error.message).code;
-    return { error: DRAFT_ACTION_ERROR_COPY[code], kind: DRAFT_ACTION_ERROR_KIND[code] };
+    const kind = DRAFT_ACTION_ERROR_KIND[code];
+    if (kind === "error") logUnexpectedActionError({ action: "submitDraftPickAction", code, ids: { draftId, playerId } });
+    return { error: DRAFT_ACTION_ERROR_COPY[code], kind };
   }
   await maybeOpenFirstRound(draftId);
   revalidatePath("/draft");
@@ -90,7 +93,9 @@ export async function resolveExpiredPickAction(draftId: string): Promise<DraftAc
   const { error } = await supabase.rpc("resolve_expired_pick", { p_draft_id: draftId });
   if (error && error.message !== "TIMER_NOT_EXPIRED") {
     const code = toDraftActionError(error.message).code;
-    return { error: DRAFT_ACTION_ERROR_COPY[code], kind: DRAFT_ACTION_ERROR_KIND[code] };
+    const kind = DRAFT_ACTION_ERROR_KIND[code];
+    if (kind === "error") logUnexpectedActionError({ action: "resolveExpiredPickAction", code, ids: { draftId } });
+    return { error: DRAFT_ACTION_ERROR_COPY[code], kind };
   }
   if (!error) {
     await maybeOpenFirstRound(draftId);

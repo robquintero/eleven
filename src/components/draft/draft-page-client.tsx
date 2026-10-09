@@ -8,6 +8,7 @@ import type { DraftState } from "@/data-access/drafts";
 import type { PlayerDatabasePage } from "@/data-access/players";
 import type { PlayerPosition } from "@/lib/types/fantasy";
 import { currentDraftUpdate } from "@/lib/draft-snapshot";
+import { createLatestOnlyGuard } from "@/lib/search/stale-response-guard";
 
 /** Owns player search and polls changing draft/ownership state without reloading the catalog. */
 export function DraftPageClient({
@@ -40,6 +41,10 @@ export function DraftPageClient({
       : "free" as const })),
   } : basePlayers;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // A stale, slower search response (e.g. a broad "G" query that takes
+  // longer than the narrower "Gu" typed right after it) must never
+  // overwrite a newer one's results -- see stale-response-guard.ts.
+  const searchGuardRef = useRef(createLatestOnlyGuard());
 
   useEffect(() => {
     if (currentDraft.status !== "in_progress") return;
@@ -62,10 +67,14 @@ export function DraftPageClient({
 
   function runSearch(nextQuery: string, nextPosition: PlayerPosition | null) {
     if (!nextQuery && !nextPosition) {
+      searchGuardRef.current.start();
       setSearchResults(null);
       return;
     }
-    getAvailablePlayersAction(leagueId, nextQuery, nextPosition ?? undefined).then(setSearchResults);
+    const token = searchGuardRef.current.start();
+    getAvailablePlayersAction(leagueId, nextQuery, nextPosition ?? undefined).then((response) => {
+      if (searchGuardRef.current.isLatest(token)) setSearchResults(response);
+    });
   }
 
   function handleSearch(nextQuery: string) {
