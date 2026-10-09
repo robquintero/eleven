@@ -5,11 +5,10 @@ Detailed evidence: `docs/audits/draft-stabilization-2026-10-09.md`.
 
 ## 1. Current objective
 
-Phases A/B/C/D/F/E1 were already complete and have not been repeated.
-E2/E3/E4/E6 and G are now implemented and validated. Phase H validation and
-review are complete; the sole additive synchronization migration is applied and production
-invariants are unchanged. Commit/push and verify Vercel production and read-only
-smoke. Never repeat existing position overrides or live lineup repair.
+Completed the authorized continuation: E2/E3/E4/E6, isolated G simulation,
+H validation/migration/release/smoke. Previously completed A/B/C/D/F/E1 were
+preserved, not repeated. No engineering work remains in this pass. Do not
+restart investigations, rerun repairs or create a new optimization pass.
 
 ## 2. Completed phases
 
@@ -51,23 +50,26 @@ smoke. Never repeat existing position overrides or live lineup repair.
 
 ## 3. Remaining phases
 
-Only H application release steps remain: synchronization migration applied
-through normal Supabase mechanism; all preserved production rows identical.
-Commit intentional continuation, fast-forward
-push main, verify GitHub Vercel check AND Production deployment success, run
-non-destructive production smoke, and verify clean Git + all invariants again.
-Do not infer deployment success from Git push. Record the resulting state here.
+None. Application release deployed successfully and read-only production smoke
+passed. The product owner confirmed all six signed-in routes and their intended
+XI look correct. This completion record is a documentation-only follow-up;
+inspect current HEAD/origin/main and the exact Vercel Production deployment
+independently before assuming any later state. Do not mutate a completed draft
+to exercise live events: future-draft fanout is covered by isolated tests.
 
 ## 4. Current Git state
 
-Starting main HEAD `af0cda0`, remote `308f9029`, eight committed local changes.
-Continuation is intentionally uncommitted, validated and migration-verified, ready for release.
-Existing commits reviewed: `3a0ce93`, `2e93483`, `d6221d0`, `87d2b99`, `f74197d`,
-`c820023`, `dd649d4`, `af0cda0`. No unrelated files were found.
+Started main at `af0cda0`, remote `308f9029`, eight local commits reviewed:
+`3a0ce93`, `2e93483`, `d6221d0`, `87d2b99`, `f74197d`, `c820023`, `dd649d4`,
+`af0cda0`. Feature continuation commit `b08cb1ec0d6792970c55b32e8fb1c2bf1667d146` pushed normally to main along
+with all eight reviewed commits. Vercel check and Production deployment both
+succeeded for that exact SHA. Working tree was clean and HEAD matched origin
+at release verification. This documentation-only completion commit follows;
+use Git and deployment status for the latest exact SHA, not a self-reference.
 
 ## 5. Production state
 
-Supabase project `oknhqdiinaxofrzxphxf`. Before continuation release, all
+Supabase project `oknhqdiinaxofrzxphxf`. All
 migrations through `20261016000000` applied. Realtime publication now includes
 drafts, draft_picks and league_player_ownership; it previously had zero tables. Original 80 picks match snapshot exactly including timestamps.
 All five teams have 16 active players, 11 starters and 5 bench, valid 4-3-3,
@@ -75,7 +77,20 @@ no duplicate players/wrong slots. 80 ownership rows; two inactive historical
 roster rows and corresponding historical slots are preserved, not deleted.
 Four approved overrides, all roster/slot rows, raw/canonical positions, and
 final matchup/score rows unchanged in the post-migration comparison.
-Application changes have not yet been pushed/deployed at this checkpoint.
+Application feature release `b08cb1ec0d6792970c55b32e8fb1c2bf1667d146` deployed successfully:
+https://eleven-i1p77lmzl-quintero-digital-llc.vercel.app .
+Post-deployment baseline comparison confirmed all captured production rows
+remain identical: picks, ownership, active/inactive roster history, all lineup
+slots, four overrides, raw/canonical positions, final matchups and final scores.
+All five real teams still have valid 16/11/5 squads and 4-3-3 XIs.
+
+Read-only live smoke: Home/Team/Matchup/Players/League/Draft/Account reach the
+normal signed-out login boundary; login 200; 16 JS/CSS assets 200; login/404
+browser rendering at 1440/375/320 has zero exceptions, 5xx or overflow.
+Chrome connector advertised a profile but rejected both its name and id as
+unavailable. Product owner manually confirmed Home, Team, Matchup, Players,
+League and Draft work while signed in and their intended XI looks correct.
+No production picks/roster actions were performed by Codex.
 
 ## 6. Database changes
 
@@ -122,12 +137,11 @@ picks. Never run the production-writing integration suite.
 
 ## 9. Next actions
 
-Follow section 3 exactly. Recheck Git/remote, do not reapply recorded migrations
-or recovery scripts, do not simulate against production. Use deployment check
-and Production deployment status for the exact pushed SHA, then safe read-only
-smoke. Preserve all completed work and report an exact blocker if release fails.
-Replace this checkpoint's release state after verification; do not start a new
-optimization, scoring, provider or design pass.
+Stop after this release. Preserve the completed work. No additional migration,
+lineup repair, draft restart, scoring/provider work or broad audit is requested.
+For any future task, inspect fresh Git/migration/deployment state first. The
+historical PLAYER_NOT_FOUND trigger is not proven; use the retained diagnostics
+if it recurs. Do not infer a failed identity flow from a normal race rejection.
 
 ## 10. Safety constraints
 

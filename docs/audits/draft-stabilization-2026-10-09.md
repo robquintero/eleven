@@ -61,7 +61,7 @@ this migration. Exact post-apply function-body/ACL checks and all three publicat
 tables passed. Every captured production invariant dataset was byte-equivalent
 as parsed JSON before/after: 80 picks, 80 ownership rows, 82 roster/lineup rows,
 80 canonical/raw position pairs, four overrides, three final matchups and six
-final score rows. Application push/deployment remains the next release step.
+final score rows. Application release and post-deployment invariant comparison subsequently passed.
 
 ## Validation
 
@@ -78,7 +78,8 @@ final score rows. Application push/deployment remains the next release step.
 - Actual draft client browser harness: 1440/375, ±10-minute wall-clock skew,
   duplicate events, lost-event polling, stale search, stale manual outcome,
   repeated expired-timer reconciliation, duplicate clicks, canonical success,
-  reconnect/remount and one-time completion refresh. No HTTP requests allowed. Waiting-lobby draft-start events trigger one
+  reconnect/remount and one-time completion refresh. No HTTP requests
+  allowed. Waiting-lobby draft-start events trigger one
   authoritative status read/route refresh without loading player rankings.
 - Real PostgreSQL 17 applied all **44 migrations** in a temporary
   loopback-only cluster with independent manager connections. Primary five-
@@ -95,7 +96,7 @@ final score rows. Application push/deployment remains the next release step.
 
 Actual draft client with local deterministic snapshots: Realtime hint to
 visible turn **70.3 ms at 1440px**, **72.7 ms at 375px**;
-missed events recovered in **3.29–3.27s** from the test's
+missed events recovered in **3.27–3.29s** from the test's
 position in the five-second polling interval. Zero active-pick route refreshes.
 Local PostgreSQL pick p50 **0.79 ms**, p95
 **23.08 ms**, including intentionally queued row-lock
@@ -152,3 +153,23 @@ Browser scripts use `ELEVEN_PLAYWRIGHT_MODULE` and
 `ELEVEN_CHROMIUM_EXECUTABLE` for an external installed Playwright/runtime;
 `node scripts/draft-stabilization-browser.mjs` blocks all HTTP and needs no
 Supabase credentials. Both scripts clean up temporary environments.
+
+## Release verification
+
+Feature commit `b08cb1ec0d6792970c55b32e8fb1c2bf1667d146` pushed normally to main with all eight
+reviewed commits. Independent GitHub Vercel check and Production deployment
+status both succeeded. Deployment:
+https://eleven-i1p77lmzl-quintero-digital-llc.vercel.app .
+Migration history confirms all 44 local/remote entries match, including the sole
+new migration applied once. Post-deployment comparison confirmed every captured
+production invariant unchanged and all five 16/11/5 4-3-3 XIs intact.
+
+Production read-only HTTP/browser smoke passed: seven authenticated paths
+reach login, login 200, 16 assets 200, six login/404 desktop/mobile browser cases,
+zero runtime exceptions/5xx/overflow or non-read requests. Browser connector
+advertised Chrome but rejected both browser identifiers as unavailable; the
+product owner confirmed all six authenticated core routes and their intended
+XI look correct. No live production draft/roster mutations were performed.
+
+This documentation-only completion record follows the verified feature release;
+latest HEAD/remote/deployment are checked independently before the final report.
