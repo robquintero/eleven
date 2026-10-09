@@ -2,81 +2,107 @@
 
 Agent-neutral. Either Claude Code or Codex should be able to resume from this file plus the repository state alone — do not assume anything from a chat transcript.
 
-Last updated: 2026-10-09T16:10Z by Claude Code, immediately after Phase B completed and verified in production.
+Last updated: 2026-10-09T17:05Z by Claude Code, handing off to Codex per the product owner's request. Claude Code has stopped writing files and executing commands as of this update — safe to begin in Codex now.
 
 ## 1. Current objective
 
-Executing the "ELEVEN — AUTONOMOUS STABILIZATION & PRODUCTION RECOVERY" brief, Phases A–H, in order. Phases B and C are **done and verified in production**. Starting Phase D (PLAYER_NOT_FOUND diagnostics) next.
+Executing the "ELEVEN — AUTONOMOUS STABILIZATION & PRODUCTION RECOVERY" brief, Phases A–H, in order. **Phases A, B, C, D, and F are done.** Phase E is partially done (E1 only). **Resume at Phase E2** (Realtime synchronization) — see section 3.
 
 ## 2. Completed phases
 
-- **Pass 1** (investigation): root-caused the draft-lag/search, Starting-XI-never-initialized, and PLAYER_NOT_FOUND symptoms in "5 Men of Class". Findings were delivered in-chat only (no file); summarized in section 8 below.
-- **Pass 2**: preserved the authoritative draft snapshot (`docs/audits/5-men-of-class-draft-snapshot-2026-10-09.json`, SHA-256 `0fdbd65851c15c48c72753130c9ea5bbcba801910881df9b2b9332737b71e2b9` — verify this before trusting the file), cross-checked all 80 players' positions against real match-appearance data, produced `docs/audits/5-men-of-class-position-accuracy-audit.md`.
-- **Pass 3**: implemented the full canonical-position system (`player_position_overrides` table, `players.canonical_position` trigger-maintained column, every gameplay RPC and data-access site wired to it) and the 4-3-3 `update_team_lineup` migration. Verified with real PGlite tests against the actual migration files. Report: `docs/audits/5-men-of-class-pass3-position-overrides-and-formation-impact.md`.
-- **Autonomous pass, Phase A**: baseline confirmed (git clean, build/tsc/lint/tests all green), committed Pass 2/3 work as commit `3a0ce93`.
-- **Autonomous pass, Phase B — DONE, VERIFIED IN PRODUCTION** (commit `2e93483` + production migrations/data):
-  - Added a transitional migration (`20261015000200_formation_dual_shape_transition.sql`) so `update_team_lineup` accepts EITHER the old 4-4-2 or new 4-3-3 shape, specifically to make the migration-then-deploy ordering safe in either direction (no incompatible client/server window). Added a matching test proving both shapes are accepted and a truly-invalid shape is still rejected.
-  - Activated `FORMATION_RULES` to 4-3-3 in `src/domain/fantasy/constants.ts` and fixed every place that assumed 4-4-2 (Team-page loading skeleton, landing-page preview copy, pitch-layout coordinate presets, and ~6 test files) — full suite re-verified green (756 passing) before touching production.
-  - **Applied to production** (`npx supabase db push`, confirmed via `supabase migration list`): `20261014000000_position_classification_overrides.sql`, `20261015000000_canonical_position_resolution.sql`, `20261015000100_formation_4_3_3_and_canonical_position_lineup.sql`, `20261015000200_formation_dual_shape_transition.sql`. Verified read-only afterward: all 2767 players got `canonical_position` backfilled correctly (sample-checked, matches `position` for everyone not yet overridden).
-  - **Ran the guarded one-off override script** (`npx supabase db query --linked --file scripts/one-off/position-overrides-2026-10-09.sql`) — succeeded, drift guard passed. Verified via read-only query: all 4 overrides are live (`A. Amaimouni MID→FWD`, `M. Guéhi MID→DEF`, `M. Rogers FWD→MID`, `Pedro Porro MID→DEF`); `players.position` unchanged for all 4 (still raw provider values).
-  - **Verified all 5 "5 Men of Class" teams are 4-3-3 feasible in real production data** (not just the snapshot): 2 Goals 1 Cup GK2/DEF6/MID5/FWD3, 75Hard GK2/DEF6/MID5/FWD3, Expected Toulouse FC GK2/DEF5/MID6/FWD3, Phantom FC GK2/DEF4/MID6/FWD4, Pressure FC GK2/DEF5/MID5/FWD4 — every team has ≥1 GK, ≥4 DEF, ≥3 MID, ≥3 FWD.
-  - **Not yet done**: the app code change (constants.ts 4-3-3 + all the canonical_position TS wiring) has NOT been deployed to Vercel yet — only the DB side is live. This is safe right now because of the dual-shape transition, but it means the production UI is still presenting/enforcing 4-4-2 until the deploy happens (Phase H). Do not narrow the dual-shape migration to 4-3-3-only until that deploy is confirmed live.
-- **Autonomous pass, Phase C — DONE, VERIFIED IN PRODUCTION** (commit `d6221d0` + a live data repair, no new migration needed):
-  - Root cause confirmed: the post-draft lineup self-heal (`repairIncompleteRoundOne`, rounds.ts) only ever acted on a team with literally ZERO `lineup_slots` rows; any team with even one existing slot (all 5 "5 Men of Class" teams had exactly 1, from a manager clicking a starter mid-draft) was skipped forever, leaving the other 15 roster entries slot-free.
-  - Fix: `provisionMissingLineupSlots` (lineup.ts) + pure decision function `planPartialLineupProvisioning` (auto-lineup.ts) — fills ONLY the missing roster entries for a team, computing remaining formation need from whatever's already a starter, never touching an existing slot. Wired into `repairIncompleteRoundOne` for every team with any gap (zero or partial). Genuine conflicts (insufficient depth, inconsistent existing selection) are recorded as a `LINEUP_PROVISIONING_FAILED` domain event, not silently swallowed. 14 new tests (7 pure-function, 7 against the real self-heal flow with the actual "1 existing starter, 15 missing" shape).
-  - **Repaired the live league**: ran `provisionMissingLineupSlots` (the real, tested function, not a one-off reimplementation) against "5 Men of Class"'s current round (`ab75c6e1-7bc7-4f95-8ee7-42001b3be79d`) for all 5 teams. All 5 returned `{status: "provisioned", createdCount: 15}`.
-  - **Verified in production**: every team now has exactly 16 roster / 11 starters / 5 bench, a valid 4-3-3 composition (GK1/DEF4/MID3/FWD3), zero duplicate roster assignments, and — critically — the pre-existing manual starter slot for each team was confirmed byte-for-byte unchanged (same roster_entry_id, still `starter: true`). `draft_picks` still 80/80, `league_player_ownership` still 80 rows, both unchanged.
-  - No further live-league action needed for Phase C. The architectural fix is also now live for every OTHER league in production (any future draft completion benefits from the same fix).
+- **Pass 1** (investigation, chat-only, not in a file): root-caused the draft-lag/search, Starting-XI-never-initialized, and PLAYER_NOT_FOUND symptoms in "5 Men of Class". Summarized in section 8.
+- **Pass 2**: preserved the authoritative draft snapshot (`docs/audits/5-men-of-class-draft-snapshot-2026-10-09.json`, SHA-256 `0fdbd65851c15c48c72753130c9ea5bbcba801910881df9b2b9332737b71e2b9` — verify before trusting), cross-checked all 80 players' positions against real match-appearance data, produced `docs/audits/5-men-of-class-position-accuracy-audit.md`.
+- **Pass 3**: implemented the full canonical-position system and the 4-3-3 `update_team_lineup` migration, verified with PGlite tests. Report: `docs/audits/5-men-of-class-pass3-position-overrides-and-formation-impact.md`.
+- **Phase A** (baseline): confirmed clean before starting; committed Pass 2/3 work as `3a0ce93`.
+- **Phase B — DONE, VERIFIED IN PRODUCTION** (commits `2e93483`, `3a0ce93` + production migrations/data):
+  - 4-3-3 activated in `constants.ts`; every 4-4-2 assumption fixed (loading skeleton, landing page, pitch-layout presets, ~6 test files).
+  - Transitional migration `20261015000200_formation_dual_shape_transition.sql` makes `update_team_lineup` accept EITHER 4-4-2 or 4-3-3, specifically so the DB-migration-vs-Vercel-deploy ordering can never produce an incompatible client/server pair.
+  - **Applied to production**: all 4 new migrations (`20261014000000`, `20261015000000`, `20261015000100`, `20261015000200`), confirmed via `supabase migration list`.
+  - **Ran the guarded override script** against production (`scripts/one-off/position-overrides-2026-10-09.sql`) — all 4 overrides live, verified by read-only query (`canonical_position` correct, raw `position` untouched for all 4 players).
+  - **Verified all 5 "5 Men of Class" teams are 4-3-3-feasible in real production data.**
+  - **STILL NOT DONE**: the Vercel app deploy (constants.ts 4-3-3 + canonical_position TS wiring) has **not shipped**. `origin/main` is still behind local `main` as of this update — nothing has been pushed yet. This is safe right now (dual-shape migration covers the gap) but means production is still running pre-this-session app code. Do this at Phase H, not before everything else is validated.
+- **Phase C — DONE, VERIFIED IN PRODUCTION** (commit `d6221d0` + a live data repair via script, no new migration):
+  - Root cause: `repairIncompleteRoundOne` only ever acted on a team with ZERO `lineup_slots` rows; a team with even one existing slot (all 5 "5 Men of Class" teams, from a manager clicking a starter mid-draft) was skipped forever.
+  - Fix: `provisionMissingLineupSlots` (`src/lib/fantasy-engine/lineup.ts`) + pure decision function `planPartialLineupProvisioning` (`src/domain/fantasy/auto-lineup.ts`) — fills only missing roster entries, preserves every existing slot, reports genuine conflicts as a `LINEUP_PROVISIONING_FAILED` domain event instead of swallowing them. 14 new tests.
+  - **Repaired the live league**: ran the real, tested function against all 5 teams — all returned `{status: "provisioned", createdCount: 15}`. **Verified in production**: every team now has 16 roster / 11 starters / 5 bench, valid 4-3-3, zero duplicates, pre-existing manual slots byte-for-byte unchanged, `draft_picks` still 80/80, ownership still 80 rows.
+- **Phase D — DONE** (commit `f74197d`):
+  - Traced the full player-identity flow (search result → draft/sign/drop action → RPC). Found **no identifier-type/serialization bug** — `player.id` flows untransformed everywhere checked. The exact historical PLAYER_NOT_FOUND trigger remains **unreproduced from available evidence** — this is reported honestly, not guessed at.
+  - Added `logUnexpectedActionError` (`src/lib/errors/action-error-diagnostics.ts`), wired into `submitDraftPickAction`, `resolveExpiredPickAction`, `signPlayerAction`, `dropPlayerAction` — any RPC failure classified as a genuine error (never an expected rule outcome) is now logged server-side with the action name, error code, and opaque ids. If PLAYER_NOT_FOUND recurs, it will now be observable in Vercel logs.
+  - Fixed a real, confirmed stale-response race in the Draft page's player search (`src/lib/search/stale-response-guard.ts`, wired into `draft-page-client.tsx`): an older, slower search response could resolve after a newer one and silently overwrite it with stale data. The Players page's own search goes through router navigation and did not have this bug.
+- **Phase E — PARTIALLY DONE (E1 only)** (commit `dd649d4`):
+  - **E1 (search performance) — done**: `queryPlayerDatabase`'s `sort:"points"` path (the draft board's hardcoded sort) was aggregating fantasy scores across the ENTIRE active catalog on every keystroke, ignoring whatever search/position/competition filter had already narrowed the candidates. Now resolves the filtered candidate ids first, then scopes the score aggregation to exactly those ids. An unfiltered "browse everyone by points" view is unaffected (correctly still scores everyone). This was the confirmed, measured root cause of "typing a player name triggers expensive scoring work."
+  - **E2 (Realtime), E3 (countdown accuracy reconciliation), E4 (pick/autopick race UI handling), E6 (reconnection)** — **NOT STARTED.** E5 (search request races) was already fixed as part of Phase D (the stale-response guard above covers it).
+  - No before/after latency measurements have been taken yet for the E1 fix or anything else — see section 9 for what Codex should measure.
+- **Phase F — DONE** (commit `c820023`):
+  - Confirmed empirically (direct production query): only the 5 domestic Big Five competition codes ever have any players; all 23 other codes (including UCL/UEL, which have zero players too) always returned zero results when selected — `players.competition_id` is never set for international rows.
+  - `getCompetitionFilters()` (`src/data-access/players.ts`) now only returns competitions with ≥1 matching player (determined dynamically, not a hardcoded list), and the dropdown renders the competition's real `name` instead of its raw `code`. No competition/historical data was deleted or hidden elsewhere — only this one filter's offered options changed.
+  - The deeper Phase F question ("model club-competition vs. international-eligibility vs. bookkeeping as different concepts") was answered in the comment/reasoning but not built as new infrastructure — out of scope for the minimal, evidence-backed fix actually needed. No new UI for browsing international players was added (not asked for).
 
-## 3. Remaining phases (at time of writing)
+## 3. Remaining phases — resume here
 
-B (activate positions/4-3-3) → C (permanent lineup-init fix + live league repair) → D (PLAYER_NOT_FOUND diagnostics) → E (draft performance) → F (competition filters) → G (5-manager simulation) → H (validation + deploy) — all still to do as of this update. This section will be rewritten, not appended to, at each subsequent update — treat only the LATEST version of this file as current.
+**Phase E, continued (E2, E3, E4, E6 — not started):**
+- **E2 Realtime**: no `postgres_changes`/Realtime subscription exists anywhere in the app (confirmed by repo-wide grep in Pass 1 — re-verify this is still true before building). The draft page currently polls every 5s (`src/components/draft/draft-page-client.tsx`'s `poll()` function) and calls `router.refresh()` after every pick. The brief wants Realtime as an ENHANCEMENT (faster turn/pick/timer/autopick updates) with polling kept as the fallback — the server/DB stays authoritative either way. Suggested scope: subscribe to `postgres_changes` on `draft_picks` (INSERT) and `drafts` (UPDATE) for the current draft id, and on receiving an event, just trigger the SAME poll function early (don't rebuild the reconciliation logic — `currentDraftUpdate`/`draft-snapshot.ts` already exists and is tested) rather than inventing a second state-merge path. Needs a migration to add `draft_picks`/`drafts` to the `supabase_realtime` publication if not already present — check `select * from pg_publication_tables where pubname = 'supabase_realtime'` read-only first.
+- **E3 countdown accuracy**: `draft-workspace.tsx`'s countdown is client-clock-based against a server-stored deadline (`current_pick_started_at` + `pickTimerSeconds`) — this part is already correct per Pass 1. What's missing: explicit clock-skew compensation (compare the server's `now()` from a response against the client's `Date.now()` at receipt and store an offset) and *not* treating an expired-looking client timer as proof the server has autopicked (the brief's own warning) — check whether `resolveExpiredPickAction` is already safe here (it re-checks the server deadline itself, so it likely already is) before adding anything.
+- **E4 pick/autopick races**: Pass 1 found the DB layer already handles this correctly (row-locked, no double-ownership possible) but a losing manual click surfaces as a raw `NOT_YOUR_TURN` error with no automatic retry/explanation. Brief says "never blindly retry the same selection against the next pick" — so the fix is better UX/messaging on that specific error, not a retry loop.
+- **E6 reconnection**: no work done. Need to verify a full page reload mid-draft correctly reconstructs state from the server (it likely mostly does already, since the page is server-rendered + polls) — this is more of a verification task than a build task; document what's already correct vs. what needs fixing.
+- Take real before/after latency measurements for whatever gets changed (brief explicitly warns against unmeasured performance claims) — there is no load-testing harness in this repo; a simple timed script against a local dev server, or `console.time` instrumentation removed before commit, would satisfy this.
+
+**Phase G (five-manager integration simulation) — NOT STARTED.** Brief requires an ISOLATED test environment, never the production league. This repo already has a simulation harness (`src/lib/fantasy-engine/simulate.ts`, CLI via `npm run fantasy:simulate`) and a PGlite pattern (see `src/lib/position-override-db.test.ts`, `src/lib/player-acquisition-db.test.ts` for the exact harness — spins up embedded real Postgres, runs every real migration, no live Supabase needed). The most reliable approach is extending that PGlite pattern to drive a full 80-pick draft with concurrent/latency-simulated picks rather than inventing a new environment. Required coverage per the brief: normal selections, autopicks, last-second selections, concurrent submissions, search during others' picks, repeated refreshes, disconnection/reconnection, position constraints, duplicate-ownership prevention, draft completion, automatic Starting XI initialization (now fixed in Phase C — this is the regression test that should have caught the original bug), partial lineup provisioning + repeated provisioning attempts.
+
+**Phase H (validation and release) — NOT STARTED.**
+- Run full `npm test`, `npx tsc --noEmit`, `npm run lint`, `npm run build` after Phase E/G work lands (all currently green as of this update — re-run, don't assume still green after further changes).
+- **Deploy**: `git push origin main` (nothing has been pushed yet this entire session — verify with `git log origin/main..HEAD` before pushing, there should be ~8 local commits ahead as of this update). This is the actual Vercel-triggering action; no Vercel CLI session exists in this environment to independently verify the deploy afterward — curl `https://www.elevenfantasy.com/` and check for a build-id/asset hash change, or ask the product owner to confirm via the Vercel dashboard.
+- Once the app deploy is confirmed live, consider (separately, forward-only migration) narrowing `update_team_lineup` back to 4-3-3-only, closing the Phase B dual-shape compatibility window — not urgent, the dual-shape acceptance is harmless to leave in place indefinitely if in doubt.
+- Re-verify every "Production invariants" bullet in the original brief's section 10 before declaring done.
 
 ## 4. Current Git state
 
-- Branch: `main`. HEAD at pass start: `308f9029bd792dbf2f22dc6e67db0ff9066766ed` (= `origin/main`, confirmed via fetch).
-- Uncommitted working-tree changes at pass start (all from Pass 2/3, untested-by-commit but test-suite-verified): see `git status --short` — 8 modified data-access/lineup files, 1 modified generated-types file, 1 modified test fixture, plus new files: 3 new migrations, 2 new domain modules + tests, 2 new DB-backed test files, 1 one-off SQL script, `docs/audits/` (3 files).
-- Nothing has been committed yet in this session as of this update.
+- Branch: `main`. Local HEAD as of this update: `dd649d4` ("Scope draft-board score aggregation to the actual search results").
+- `origin/main` is still at the PRE-SESSION commit (`308f9029`) — **nothing has been pushed yet**. Run `git log origin/main..HEAD --oneline` to see the full list (should be 8 commits: `3a0ce93`, `2e93483`, `d6221d0`, `87d2b99`, `f74197d`, `c820023`, `dd649d4`, plus this handoff-doc-only commit if one follows).
+- Working tree is clean (confirmed via `git status --short` immediately before this handoff was written).
 
 ## 5. Production state
 
-- Supabase project ref: `oknhqdiinaxofrzxphxf`. **All migrations through `20261015000200` are applied** (confirmed via `supabase migration list` — every row shows matching local/remote timestamps). Use `npx supabase migration list` to re-verify; do not trust this file blindly if much time has passed.
-- The 4 approved position overrides are live in the `player_position_overrides` table (verified via read-only query, see Phase B section above).
-- Vercel: no linked CLI session in this environment (not logged in), and **the app code deploy for Phase B (constants.ts 4-3-3 + canonical_position TS wiring) has not shipped yet** — `origin/main` is still at the pre-this-session commit as of this update (nothing has been pushed). Production is almost certainly still serving the OLD app code. Production deployment commit SHA is otherwise **not independently verifiable** from here (no Vercel CLI session) — do not assume it matches `origin/main`. Last known fact (Pass 1 history, unconfirmed since): production had been temporarily rolled back to commit `2a4c5a7` after a live-draft incident, with intent to restore later.
+- Supabase project ref: `oknhqdiinaxofrzxphxf`. All migrations through `20261015000200_formation_dual_shape_transition.sql` are applied (re-verify with `npx supabase migration list`).
+- All 4 position overrides are live in `player_position_overrides`.
+- "5 Men of Class" league: all 5 teams have correct 16/11/5 rosters with valid 4-3-3 lineups (verified, see Phase C above).
+- Vercel: **app code has NOT been deployed** — production is still running whatever commit was live before this session (last known fact, unconfirmed since: a prior rollback to `2a4c5a7` after a live-draft incident). No Vercel CLI session available in this environment; the next agent likely won't have one either unless the product owner provides one.
 
 ## 6. Database changes
 
-**Applied** (through `20261015000200_formation_dual_shape_transition.sql`, confirmed in production):
-- `20261014000000_position_classification_overrides.sql`
-- `20261015000000_canonical_position_resolution.sql`
-- `20261015000100_formation_4_3_3_and_canonical_position_lineup.sql`
-- `20261015000200_formation_dual_shape_transition.sql` (the dual-shape compatibility shim — update_team_lineup currently accepts EITHER 4-4-2 or 4-3-3; narrow this to 4-3-3-only in a follow-up migration only after the app deploy below is confirmed live)
-**Applied data** (one-off, not a migration): `scripts/one-off/position-overrides-2026-10-09.sql` — ran successfully, all 4 overrides live.
-**Not yet deployed** (app code, local commits only as of this update): the `constants.ts` FORMATION_RULES 4-3-3 change and all canonical_position TS data-access wiring, committed locally (`2e93483` and `3a0ce93`) but not pushed to `origin/main` / not deployed to Vercel.
+Applied (all confirmed in production): `20261014000000_position_classification_overrides.sql`, `20261015000000_canonical_position_resolution.sql`, `20261015000100_formation_4_3_3_and_canonical_position_lineup.sql`, `20261015000200_formation_dual_shape_transition.sql`. Applied data: `scripts/one-off/position-overrides-2026-10-09.sql` (already run — do NOT re-run expecting a different effect; it's idempotent/guarded but there's nothing further for it to do). No further migrations needed unless Phase E2 requires enabling Realtime on `draft_picks`/`drafts` (check first, don't assume).
 
-## 7. Test results (as of last full run, Pass 3)
+## 7. Test results (as of this update, full run)
 
-`npm test`: 755 passing, 0 failing, 104 skipped (integration tests requiring live Supabase credentials). `npx tsc --noEmit`: clean. `eslint` on touched files: clean. No production build (`npm run build`) has been run yet this pass.
+`npm test`: 769 passing, 0 failing, 104 skipped (integration tests requiring live Supabase credentials — do NOT run `npm run test:integration`, it writes to the real production project via `.env.local`). `npx tsc --noEmit`: clean. `npm run lint`: clean except one pre-existing, unrelated warning (`player-avatar.tsx`'s `<img>` usage). `npm run build`: last run clean during Phase A; re-run before deploying.
 
-## 8. Known issues (carried from Pass 1, not yet fixed as of this update)
+## 8. Known issues
 
-- **Starting XI never initialized for "5 Men of Class"**: the league's `fantasy_rounds` row was created ~11 hours *before* the draft started, so `createRoundLineupSlots` ran against 0-player rosters for every team and silently no-opped. No automatic re-trigger exists once a round has "opened" — only a partial Team-page-visit self-heal (`repairIncompleteRoundOne`), which only handles teams with *zero* existing slots, not partially-initialized ones. DB evidence: only 7 of 80 expected `lineup_slots` rows exist league-wide.
-- **PLAYER_NOT_FOUND**: traced to the `players.id` lookup inside `sign_player`/`_perform_draft_pick`, never to `update_team_lineup`. The specific trigger (which player ID, which action) was not reproduced from available evidence.
-- **Draft lag/search**: root-caused to a hardcoded `sort:"points"` full-catalog query re-run on every keystroke/filter/pick (no server-side bounding), zero Realtime (5s polling + `router.refresh()` only), and no stale-response guard on search.
-- **Competition filter**: Players-page dropdown renders raw `competitions.code` instead of `name`; international competition codes are selectable but can never match a player (`players.competition_id` is never set for international rows), so they're misleading zero-result options.
-- **West Ham / promotion-relegation**: confirmed currently correctly classified (Premier League, season 2026) — not a live bug, but the schema has no mechanism to ever re-derive a club's division, which is a latent gap.
+**Fixed this pass**: Starting XI initialization (Phase C), the 4-3-3/position-override activation (Phase B), the draft-board full-catalog score aggregation (Phase E1), the competition-filter dead-end options (Phase F), the search stale-response race (Phase D/E5).
 
-## 9. Next actions for whichever agent resumes
+**Confirmed but NOT fixed / not applicable to fix**:
+- PLAYER_NOT_FOUND's exact historical trigger (Phase D) — diagnostics added, root cause not reproducible from available evidence.
+- No Realtime anywhere (Phase E2) — polling (5s) + `router.refresh()` is the only sync mechanism today.
+- Client-clock countdown has no explicit skew compensation (Phase E3), though the server-side deadline check is already authoritative.
+- A losing manual pick in a pick/autopick race surfaces as a raw `NOT_YOUR_TURN` error, not a friendly reconciliation message (Phase E4).
+- No promotion/relegation mechanism exists for club-competition membership (Pass 1 finding, West Ham specifically confirmed NOT currently affected, but the structural gap is real and out of scope for this pass).
+- Historical matchup display (`src/data-access/matchups.ts`) deliberately NOT wired to `canonical_position` (Pass 3 decision) — it already derives formation from a live `players.position` join, a pre-existing characteristic, not a new risk, but also not improved.
 
-1. Re-verify this file's "Production state" and "Database changes" sections against the *actual* live Supabase project and Vercel before doing anything — they may be stale by the time you read this.
-2. If Phase B hasn't been marked complete below, start there: apply the 3 migrations in order, confirm via the verification query in the one-off script's header, THEN decide deploy-vs-migration ordering before touching `constants.ts` or running the override script (read that script's own header comment for why order matters).
-3. Continue sequentially through the phases listed in section 3 above (always trust the LATEST version of this file, not this one, if a newer one exists).
+## 9. Next actions for Codex (be specific, don't re-investigate what's already answered above)
+
+1. Read this entire file first. Then re-verify section 4 and 5 (git/production state) against the real repo and Supabase project — they are accurate as of 2026-10-09T17:05Z but may have drifted.
+2. Do NOT re-run Phase B/C production mutations (migrations, the override script, the live-league repair) — they are done and verified. Re-running the override script is harmless (idempotent) but pointless; re-running any form of the OLD lineup-repair logic is unnecessary since Phase C's fix is already live and already fixed the league.
+3. Start at Phase E2 (Realtime) per the scoping notes in section 3, or re-order to Phase G (simulation) first if that feels lower-risk to build before touching Realtime — both are legitimate next steps and the brief doesn't strictly require E-before-G, only that both happen before Phase H.
+4. Take real before/after measurements for anything performance-related; do not claim improvement without a number.
+5. Phase H's deploy step (`git push origin main`) is the first action in this entire pass that will actually change what production serves to real users. Do it only after Phase E/G work is merged, tested, and typechecked — and re-read this file's section 10 safety constraints first.
+6. Update this document again before stopping, following the same structure, replacing (not appending to) sections 1–3 and 7–9 with the new current state.
 
 ## 10. Safety constraints (do not violate, regardless of which agent is executing)
 
-- Never reset, delete, or restart the "5 Men of Class" draft/league/teams.
+- Never reset, delete, or restart the "5 Men of Class" draft/league/teams, or any other league.
 - Never reassign player ownership or drop/sign a player on a manager's behalf.
 - Never rewrite a settled matchup result or change V4 scoring weights.
-- Never run the one-off override script if its own drift guard would fail silently (it raises an exception on drift — if it ever doesn't, stop and investigate rather than trusting it).
-- Never apply `20261015000100_formation_4_3_3_and_canonical_position_lineup.sql` to production without the `constants.ts` `FORMATION_RULES` change deployed in the same window — see that migration's header for why.
+- Never run `npm run test:integration` or any script that writes to the real production Supabase project except a narrowly-scoped, pre-verified repair identical in spirit to Phases B/C above (read current state first, compute expected effect, verify after).
+- Never apply a migration that narrows `update_team_lineup` back to 4-3-3-only until the Vercel app deploy carrying the matching `constants.ts` change is confirmed live.
 - Never push to `main` / trigger a deploy with failing tests, a dirty typecheck, or an unreviewed diff.
+- Never build Phase G's simulation against the real "5 Men of Class" league or any other real league — isolated environment only (PGlite or equivalent).
