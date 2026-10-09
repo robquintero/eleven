@@ -265,7 +265,7 @@ export function PlayersWorkspace({
               .filter((c) => visibleFilters.competitionId === "ALL" || c.competitionId === visibleFilters.competitionId)
               .map((c) => ({ value: c.id, label: clubDisplayLabel(c) })),
           ]}
-          competitionOptions={[{ value: "ALL", label: "ALL" }, ...competitions.map((c) => ({ value: c.id, label: c.code }))]}
+          competitionOptions={[{ value: "ALL", label: "ALL" }, ...competitions.map((c) => ({ value: c.id, label: c.name }))]}
           showOwnershipFilter={hasActiveLeague}
         />
       </div>

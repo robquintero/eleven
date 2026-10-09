@@ -539,12 +539,35 @@ export interface CompetitionFilterOption {
   name: string;
 }
 
-/** Real ingested competitions only — `[]` until at least one `sync competitions` has run. */
+/**
+ * Autonomous stabilization pass, Phase F: only competitions that can
+ * actually match a player here. `players.competition_id` is set for
+ * domestic club rosters only (Big Five today) -- international
+ * ingestion (`player_national_teams`) never touches it, and even UCL/UEL
+ * rows currently have zero players -- so every international/
+ * qualification code (AFCON_Q, FIFA_WCQ_AFR, INTL, ...) was previously
+ * selectable here but could never return a single result. Those codes
+ * represent a different concept entirely (international/fixture
+ * eligibility, or in INTL's case an internal bookkeeping category), not
+ * a player's CLUB competition -- which is specifically what this filter
+ * queries (`queryPlayerDatabase`'s `competition_id` filter, players.ts).
+ * Forcing them into the same dropdown produced a misleading always-empty
+ * choice; excluding them here hides no real, matchable player and
+ * deletes no competition/historical data -- `competitions` rows for
+ * those codes are untouched, just not offered in THIS specific filter.
+ * Determined dynamically (which competitions currently have >=1 player)
+ * rather than a hardcoded code list, so this self-corrects if
+ * international player-level data is ever added later.
+ */
 export async function getCompetitionFilters(): Promise<CompetitionFilterOption[]> {
   if (!isSupabaseConfigured()) return [];
   const supabase = await resolveClient();
-  const { data } = await supabase.from("competitions").select("id, code, name").order("name", { ascending: true });
-  return data ?? [];
+  const [{ data: competitions }, { data: playerCompetitionRows }] = await Promise.all([
+    supabase.from("competitions").select("id, code, name").order("name", { ascending: true }),
+    supabase.from("players").select("competition_id"),
+  ]);
+  const competitionIdsWithPlayers = new Set((playerCompetitionRows ?? []).map((p) => p.competition_id));
+  return (competitions ?? []).filter((c) => competitionIdsWithPlayers.has(c.id));
 }
 
 export interface ClubFilterOption {
