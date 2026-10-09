@@ -6,12 +6,12 @@
  * across it. Attacking direction is "up" the pitch, matching `Pitch`'s
  * own `top: 100 - y` convention.
  *
- * Pass 10.5C.5: Eleven V1 is 4-4-2 only (see
- * `src/domain/fantasy/constants.ts`'s `FORMATION_RULES`) — the realistic
- * per-position coordinates below are this one shape's geometry, not a
- * selectable preset among several. Presentation only — this never changes
- * starter-composition validation/legality (`isStarterCompositionValid`),
- * only where a slot is drawn.
+ * Eleven supports exactly one formation at a time (see
+ * `src/domain/fantasy/constants.ts`'s `FORMATION_RULES`, currently
+ * 4-3-3) — the realistic per-position coordinates below are that one
+ * shape's geometry, not a selectable preset among several. Presentation
+ * only — this never changes starter-composition validation/legality
+ * (`isStarterCompositionValid`), only where a slot is drawn.
  */
 
 import type { PlayerPosition } from "@/domain/football/types";
@@ -31,18 +31,21 @@ export interface LayoutResult<T> {
 }
 
 /**
- * Realistic 4-4-2 coordinates for DEF/MID/FWD (Pass 10.5C.1) —
- * evenly-spaced rows read as a flat "grid," not a real football shape
- * (most visibly: a strike partnership spread almost to the touchlines
- * instead of standing close together centrally). GK is always exactly 1
- * and stays centered via the generic fallback below, so it has no entry
- * here. Each array is one fixed, stable left-to-right ordering that
- * callers' own (already position-grouped, stably-ordered) items are
- * zipped against 1:1 — used only when the group's size exactly matches
- * the preset's length; a non-standard composition (shouldn't arise now
- * that starter composition is fixed to exactly 4-4-2, but kept as a safe
- * fallback for an in-progress/incomplete XI) falls back to the original
- * even 10-90 spread instead.
+ * Realistic per-formation coordinates for DEF/MID/FWD (Pass 10.5C.1;
+ * updated for 4-3-3 in the autonomous stabilization pass) —
+ * evenly-spaced rows read as a flat "grid," not a real football shape.
+ * GK is always exactly 1 and stays centered via the generic fallback
+ * below, so it has no entry here. DEF is unchanged (4-3-3 keeps 4
+ * defenders); MID/FWD are now 3-player presets (a midfield trio, and a
+ * front three with the two wide forwards sitting slightly deeper than
+ * the central one) instead of 4-4-2's 4/2. Each array is one fixed,
+ * stable left-to-right ordering that callers' own (already
+ * position-grouped, stably-ordered) items are zipped against 1:1 —
+ * used only when the group's size exactly matches the preset's length;
+ * a non-standard composition (shouldn't arise now that starter
+ * composition is fixed to exactly 4-3-3, but kept as a safe fallback for
+ * an in-progress/incomplete XI) falls back to the original even 10-90
+ * spread instead.
  */
 const FORMATION_COORDINATES: Partial<Record<PlayerPosition, { x: number; y: number }[]>> = {
   DEF: [
@@ -51,16 +54,18 @@ const FORMATION_COORDINATES: Partial<Record<PlayerPosition, { x: number; y: numb
     { x: 63, y: 22 },
     { x: 88, y: 26 },
   ],
+  // A midfield trio, not an evenly-spread flat four.
   MID: [
-    { x: 12, y: 54 },
-    { x: 37, y: 50 },
-    { x: 63, y: 50 },
-    { x: 88, y: 54 },
+    { x: 20, y: 56 },
+    { x: 50, y: 50 },
+    { x: 80, y: 56 },
   ],
-  // A central strike partnership, close together, not spread wide.
+  // A front three -- two wide forwards sitting slightly deeper than a
+  // central striker, not a strike partnership spread wide.
   FWD: [
-    { x: 40, y: 86 },
-    { x: 60, y: 86 },
+    { x: 18, y: 82 },
+    { x: 50, y: 88 },
+    { x: 82, y: 82 },
   ],
 };
 

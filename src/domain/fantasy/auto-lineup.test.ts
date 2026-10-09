@@ -14,32 +14,33 @@ function roster(counts: Record<string, number>): RosterPlayer[] {
   return players;
 }
 
-// Pass 10.5C.5: Eleven V1 is 4-4-2 only -- FORMATION_RULES' positionRange
-// is now a fixed point (GK 1, DEF 4, MID 4, FWD 2), which already sums to
-// 11, so chooseAutomaticStartingXi's minimums-first fill always produces
+// Autonomous stabilization pass, Phase B: Eleven is 4-3-3 only (was
+// 4-4-2 through Pass 10.5C.5) -- FORMATION_RULES' positionRange is a
+// fixed point (GK 1, DEF 4, MID 3, FWD 3), which already sums to 11, so
+// chooseAutomaticStartingXi's minimums-first fill always produces
 // exactly that shape for any legally-drafted (ROSTER_RULES-conforming)
 // 16-player roster -- its "fill the rest" round-robin pass never has
 // anything left to do.
 
-test("a well-stocked roster (2 GK, 5 DEF, 5 MID, 3 FWD) produces exactly the fixed 4-4-2 shape", () => {
+test("a well-stocked roster (2 GK, 5 DEF, 5 MID, 3 FWD) produces exactly the fixed 4-3-3 shape", () => {
   const result = chooseAutomaticStartingXi(roster({ GK: 2, DEF: 5, MID: 5, FWD: 3 }));
   assert.equal(result.starters.length, 11);
   const counts: Record<string, number> = {};
   for (const s of result.starters) counts[s.position] = (counts[s.position] ?? 0) + 1;
-  assert.deepEqual(counts, { GK: 1, DEF: 4, MID: 4, FWD: 2 }, "the auto-XI must always be exactly 4-4-2, not merely a legal range");
+  assert.deepEqual(counts, { GK: 1, DEF: 4, MID: 3, FWD: 3 }, "the auto-XI must always be exactly 4-3-3, not merely a legal range");
   assert.equal(result.bench.length, 15 - 11);
 });
 
-test("a legally-drafted 16-player roster (2 GK, 6 DEF, 4 MID, 4 FWD) -- an unusual but valid ROSTER_RULES shape -- still produces exactly 4-4-2", () => {
+test("a legally-drafted 16-player roster (2 GK, 6 DEF, 4 MID, 4 FWD) -- an unusual but valid ROSTER_RULES shape -- still produces exactly 4-3-3", () => {
   const result = chooseAutomaticStartingXi(roster({ GK: 2, DEF: 6, MID: 4, FWD: 4 }));
   const counts: Record<string, number> = {};
   for (const s of result.starters) counts[s.position] = (counts[s.position] ?? 0) + 1;
-  assert.deepEqual(counts, { GK: 1, DEF: 4, MID: 4, FWD: 2 });
+  assert.deepEqual(counts, { GK: 1, DEF: 4, MID: 3, FWD: 3 });
 });
 
 test("a roster below the new fixed minimums (1 GK, 3 DEF, 3 MID, 1 FWD) starts everyone it can, short of 11", () => {
   const result = chooseAutomaticStartingXi(roster({ GK: 1, DEF: 3, MID: 3, FWD: 1 }));
-  assert.equal(result.starters.length, 8, "can only field 8 -- not enough depth for 4-4-2's fixed minimums, a roster-construction problem ROSTER_RULES prevents upstream in practice");
+  assert.equal(result.starters.length, 8, "can only field 8 -- not enough depth for 4-3-3's fixed minimums, a roster-construction problem ROSTER_RULES prevents upstream in practice");
   assert.equal(result.bench.length, 0);
 });
 

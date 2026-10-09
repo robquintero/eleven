@@ -184,9 +184,13 @@ test("update_team_lineup's 4-3-3 shape check and slot label both use canonical_p
   assert.equal(amaimouniSlot?.slot, "FWD", "Amaimouni's written slot label reflects his override (FWD), not his raw provider position (MID)");
 
   // The exact same 11 players, without the override, is GK1/DEF4/MID4/FWD2
-  // -- the OLD 4-4-2 shape -- which the NEW 4-3-3 check must reject.
-  // Prove it by removing the override and replaying the identical
-  // selection against a fresh round.
+  // -- the OLD 4-4-2 shape. The transitional dual-shape RPC
+  // (20261015000200_formation_dual_shape_transition.sql, superseding
+  // 20261015000100's 4-3-3-only check for the duration of the rollout)
+  // must still ACCEPT this -- an old, not-yet-redeployed client must
+  // keep working while the DB migration and the app deploy aren't
+  // atomic. Prove it by removing the override and replaying the
+  // identical selection against a fresh round.
   await asService();
   await db.query("delete from player_position_overrides where player_id=$1", [AMAIMOUNI]);
   await db.exec(`insert into fantasy_rounds(id,league_id,season_id,number,starts_at,ends_at) values('${id(301)}','${league}','${season}',2,'2090-01-12','2090-01-19')`);
@@ -195,9 +199,36 @@ test("update_team_lineup's 4-3-3 shape check and slot label both use canonical_p
   }
   const sameElevenRound2 = starterIds.map((pid) => ({ roster_entry_id: reIdOf(pid), starter: true, position: null }));
   await asUser();
+  await db.query("select update_team_lineup($1,$2,$3::jsonb)", [team, id(301), JSON.stringify(sameElevenRound2)]);
+  const { rows: round2Starters } = await db.query<{ count: string }>(
+    "select count(*)::text as count from lineup_slots where fantasy_round_id=$1 and starter=true",
+    [id(301)]
+  );
+  assert.equal(round2Starters[0].count, "11", "the old 4-4-2 shape must still be accepted during the transition window, without the override");
+});
+
+test("a genuinely invalid shape (neither old 4-4-2 nor new 4-3-3) is rejected by the transitional dual-shape check", async () => {
+  await asService();
+  await db.exec(`insert into fantasy_rounds(id,league_id,season_id,number,starts_at,ends_at) values('${id(400)}','${league}','${season}',1,'2090-01-05','2090-01-12')`);
+  // 1 GK, 4 DEF, 2 MID, 5 FWD -- a real count that is neither accepted shape.
+  const invalidRosterSpec: [string, string][] = [
+    [id(950), "GK"],
+    [id(951), "DEF"], [id(952), "DEF"], [id(953), "DEF"], [id(954), "DEF"],
+    [id(955), "MID"], [id(956), "MID"],
+    [id(957), "FWD"], [id(958), "FWD"], [id(959), "FWD"], [id(960), "FWD"], [id(961), "FWD"],
+  ];
+  for (const [pid, pos] of invalidRosterSpec) {
+    await db.query(`insert into players(id,club_id,competition_id,name,short_name,position) values($1,$2,$3,$4,$4,$5) on conflict (id) do nothing`, [pid, club, competition, pid.slice(-4), pos]);
+    const reId = `00000000-0000-4000-9000-${pid.slice(-12)}`;
+    await db.query("insert into roster_entries(id,league_id,fantasy_team_id,player_id,acquisition_type) values($1,$2,$3,$4,'draft')", [reId, league, team, pid]);
+    await db.query("insert into league_player_ownership(league_id,player_id,fantasy_team_id,roster_entry_id) values($1,$2,$3,$4)", [league, pid, team, reId]);
+    await db.query("insert into lineup_slots(id,roster_entry_id,fantasy_round_id,starter,slot) values($1,$2,$3,true,$4)", [`00000000-0000-4000-a000-${pid.slice(-12)}`, reId, id(400), pos]);
+  }
+  const noChange = invalidRosterSpec.map(([pid]) => ({ roster_entry_id: `00000000-0000-4000-9000-${pid.slice(-12)}`, starter: true, position: null }));
+  await asUser();
   await assert.rejects(
-    db.query("select update_team_lineup($1,$2,$3::jsonb)", [team, id(301), JSON.stringify(sameElevenRound2)]),
+    db.query("select update_team_lineup($1,$2,$3::jsonb)", [team, id(400), JSON.stringify(noChange)]),
     /INVALID_FORMATION/,
-    "the exact same 11 players, without the override, is the old 4-4-2 shape (MID4/FWD2) -- the 4-3-3 check must reject it, proving the earlier pass's success depended on canonical_position, not raw position"
+    "MID2/FWD5 is neither the old nor the new formation and must still be rejected"
   );
 });

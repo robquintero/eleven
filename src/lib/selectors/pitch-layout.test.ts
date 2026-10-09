@@ -7,10 +7,10 @@ test("a lone player in a row is centered at x=50", () => {
   assert.equal(result[0].x, 50);
 });
 
-test("a full back four uses the realistic 4-4-2 preset, spanning most of the pitch width", () => {
-  // Pass 10.5C.5: there is only one preset now (4-4-2), so an exact
-  // 4-player DEF group always gets it -- not a generic even spread
-  // (that fallback is for a non-standard DEF count only, see below).
+test("a full back four uses the realistic 4-3-3 preset, spanning most of the pitch width", () => {
+  // There is only one preset now (4-3-3), so an exact 4-player DEF
+  // group always gets it -- not a generic even spread (that fallback is
+  // for a non-standard DEF count only, see below).
   const result = layoutStartingXi([
     { position: "DEF", value: "a" },
     { position: "DEF", value: "b" },
@@ -53,25 +53,28 @@ test("an empty starting XI produces an empty layout", () => {
 });
 
 // ---------------------------------------------------------------------
-// Pass 10.5C.1 / 10.5C.5: realistic 4-4-2 geometry -- Eleven V1 supports
-// exactly one formation (src/domain/fantasy/constants.ts's
-// FORMATION_RULES), so layoutStartingXi/formationSlots no longer take a
-// formation argument at all; there is only ever one preset.
+// Pass 10.5C.1 (updated for 4-3-3 in the autonomous stabilization pass):
+// realistic formation geometry -- Eleven supports exactly one formation
+// at a time (src/domain/fantasy/constants.ts's FORMATION_RULES), so
+// layoutStartingXi/formationSlots no longer take a formation argument at
+// all; there is only ever one preset.
 // ---------------------------------------------------------------------
 
-test("the two strikers form a central strike partnership, not spread to the touchlines", () => {
+test("the front three has two wide forwards sitting deeper than a central striker, not an even spread", () => {
   const result = layoutStartingXi([
     { position: "FWD" as const, value: "a" },
     { position: "FWD" as const, value: "b" },
+    { position: "FWD" as const, value: "c" },
   ]);
-  const xs = result.map((r) => r.x).sort((a, b) => a - b);
-  assert.ok(xs[0] > 30 && xs[0] < 50, `left striker should sit centrally, got x=${xs[0]}`);
-  assert.ok(xs[1] > 50 && xs[1] < 70, `right striker should sit centrally, got x=${xs[1]}`);
-  assert.ok(xs[1] - xs[0] < 30, `strikers should be close together, gap was ${xs[1] - xs[0]}`);
+  const byX = [...result].sort((a, b) => a.x - b.x);
+  assert.ok(byX[0].x < 30, `left forward should sit wide, got x=${byX[0].x}`);
+  assert.ok(byX[1].x > 40 && byX[1].x < 60, `central forward should sit centrally, got x=${byX[1].x}`);
+  assert.ok(byX[2].x > 70, `right forward should sit wide, got x=${byX[2].x}`);
+  assert.ok(byX[1].y > byX[0].y && byX[1].y > byX[2].y, "the central forward should sit more advanced (higher y) than the two wide forwards");
 });
 
-test("the 4-4-2 preset produces exactly as many coordinates as its own DEF/MID/FWD counts, each distinct", () => {
-  const shape = { DEF: 4, MID: 4, FWD: 2 };
+test("the 4-3-3 preset produces exactly as many coordinates as its own DEF/MID/FWD counts, each distinct", () => {
+  const shape = { DEF: 4, MID: 3, FWD: 3 };
   for (const position of ["DEF", "MID", "FWD"] as const) {
     const items = Array.from({ length: shape[position] }, (_, i) => ({ position, value: i }));
     const result = layoutStartingXi(items);
@@ -81,7 +84,7 @@ test("the 4-4-2 preset produces exactly as many coordinates as its own DEF/MID/F
   }
 });
 
-test("a non-standard composition that doesn't match the 4-4-2 preset's exact count falls back to the generic even spread", () => {
+test("a non-standard composition that doesn't match the 4-3-3 preset's exact count falls back to the generic even spread", () => {
   // 5 forwards matches no preset count at all.
   const result = layoutStartingXi(Array.from({ length: 5 }, (_, i) => ({ position: "FWD" as const, value: i })));
   const xs = result.map((r) => r.x).sort((a, b) => a - b);
@@ -96,12 +99,12 @@ test("a non-standard composition that doesn't match the 4-4-2 preset's exact cou
 // items already placed just because more get added later.
 // ---------------------------------------------------------------------
 
-test("formationSlots produces exactly 11 slots with unique, stable ids matching 1 GK / 4 DEF / 4 MID / 2 FWD", () => {
+test("formationSlots produces exactly 11 slots with unique, stable ids matching 1 GK / 4 DEF / 3 MID / 3 FWD", () => {
   const slots = formationSlots();
   assert.equal(slots.length, 11);
   const ids = new Set(slots.map((s) => s.id));
   assert.equal(ids.size, 11, "slot ids must all be unique");
-  const shape = { GK: 1, DEF: 4, MID: 4, FWD: 2 };
+  const shape = { GK: 1, DEF: 4, MID: 3, FWD: 3 };
   for (const position of ["GK", "DEF", "MID", "FWD"] as const) {
     assert.equal(slots.filter((s) => s.position === position).length, shape[position], `${position} slot count`);
   }

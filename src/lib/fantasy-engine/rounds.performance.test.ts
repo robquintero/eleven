@@ -41,7 +41,7 @@ test("healthy ten-team Round 1 needs four reads and no writes", async () => {
   assert.equal(calls.length, 4);
   assert.ok(calls.every((q) => q.operation === "select"));
 });
-test("incomplete Round 1 initializes only the missing teams with unchanged automatic 4-4-2", async () => {
+test("incomplete Round 1 initializes only the missing teams with unchanged automatic 4-3-3", async () => {
   const { client, calls } = fixture({ missing: ["team2", "team7"] });
   await ensureFirstRoundOpened(client, "league");
   const writes = calls.filter((q) => q.operation === "upsert");
@@ -51,7 +51,7 @@ test("incomplete Round 1 initializes only the missing teams with unchanged autom
     assert.equal(rows.length, 16);
     assert.ok(rows.every((r) => r.roster_entry_id.startsWith(team)));
     assert.equal(rows.filter((r) => r.starter).length, 11);
-    assert.deepEqual(["GK", "DEF", "MID", "FWD"].map((p) => rows.filter((r) => r.starter && r.slot === p).length), [1, 4, 4, 2]);
+    assert.deepEqual(["GK", "DEF", "MID", "FWD"].map((p) => rows.filter((r) => r.starter && r.slot === p).length), [1, 4, 3, 3]);
   }
 });
 test("missing lineup initialization recovers; even one existing slot protects manager edits", async () => {

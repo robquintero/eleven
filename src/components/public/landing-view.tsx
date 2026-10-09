@@ -5,7 +5,7 @@ import { PublicShell } from "./public-shell";
 
 const steps = [
   ["Draft your squad", "Take turns picking players in a live snake draft. Each player belongs to one manager in your league."],
-  ["Set your XI", "Choose your 4–4–2 and use your bench. Each player locks when their first match of the week kicks off."],
+  ["Set your XI", "Choose your 4–3–3 and use your bench. Each player locks when their first match of the week kicks off."],
   ["Win your matchweek", "Face another manager head-to-head. Real football performances decide your fantasy score."],
   ["Work the market", "Find free agents and trade with other managers. Build a squad that lasts beyond one good weekend."],
 ];
@@ -25,8 +25,8 @@ export function LandingView() {
       </div>
       <div className="landing-preview" aria-label="Illustrative lineup preview">
         <div className="preview-heading"><span>Starting XI</span><span className="v2-meta">Illustrative preview</span></div>
-        <div className="preview-formation" aria-label="4–4–2 formation">
-          {([['FWD','FWD'], ['MID','MID','MID','MID'], ['DEF','DEF','DEF','DEF'], ['GK']] as const).map((line, i) => <div className="preview-line" key={i}>{line.map((position,j) => <div className="preview-player" key={j}><span className="preview-shirt" aria-hidden="true">{[9,7,6,1][i] + j}</span><PositionBadge position={position} /></div>)}</div>)}
+        <div className="preview-formation" aria-label="4–3–3 formation">
+          {([['FWD','FWD','FWD'], ['MID','MID','MID'], ['DEF','DEF','DEF','DEF'], ['GK']] as const).map((line, i) => <div className="preview-line" key={i}>{line.map((position,j) => <div className="preview-player" key={j}><span className="preview-shirt" aria-hidden="true">{[9,7,6,1][i] + j}</span><PositionBadge position={position} /></div>)}</div>)}
         </div>
         <div className="preview-caption"><strong>Eleven starters. One team.</strong><p>Build your squad in the draft. Choose who plays each week.</p></div>
       </div>

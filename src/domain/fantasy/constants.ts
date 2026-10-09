@@ -2,15 +2,23 @@ import type { PlayerPosition } from "@/domain/football/types";
 import type { LeagueSettings } from "@/domain/fantasy/types";
 
 /**
- * Starting-XI composition rules. Pass 10.5C.5: Eleven V1 supports exactly
- * ONE formation, 4-4-2 — `positionRange` is now a single fixed point
- * (min === max for every position) rather than a range spanning multiple
- * named formations, so `isStarterCompositionValid` below rejects anything
- * that isn't exactly 1 GK / 4 DEF / 4 MID / 2 FWD. This is also why
- * `chooseAutomaticStartingXi` (auto-lineup.ts) always produces exactly
- * 4-4-2 with no changes of its own: its minimums-first fill (GK 1, DEF 4,
- * MID 4, FWD 2) already sums to 11, so its later "fill the rest" pass
- * never has anything left to do.
+ * Starting-XI composition rules. Eleven supports exactly ONE formation at
+ * a time -- `positionRange` is a single fixed point (min === max for
+ * every position) rather than a range spanning multiple named
+ * formations, so `isStarterCompositionValid` below rejects anything that
+ * isn't exactly this shape. This is also why `chooseAutomaticStartingXi`
+ * (auto-lineup.ts) always produces exactly this shape with no changes of
+ * its own: its minimums-first fill already sums to 11, so its later
+ * "fill the rest" pass never has anything left to do.
+ *
+ * Autonomous stabilization pass, Phase B: 4-3-3 (was 4-4-2, Pass 10.5C.5
+ * through here). Deploying this alongside
+ * `supabase/migrations/20261015000200_formation_dual_shape_transition.sql`
+ * (which accepts EITHER shape server-side for the rollout window) means
+ * this can go out before, during, or after that migration applies
+ * without ever producing an incompatible client/server pair -- see that
+ * migration's own header for why the dual-shape acceptance exists and
+ * when it should be retired.
  */
 export const FORMATION_RULES: {
   startersTotal: number;
@@ -22,8 +30,8 @@ export const FORMATION_RULES: {
   positionRange: {
     GK: { min: 1, max: 1 },
     DEF: { min: 4, max: 4 },
-    MID: { min: 4, max: 4 },
-    FWD: { min: 2, max: 2 },
+    MID: { min: 3, max: 3 },
+    FWD: { min: 3, max: 3 },
   },
 };
 
