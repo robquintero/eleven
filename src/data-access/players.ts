@@ -57,6 +57,7 @@ interface PlayerRow {
   id: string;
   name: string;
   position: string;
+  canonical_position: string;
   shirt_number: number | null;
   nationality: string | null;
   availability_status: string | null;
@@ -256,7 +257,7 @@ export async function queryPlayerDatabase(
           ? next.or(`name_unaccented.ilike.%${normalizedTerm}%,club_id.in.(${matchingClubIds.join(",")})`)
           : next.ilike("name_unaccented", `%${normalizedTerm}%`);
     }
-    if (query.position) next = next.eq("position", query.position);
+    if (query.position) next = next.eq("canonical_position", query.position);
     if (query.competitionId) next = next.eq("competition_id", query.competitionId);
     if (query.clubId) next = next.eq("club_id", query.clubId);
     if (query.availability) next = next.eq("availability_status", query.availability);
@@ -325,7 +326,7 @@ export async function queryPlayerDatabase(
     const { data: pageRows, error: pageError } = await supabase
       .from("players")
       .select(
-        "id, name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))"
+        "id, name, position, canonical_position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))"
       )
       .in("id", pageIds);
     if (pageError) console.error(`queryPlayerDatabase: page fetch failed for sort="${query.sort}":`, pageError);
@@ -338,7 +339,7 @@ export async function queryPlayerDatabase(
       supabase
         .from("players")
         .select(
-          "id, name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))",
+          "id, name, position, canonical_position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))",
           { count: "exact" }
         )
         .eq("active", true)
@@ -390,7 +391,7 @@ export async function queryPlayerDatabase(
         league: bigFiveLeagueFromCompetitionCode(competitionCode),
         crestColor: "#6e6e73",
       },
-      position: row.position as Player["position"],
+      position: row.canonical_position as Player["position"],
       number: row.shirt_number ?? undefined,
       nationality: row.nationality,
       fantasyPoints: 0,
@@ -730,10 +731,10 @@ export async function queryPlayerIdentityMatches(supabase: SupabaseClientType, q
   const { data: clubs } = await supabase.from("clubs").select("id")
     .or(`name_unaccented.ilike.%${term}%,short_name_unaccented.ilike.%${term}%`);
   const clubIds = (clubs ?? []).map((c) => c.id);
-  let builder = supabase.from("players").select("id, name, position, clubs!players_club_id_fkey(short_name)")
+  let builder = supabase.from("players").select("id, name, position, canonical_position, clubs!players_club_id_fkey(short_name)")
     .eq("active", true);
   builder = clubIds.length ? builder.or(`name_unaccented.ilike.%${term}%,club_id.in.(${clubIds.join(",")})`)
     : builder.ilike("name_unaccented", `%${term}%`);
   const { data } = await builder.order("name", { ascending: true }).order("id", { ascending: true }).limit(6);
-  return (data ?? []).map((p) => ({ id: p.id, name: p.name, position: p.position, clubShortName: p.clubs?.short_name ?? "—" }));
+  return (data ?? []).map((p) => ({ id: p.id, name: p.name, position: p.canonical_position, clubShortName: p.clubs?.short_name ?? "—" }));
 }

@@ -24,7 +24,7 @@ interface TradeAssetRow {
   trade_id: string;
   from_team_id: string;
   player_id: string;
-  players: { id: string; name: string; position: string } | null;
+  players: { id: string; name: string; canonical_position: string } | null;
 }
 
 /**
@@ -59,7 +59,7 @@ export async function getTeamTrades(
   const [{ data: assets }, { data: teams }] = await Promise.all([
     supabase
       .from("trade_assets")
-      .select("trade_id, from_team_id, player_id, players(id, name, position)")
+      .select("trade_id, from_team_id, player_id, players(id, name, canonical_position)")
       .in("trade_id", tradeIds),
     supabase.from("fantasy_teams").select("id, name").in("id", teamIds),
   ]);
@@ -85,7 +85,7 @@ export async function getTeamTrades(
       const view: TradeAssetView = {
         playerId: asset.players.id,
         playerName: asset.players.name,
-        position: asset.players.position as PlayerPosition,
+        position: asset.players.canonical_position as PlayerPosition,
       };
       if (asset.from_team_id === trade.proposing_team_id) offeredPlayers.push(view);
       else requestedPlayers.push(view);

@@ -933,6 +933,7 @@ export type Database = {
         Row: {
           active: boolean
           availability_status: string | null
+          canonical_position: string
           club_id: string
           competition_id: string
           created_at: string
@@ -948,6 +949,7 @@ export type Database = {
         Insert: {
           active?: boolean
           availability_status?: string | null
+          canonical_position?: string
           club_id: string
           competition_id: string
           created_at?: string
@@ -963,6 +965,7 @@ export type Database = {
         Update: {
           active?: boolean
           availability_status?: string | null
+          canonical_position?: string
           club_id?: string
           competition_id?: string
           created_at?: string

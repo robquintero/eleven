@@ -33,6 +33,7 @@ interface RosterRow {
     name: string;
     short_name: string;
     position: string;
+    canonical_position: string;
     shirt_number: number | null;
     nationality: string | null;
     availability_status: string | null;
@@ -69,7 +70,7 @@ function toPlayer(
       league: bigFiveLeagueFromCompetitionCode(competitionCode),
       crestColor: "#6e6e73",
     },
-    position: player.position as PlayerPosition,
+    position: player.canonical_position as PlayerPosition,
     number: player.shirt_number ?? undefined,
     nationality: player.nationality,
     // Pass 14.5: real, round-scoped points (same aggregation
@@ -126,7 +127,7 @@ export async function querySquad(
     supabase
     .from("roster_entries")
     .select(
-      "id, player_id, acquired_at, players(id, name, short_name, position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code)))"
+      "id, player_id, acquired_at, players(id, name, short_name, position, canonical_position, shirt_number, nationality, availability_status, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code)))"
     )
     .eq("league_id", leagueId)
     .eq("fantasy_team_id", fantasyTeamId)
@@ -273,7 +274,7 @@ export async function getTeamRosterPlayers(
 
   const { data, error } = await supabase
     .from("roster_entries")
-    .select("players(id, name, position)")
+    .select("players(id, name, canonical_position)")
     .eq("league_id", leagueId)
     .eq("fantasy_team_id", fantasyTeamId)
     .eq("status", "active");
@@ -282,8 +283,8 @@ export async function getTeamRosterPlayers(
 
   return data
     .map((row) => row.players)
-    .filter((p): p is { id: string; name: string; position: string } => Boolean(p))
-    .map((p) => ({ id: p.id, name: p.name, position: p.position as PlayerPosition }));
+    .filter((p): p is { id: string; name: string; canonical_position: string } => Boolean(p))
+    .map((p) => ({ id: p.id, name: p.name, position: p.canonical_position as PlayerPosition }));
 }
 
 /** Batched, RLS-scoped composition choices, fetched only when a trade opens. */
@@ -297,13 +298,13 @@ export async function queryLeagueRosterPlayersByTeam(supabase: SupabaseClient<Da
   const result: Record<string, RosterPlayerOption[]> = {};
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase.from("roster_entries")
-      .select("fantasy_team_id, players(id, name, position)")
+      .select("fantasy_team_id, players(id, name, canonical_position)")
       .eq("league_id", leagueId).eq("status", "active")
       .order("id", { ascending: true }).range(from, from + 999);
     if (error) throw new Error("Couldn't load trade rosters.");
     for (const row of data ?? []) {
       if (!row.players) continue;
-      (result[row.fantasy_team_id] ??= []).push({ ...row.players, position: row.players.position as PlayerPosition });
+      (result[row.fantasy_team_id] ??= []).push({ ...row.players, position: row.players.canonical_position as PlayerPosition });
     }
     if (!data || data.length < 1000) break;
   }

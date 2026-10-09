@@ -7,7 +7,7 @@ const startsAt = "2090-01-03T00:00:00Z";
 const endsAt = "2090-01-10T00:00:00Z";
 const positions = ["GK", ...Array(4).fill("DEF"), ...Array(4).fill("MID"), "FWD", "FWD", "GK", "DEF", "MID", "FWD", "FWD"];
 function roster(team: string) {
-  return positions.map((position, i) => ({ id: `${team}-${i}`, player_id: `${team}-p${i}`, players: { position, club_id: "club" } }));
+  return positions.map((position, i) => ({ id: `${team}-${i}`, player_id: `${team}-p${i}`, players: { position, canonical_position: position, club_id: "club" } }));
 }
 function fixture(options: { teams?: number; missing?: string[]; partial?: string[]; round?: number; completed?: boolean; failedCheck?: boolean; many?: boolean } = {}) {
   const teams = Array.from({ length: options.teams ?? 10 }, (_, i) => `team${i}`);

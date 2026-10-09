@@ -32,7 +32,7 @@ export async function createRoundLineupSlots(
 ): Promise<void> {
   const { data: rosterEntries } = await admin
     .from("roster_entries")
-    .select("id, player_id, players(club_id, position)")
+    .select("id, player_id, players(club_id, canonical_position)")
     .eq("fantasy_team_id", fantasyTeamId)
     .eq("status", "active");
 
@@ -56,7 +56,7 @@ export async function createRoundLineupSlots(
     const rosterForAutoLineup = rosterEntries
       .map((entry) => ({
         rosterEntryId: entry.id,
-        position: (entry.players as { position: string } | null)?.position as PlayerPosition | undefined,
+        position: (entry.players as { canonical_position: string } | null)?.canonical_position as PlayerPosition | undefined,
       }))
       .filter((entry): entry is { rosterEntryId: string; position: PlayerPosition } => Boolean(entry.position));
     const { starters } = chooseAutomaticStartingXi(rosterForAutoLineup);
@@ -76,10 +76,10 @@ export async function createRoundLineupSlots(
   );
 
   const rows = rosterEntries.map((entry) => {
-    const player = entry.players as { club_id: string; position: string } | null;
+    const player = entry.players as { club_id: string; canonical_position: string } | null;
     const previous = previousSlotByRosterEntry.get(entry.id);
     const starter = previousRoundId ? (previous?.starter ?? false) : (autoInitialStarterIds?.has(entry.id) ?? false);
-    const slot = starter ? (player?.position ?? "BENCH") : "BENCH";
+    const slot = starter ? (player?.canonical_position ?? "BENCH") : "BENCH";
     const kickoffs = kickoffsByPlayerId.get(entry.player_id) ?? [];
     const lockedAt = computeLockInstant(kickoffs);
 

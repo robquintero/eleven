@@ -40,6 +40,7 @@ interface CandidatePlayerRow {
   id: string;
   name: string;
   position: string;
+  canonical_position: string;
   shirt_number: number | null;
   nationality: string | null;
   availability_status: string | null;
@@ -71,7 +72,7 @@ function toPlayer(
       league: bigFiveLeagueFromCompetitionCode(club?.competitions?.code ?? null),
       crestColor: "#6e6e73",
     },
-    position: row.position as PlayerPosition,
+    position: row.canonical_position as PlayerPosition,
     number: row.shirt_number ?? undefined,
     nationality: row.nationality,
     // No owning team/round context here (these are free agents) -- the
@@ -181,7 +182,7 @@ export async function queryHotFreeAgents(
   const { data: playerRows } = await supabase
     .from("players")
     .select(
-      "id, name, position, shirt_number, nationality, availability_status, active, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))"
+      "id, name, position, canonical_position, shirt_number, nationality, availability_status, active, club_id, clubs!players_club_id_fkey(id, name, short_name, competition_id, competitions(code))"
     )
     .in("id", allIds)
     .eq("active", true);

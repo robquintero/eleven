@@ -160,7 +160,7 @@ export async function queryDraftState(supabase: Awaited<ReturnType<typeof create
     .order("position", { ascending: true }),
     supabase
     .from("draft_picks")
-    .select("pick_number, round, fantasy_team_id, picked_at, fantasy_teams(name), players(id, name, position, clubs!players_club_id_fkey(short_name))")
+    .select("pick_number, round, fantasy_team_id, picked_at, fantasy_teams(name), players(id, name, canonical_position, clubs!players_club_id_fkey(short_name))")
     .eq("draft_id", draftRow.id)
     .order("pick_number", { ascending: true }),
     (async () => {
@@ -194,7 +194,7 @@ export async function queryDraftState(supabase: Awaited<ReturnType<typeof create
 
   const picks: DraftPickRecord[] = (pickRows ?? []).map((row) => {
     const team = row.fantasy_teams as unknown as { name: string } | null;
-    const player = row.players as unknown as { id: string; name: string; position: string; clubs: { short_name: string } | null } | null;
+    const player = row.players as unknown as { id: string; name: string; canonical_position: string; clubs: { short_name: string } | null } | null;
     return {
       pickNumber: row.pick_number,
       round: row.round,
@@ -202,7 +202,7 @@ export async function queryDraftState(supabase: Awaited<ReturnType<typeof create
       teamName: team?.name ?? "—",
       playerId: player?.id ?? "",
       playerName: player?.name ?? "—",
-      position: (player?.position as PlayerPosition) ?? "MID",
+      position: (player?.canonical_position as PlayerPosition) ?? "MID",
       clubShortName: player?.clubs?.short_name ?? "—",
       pickedAt: row.picked_at,
     };
